@@ -16,89 +16,83 @@ import java.util.Set;
  */
 
 public class StopwordTermProcessor implements TermProcessor {
-	private static final long serialVersionUID = 1L;
-	private String fileName;
-	/** Blacklisted words **/
-	private static final String DEFAULT_BLACKLIST_FILENAME = "blacklist.txt";
+    private static final long serialVersionUID = 1L;
+    private String fileName;
+    /** Blacklisted words **/
+    private static final String DEFAULT_BLACKLIST_FILENAME = "blacklist.txt";
 
-	private transient Set<String> blacklist = new HashSet<String>();
+    private transient Set<String> blacklist = new HashSet<String>();
 
-	private static StopwordTermProcessor INSTANCE = null;
-	
-	static {
-		try {
-			INSTANCE = new StopwordTermProcessor(DEFAULT_BLACKLIST_FILENAME);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		} catch (ClassNotFoundException e) {
-			throw new RuntimeException(e);
-		}
+    private static StopwordTermProcessor INSTANCE = null;
+
+    static {
+	try {
+	    INSTANCE = new StopwordTermProcessor(DEFAULT_BLACKLIST_FILENAME);
+	} catch (IOException e) {
+	    throw new RuntimeException(e);
+	} catch (ClassNotFoundException e) {
+	    throw new RuntimeException(e);
 	}
-		
+    }
 
-	public StopwordTermProcessor(final String fileName) throws IOException,
-			ClassNotFoundException {
-		this.fileName = fileName;
-		// Load blacklist
-		try {
-			// Loading from JAR
-			BufferedReader reader = new BufferedReader(new InputStreamReader(
-					StopwordTermProcessor.class.getClassLoader()
-							.getResourceAsStream(fileName)));
-			String nextLine = "";
-			while ((nextLine = reader.readLine()) != null) {
-				blacklist.add(nextLine.trim());
-			}
-			reader.close();
-		} catch (Exception e) {
-			// Loading from file system
-			BufferedReader reader;
-			
-				reader = new BufferedReader(new FileReader(fileName));
-				String nextLine = "";
-				while ((nextLine = reader.readLine()) != null) {
-					blacklist.add(nextLine.trim());
-				}
-				reader.close();
-			
+    public StopwordTermProcessor(final String fileName) throws IOException, ClassNotFoundException {
+	this.fileName = fileName;
+	// Load blacklist
+	try {
+	    // Loading from JAR
+	    BufferedReader reader = new BufferedReader(new InputStreamReader(StopwordTermProcessor.class.getClassLoader().getResourceAsStream(fileName)));
+	    String nextLine = "";
+	    while ((nextLine = reader.readLine()) != null) {
+		blacklist.add(nextLine.trim());
+	    }
+	    reader.close();
+	} catch (Exception e) {
+	    // Loading from file system
+	    BufferedReader reader;
 
-		}
-	}
-	
-  
-	public final static TermProcessor getInstance() {
-		return INSTANCE;
-	}
+	    reader = new BufferedReader(new FileReader(fileName));
+	    String nextLine = "";
+	    while ((nextLine = reader.readLine()) != null) {
+		blacklist.add(nextLine.trim());
+	    }
+	    reader.close();
 
-	public boolean processTerm(final MutableString term) {
-		if (term == null)
-			return false;
-		if (blacklist.contains(term.toLowerCase()))
-			return false;
-		return true;
 	}
+    }
 
-	public boolean processPrefix(final MutableString prefix) {
-		return processTerm(prefix);
-	}
+    public final static TermProcessor getInstance() {
+	return INSTANCE;
+    }
 
-	private Object readResolve() {
-		return this;
-	}
+    public boolean processTerm(final MutableString term) {
+	if (term == null)
+	    return false;
+	if (blacklist.contains(term.toLowerCase()))
+	    return false;
+	return true;
+    }
 
-	public String toString() {
-		if (fileName == null) {
-			return this.getClass().getName();
-		} else {
-			return this.getClass().getName() + "(" + fileName + ")";
-		}
-	}
+    public boolean processPrefix(final MutableString prefix) {
+	return processTerm(prefix);
+    }
 
-	public String toSpec() {
-		return toString();
-	}
+    private Object readResolve() {
+	return this;
+    }
 
-	public StopwordTermProcessor copy() {
-		return this;
+    public String toString() {
+	if (fileName == null) {
+	    return this.getClass().getName();
+	} else {
+	    return this.getClass().getName() + "(" + fileName + ")";
 	}
+    }
+
+    public String toSpec() {
+	return toString();
+    }
+
+    public StopwordTermProcessor copy() {
+	return this;
+    }
 }

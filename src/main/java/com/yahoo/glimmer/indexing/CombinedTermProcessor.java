@@ -11,45 +11,47 @@ import it.unimi.dsi.mg4j.index.snowball.PorterStemmer;
  */
 
 public class CombinedTermProcessor implements TermProcessor {
-	private static final long serialVersionUID = 1L;
-	
-	private static CombinedTermProcessor INSTANCE = new CombinedTermProcessor();
+    private static final long serialVersionUID = 1L;
 
-	public final static TermProcessor[] TERM_PROCESSORS = {NonWordTermProcessor.getInstance(), DowncaseTermProcessor.getInstance(), StopwordTermProcessor.getInstance(), new PorterStemmer()};	
+    private static CombinedTermProcessor INSTANCE = new CombinedTermProcessor();
 
-	private CombinedTermProcessor() {
-	}
-	
-	public final static TermProcessor getInstance() {
-		return INSTANCE;
-	}
+    public final static TermProcessor[] TERM_PROCESSORS = { NonWordTermProcessor.getInstance(), DowncaseTermProcessor.getInstance(),
+	    StopwordTermProcessor.getInstance(), new PorterStemmer() };
 
-	public boolean processTerm(final MutableString term) {
-		boolean process = true;
-		for (TermProcessor tp : TERM_PROCESSORS) {
-			process = tp.processTerm(term);
-			if (!process) break;
-		}
-		return process;
-	}
+    private CombinedTermProcessor() {
+    }
 
-	public boolean processPrefix(final MutableString prefix) {
-		return processTerm(prefix);
-	}
+    public final static TermProcessor getInstance() {
+	return INSTANCE;
+    }
 
-	private Object readResolve() {
-		return this;
+    public boolean processTerm(final MutableString term) {
+	boolean process = true;
+	for (TermProcessor tp : TERM_PROCESSORS) {
+	    process = tp.processTerm(term);
+	    if (!process)
+		break;
 	}
+	return process;
+    }
 
-	public String toString() {
-		return this.getClass().getName();
-	}
+    public boolean processPrefix(final MutableString prefix) {
+	return processTerm(prefix);
+    }
 
-	public String toSpec() {
-		return toString();
-	}
+    private Object readResolve() {
+	return this;
+    }
 
-	public CombinedTermProcessor copy() {
-		return this;
-	}
+    public String toString() {
+	return this.getClass().getName();
+    }
+
+    public String toSpec() {
+	return toString();
+    }
+
+    public CombinedTermProcessor copy() {
+	return this;
+    }
 }
