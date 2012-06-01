@@ -27,6 +27,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
+import org.semanticweb.yars.nx.namespace.RDF;
 import org.semanticweb.yars.nx.parser.ParseException;
 
 public class HorizontalDocumentFactory extends RDFDocumentFactory {
@@ -212,15 +213,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 
 		for (Statement stmt : handler.getStatements()) {
 
-		    if (stmt.getObject() instanceof Resource) {
-			// Object-property, ignore
-			if (mapContext != null)
-			    mapContext.getCounter(TripleIndexGenerator.Counters.OBJECTPROPERTY_TRIPLES).increment(1);
-			continue;
-		    }
-
 		    String predicate = stmt.getPredicate().toString();
-		    String object = ((Literal) stmt.getObject()).getLabel();
 
 		    String fieldName = encodeFieldName(predicate);
 
@@ -230,28 +223,43 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 			    mapContext.getCounter(TripleIndexGenerator.Counters.BLACKLISTED_TRIPLES).increment(1);
 			continue;
 		    }
-
-		    // Iterate over the words of the value
-		    fbr = new FastBufferedReader(new StringReader(object));
-		    while (fbr.next(word, nonWord)) {
-			if (word != null && !word.equals("")) {
-
-			    if (TERMPROCESSOR.processTerm(word)) {
-				// Lowercase terms
-				tokens.add(word.toString());
-
-				// Preserve casing for properties and contexts
-				properties.add(fieldName);
-
-				// Index first position in the quad (subject)
-				// subjects.add(subject);
-				// Index fourth position in the quad (context)
-				// contexts.add(context);
-			    }
-
+		    if (stmt.getObject() instanceof Resource) {
+			if (predicate.equals(RDF.TYPE.toString())) {
+			    if (mapContext != null)
+				mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
+			    tokens.add(stmt.getObject().toString());
+			    properties.add(fieldName);
+			} else {
+			    tokens.add(subjectsMph.get(stmt.getObject().toString()).toString());
+			    properties.add(fieldName);
 			}
+		    } else {
+			String object = ((Literal) stmt.getObject()).getLabel();
+			// Iterate over the words of the value
+			fbr = new FastBufferedReader(new StringReader(object));
+			while (fbr.next(word, nonWord)) {
+			    if (word != null && !word.equals("")) {
+
+				if (TERMPROCESSOR.processTerm(word)) {
+				    // Lowercase terms
+				    tokens.add(word.toString());
+
+				    // Preserve casing for properties and
+				    // contexts
+				    properties.add(fieldName);
+
+				    // Index first position in the quad
+				    // (subject)
+				    // subjects.add(subject);
+				    // Index fourth position in the quad
+				    // (context)
+				    // contexts.add(context);
+				}
+
+			    }
+			}
+			fbr.close();
 		    }
-		    fbr.close();
 		    if (mapContext != null)
 			mapContext.getCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES).increment(1);
 		}

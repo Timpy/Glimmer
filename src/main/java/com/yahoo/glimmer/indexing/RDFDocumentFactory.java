@@ -7,6 +7,7 @@ import it.unimi.dsi.lang.ObjectParser;
 import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.mg4j.index.TermProcessor;
 import it.unimi.dsi.mg4j.util.MG4JClassParser;
+import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 import it.unimi.dsi.util.Properties;
 
 import java.io.IOException;
@@ -44,6 +45,8 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 
     /** Determines if we use the namespaces table for abbreviating field names */
     public static final boolean USE_NAMESPACES = false;
+
+    protected LcpMonotoneMinimalPerfectHashFunction<CharSequence> subjectsMph;
 
     protected static final TermProcessor TERMPROCESSOR = CombinedTermProcessor.getInstance();
 
@@ -175,6 +178,7 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	return handler;
     }
 
+    @SuppressWarnings("unchecked")
     protected void init() {
 
 	Object o;
@@ -191,6 +195,8 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	} catch (TransformerConfigurationException e1) {
 	    throw new RuntimeException(e1);
 	}
+	// Retrieve MPH for objects encoding
+	subjectsMph = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) resolve(MetadataKeys.SUBJECTS_MPH, defaultMetadata);
     }
 
     private void readObject(final ObjectInputStream s) throws IOException, ClassNotFoundException {

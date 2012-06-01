@@ -21,7 +21,7 @@ import org.apache.pig.data.Tuple;
  * a = load 'test-concat.txt' using PigStorage('\t') AS
  * (key:chararray,value:chararray); b = group a by key; describe b; dump b; c =
  * foreach b generate
- * group,com.yahoo.research.barcelona.swa.pig.ConcatValuesInBag(a, ','); dump c;
+ * group,com.yahoo.glimmer.pig.ConcatValuesInBag(a, ','); dump c;
  * 
  * Result:
  * 

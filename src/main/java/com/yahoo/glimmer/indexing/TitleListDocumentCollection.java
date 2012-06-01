@@ -1,0 +1,134 @@
+package com.yahoo.glimmer.indexing;
+
+import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.io.FastBufferedReader;
+import it.unimi.dsi.io.WordReader;
+import it.unimi.dsi.lang.MutableString;
+import it.unimi.dsi.mg4j.document.AbstractDocument;
+import it.unimi.dsi.mg4j.document.AbstractDocumentCollection;
+import it.unimi.dsi.mg4j.document.Document;
+import it.unimi.dsi.mg4j.document.DocumentCollection;
+import it.unimi.dsi.mg4j.document.DocumentFactory;
+import it.unimi.dsi.mg4j.document.IdentityDocumentFactory;
+import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
+import it.unimi.dsi.util.Properties;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.StringReader;
+import java.util.List;
+
+import org.apache.commons.configuration.ConfigurationException;
+
+/**
+ * A document factory for documents that only have a title
+ * 
+ * @author pmika
+ * 
+ */
+public class TitleListDocumentCollection extends AbstractDocumentCollection {
+
+    public List<MutableString> titlelist;
+    protected transient TitleListDocumentFactory factory = new TitleListDocumentFactory();
+
+    public static class TitleListDocumentFactory extends IdentityDocumentFactory {
+
+	private static final long serialVersionUID = 1L;
+
+	public TitleListDocumentFactory() {
+	    super();
+	}
+
+	public TitleListDocumentFactory(final Reference2ObjectMap<Enum<?>, Object> defaultMetadata) {
+	    super(defaultMetadata);
+	}
+
+	public TitleListDocumentFactory(final Properties properties) throws ConfigurationException {
+	    super(properties);
+	}
+
+	public TitleListDocumentFactory(final String[] property) throws ConfigurationException {
+	    super(property);
+	}
+
+	public class TitleListDocument extends AbstractDocument {
+
+	    InputStream rawContent;
+	    Reference2ObjectMap<Enum<?>, Object> metadata;
+
+	    public TitleListDocument(final Reference2ObjectMap<Enum<?>, Object> metadata) {
+		this.metadata = metadata;
+	    }
+
+	    public CharSequence title() {
+		return (CharSequence) resolve(PropertyBasedDocumentFactory.MetadataKeys.TITLE, metadata);
+	    }
+
+	    public CharSequence uri() {
+		return (CharSequence) resolve(PropertyBasedDocumentFactory.MetadataKeys.URI, metadata);
+	    }
+
+	    public Object content(final int field) {
+		return new StringReader("");
+	    }
+
+	    public WordReader wordReader(final int field) {
+		ensureFieldIndex(field);
+		// TODO: this should actually return the WordReader of the
+		// superclass, but that is private...
+		return new FastBufferedReader();
+	    }
+
+	}
+
+	public Document getDocument(final Reference2ObjectMap<Enum<?>, Object> metadata) {
+	    return new TitleListDocument(metadata);
+	}
+
+	@Override
+	public Document getDocument(final InputStream rawContent, final Reference2ObjectMap<Enum<?>, Object> metadata) {
+	    return new TitleListDocument(metadata);
+	}
+
+    }
+
+    public TitleListDocumentCollection(List<MutableString> titlelist) {
+	this.titlelist = titlelist;
+    }
+
+    @Override
+    public DocumentCollection copy() {
+	return new TitleListDocumentCollection(titlelist);
+    }
+
+    @Override
+    public Document document(int index) throws IOException {
+	Reference2ObjectMap<Enum<?>, Object> metadata = new Reference2ObjectArrayMap<Enum<?>, Object>();
+	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.URI, titlelist.get(index));
+	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.TITLE, titlelist.get(index));
+	return factory.getDocument(metadata);
+    }
+
+    @Override
+    public Reference2ObjectMap<Enum<?>, Object> metadata(int index) throws IOException {
+	throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int size() {
+	return titlelist.size();
+    }
+
+    @Override
+    public InputStream stream(int index) throws IOException {
+	throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public DocumentFactory factory() {
+	// TODO Auto-generated method stub
+	return null;
+    }
+
+}

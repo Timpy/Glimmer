@@ -86,7 +86,7 @@ public class ComputeMphTool extends Configured implements Tool {
 
     /**
      * For static invocation from pig via define mph InvokeForLong(
-     * 'com.yahoo.research.barcelona.swa.util.ComputeMph.pigInvoker', filename);
+     * 'com.yahoo.glimmer.util.ComputeMph.pigInvoker', filename);
      * The hash function itself will be serialized to DFS as filename.mph
      * 
      * TODO Test it.

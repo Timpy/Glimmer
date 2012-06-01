@@ -6,7 +6,6 @@ import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.mg4j.document.Document;
 import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
-import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 import it.unimi.dsi.util.Properties;
 
 import java.io.BufferedReader;
@@ -28,6 +27,7 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
+import org.semanticweb.yars.nx.namespace.RDF;
 import org.semanticweb.yars.nx.parser.ParseException;
 
 /**
@@ -46,8 +46,6 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
     private static final long serialVersionUID = 1L;
 
     private List<String> indexedProperties;
-
-    LcpMonotoneMinimalPerfectHashFunction<CharSequence> subjectsMph;
 
     protected boolean parseProperty(final String key, final String[] values, final Reference2ObjectMap<Enum<?>, Object> metadata) throws ConfigurationException {
 	if (sameKey(MetadataKeys.INDEXED_PROPERTIES_FILENAME, key)) {
@@ -101,10 +99,6 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 
 	    }
 	}
-
-	// Retrieve MPH for objects encoding
-	subjectsMph = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) resolve(MetadataKeys.SUBJECTS_MPH, defaultMetadata);
-
     }
 
     /**
@@ -270,9 +264,15 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		    }
 
 		    if (stmt.getObject() instanceof Resource) {
-			// Encode the resource URI or bnode ID using the MPH for
-			// objects
-			fields.get(fieldIndex).add(subjectsMph.get(stmt.getObject().toString()).toString());
+			// For all fields except type, encode the resource URI
+			// or bnode ID using the MPH for subjects
+			if (predicate.equals(RDF.TYPE.toString())) {
+			    if (mapContext != null)
+				mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
+			    fields.get(fieldIndex).add(stmt.getObject().toString());
+			} else {
+			    fields.get(fieldIndex).add(subjectsMph.get(stmt.getObject().toString()).toString());
+			}
 		    } else {
 
 			// Iterate over the words of the value
