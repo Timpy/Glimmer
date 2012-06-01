@@ -193,7 +193,7 @@ function computeMpHashes () {
 	echo
 	# Generate Minimal Perfect Hashes for subjects, predicates and objects.
 	# On which machine does this actually get run?
-	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.research.barcelona.swa.util.ComputeMphTool \
+	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.ComputeMphTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		${OUTPUT_NAMES[1]}${COMPRESSION_EXTENSION} ${OUTPUT_NAMES[2]} ${OUTPUT_NAMES[3]}${COMPRESSION_EXTENSION}"
 	echo ${CMD}; ${CMD}
@@ -243,7 +243,7 @@ function generateIndex () {
 	fi
 	 
 	echo Generating index..
-	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.research.barcelona.swa.indexing.TripleIndexGenerator \
+	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.TripleIndexGenerator \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapred.map.tasks.speculative.execution=true \
 		-Dmapred.reduce.tasks=${SUBINDICES} \
@@ -372,7 +372,7 @@ function generateDocSizes () {
 	echo
 	echo GENERATING DOC SIZES..
 	echo
-	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.research.barcelona.swa.indexing.DocSizesGenerator \
+	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.DocSizesGenerator \
 		-Dmapred.max.map.failures.percent=1 \
 		-Dmapred.map.tasks.speculative.execution=true \
 		-Dmapred.reduce.tasks=300 \
@@ -397,7 +397,7 @@ function buildCollection () {
 	echo
 	echo BUILDING COLLECTION..
 	echo
-	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.research.barcelona.swa.indexing.BySubjectCollectionBuilder \
+	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.BySubjectCollectionBuilder \
 		-Dmapred.map.max.attempts=20 \
 		-Dmapred.map.tasks.speculative.execution=false \
 		-Dmapred.child.java.opts=-Xmx800m \

@@ -7,16 +7,16 @@ REGISTER '$swaJar';
 SET default_parallel $nTasks
 
 tuples = LOAD '$input' USING PigStorage('\n') AS (line:chararray);
-spoc = FOREACH tuples GENERATE $0 AS raw, com.yahoo.research.barcelona.swa.pig.SplitTuple($0) AS parsed;
+spoc = FOREACH tuples GENERATE $0 AS raw, com.yahoo.glimmer.pig.SplitTuple($0) AS parsed;
 
-projection = FOREACH spoc GENERATE parsed.s AS subject, com.yahoo.research.barcelona.swa.pig.ReplaceWhitespace($0) AS raw;
+projection = FOREACH spoc GENERATE parsed.s AS subject, com.yahoo.glimmer.pig.ReplaceWhitespace($0) AS raw;
 
 grouped = GROUP projection BY subject PARALLEL $nTasks;
 
 -- filter out subjects with more than 1000 stmts
 filtered = FILTER grouped BY COUNT($1) < 10000;
 
-flat = FOREACH filtered GENERATE group, com.yahoo.research.barcelona.swa.pig.ConcatValuesInBag($1, '  ');
+flat = FOREACH filtered GENERATE group, com.yahoo.glimmer.pig.ConcatValuesInBag($1, '  ');
 nonempty = FILTER flat BY ($0 neq '');
 sorted = ORDER nonempty BY $0;
 STORE sorted INTO '$output' USING PigStorage();
