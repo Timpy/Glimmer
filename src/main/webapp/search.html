@@ -1,0 +1,183 @@
+<html>
+	<head>
+		<title>WOWser</title>
+		<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssreset/cssreset-min.css">
+		<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssbase/cssbase-min.css">
+		<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssfonts/cssfonts-min.css">
+                <link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/gallery-2011.01.03-18-30/build/gallery-yui3treeview/assets/treeview-classic.css">
+		<link rel="stylesheet" type="text/css" href="schema.css">
+		<link rel="stylesheet" type="text/css" href="wowser-red-local.css">
+	</head>
+	<body>
+		<!-- Adding map capabilities -->
+		<script src="http://api.maps.ovi.com/jsl.js" type="text/javascript" charset="utf-8"></script>
+		<script src="http://yui.yahooapis.com/3.4.1/build/yui/yui-min.js"></script>
+		<!--
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+		-->
+		<!--
+		<script type='text/javascript' src='https://raw.github.com/antoniogarrote/rdfstore-js/master/dist/browser/rdf_store.js'></script>
+		-->
+		<!--
+		<script src="http://rdfquery.googlecode.com/files/jquery.rdfquery.core-1.0.js"></script>
+		<script src="http://jquery-json.googlecode.com/files/jquery.json-2.3.min.js"></script>
+		-->
+		<script type="text/javascript" src="search.js"></script>
+		<div id="container" class="container">
+			<div id="pageHeader">
+				<h1>WOWSer (The WOO Browser)</h1>
+			</div>
+			<div id="selectionbar"></div>
+			<div id="mainContent">
+				<div id = "statisticsTree">
+				   <div id="statistics-loader" >
+					<div>
+						Loading...
+					</div>
+					<img src="http://ontologyonline.org/img/ajax-loader.gif" alt="Loading Image"/>
+				   </div>
+                                   <div id="statistics-tree">
+				      <ul id="statisticsTreeList"></ul>
+                                   </div>
+                                </div>
+				<div id="topContent">
+					<!-- 
+                                          <div id = "statisticsBox">
+					    Number of entities in this KB: <div id="statistics"></div>
+					  </div>
+                                        -->
+					<div id="searchBoxes">
+						<div class="dataset">
+							Dataset:
+							<select id="dataset" name="dataset">
+								<option value="yahookb">yahookb</option>
+								<option value="local_ppr15">local_ppr15</option>
+								<option value="local_bayarea_20120213">local_bayarea_20120213</option>
+								<option value="local_yliu2">local_yliu2</option>
+								<option value="local_bayarea">local_bayarea</option>
+
+							</select>
+							Number of results:
+							<select id="numresults" name="numresults">
+								<option value="10">10</option>
+								<option value="100">100</option>
+							</select>
+							Dereferencing: <!--<select id="dereference" name="dereference">
+							<option value="true">on</option>
+							<option value="false">off</option>
+							</select>-->
+							<input id="dereference"  type='checkbox' name="dereference" checked>
+						</div>
+						
+						<h2>Unified search</h2>
+						<div id="unifiedsearch" class="yui3-skin-sam">
+							<form id="unifiedsearchform"  action="javascript:void(0);">
+								<label for="ac-input">Enter a query, e.g., personName:(barack obama) birthDate:(1961)</label>
+								<br>
+								<input id="ac-input" type="text">
+								<input type="submit" class="button" value="Search">
+							</form>
+						</div>
+                                                <div id="idsearch" class="hidden">
+                                                   <h2>Search by ID</h2>
+                                                        <form id="search-by-id" action="javascript:void(0);">
+                                                               <input id="id-text" type="text" size="36"></input>
+	                                                       <br/>
+	                                                       <input type="submit" class="button" value="Search">
+                                                        </form>
+                                                </div>
+  
+						<h2>Field-based search</h2>
+                                                <a id="togglefields" >show</a>
+						<div id="field-hider" style="display:none">
+							<div id="field-loader" >
+								<div>
+									Loading...
+								</div>
+								<img src="http://ontologyonline.org/img/ajax-loader.gif" alt="Loading Image"/>
+							</div>
+							<div id="field-message">
+								&nbsp;
+							</div>
+							<form id="search-by-field" action="javascript:void(0);">
+								<input type="checkbox" id="match-mode" name="match-mode" checked>
+								Match all
+								<div id="params">
+									&nbsp; <!--
+									<div class="param">
+									<input class="query" type="text" name="query"/>
+									<select class="field" id="field"  name="field">
+									<option value="any">any</option>
+									</select>
+									</div>
+									-->
+								</div>
+								<input id="add" type="button" class="button" value="Add more"/>
+								<br/>
+								<input type="submit" class="button" value="Search">
+							</form>
+						</div>
+
+						<h2>Ontology-based search</h2>
+                                                <a id="toggleonto">show</a>
+						<div id="onto-hider" style="display:none">
+							<div id="class-loader" >
+								<div>
+									Loading...
+								</div>
+								<img src="http://ontologyonline.org/img/ajax-loader.gif" alt="Loading Image"/>
+							</div>
+							<div id="class-message">
+								&nbsp;
+							</div>
+							<form id="search-by-class" action="javascript:void(0);">
+								<div>
+									<div id="class-select">
+										&nbsp;
+									</div>
+									<div id="class-properties">
+										&nbsp;
+									</div>
+								</div>
+								<input type="submit" class="button" value="Search">
+							</form>
+						</div>
+					</div>
+
+					<div id="spacer"></div>
+				</div>
+				<!-- end of topContent -->
+				
+				<div id="bottomContent">
+				<div id="resultContainer" style="display:none"  class="yui3-skin-sam">
+					<ul>
+						<li id="result-list-tab">
+							<a href="#list">List View</a>
+						</li>
+						<li id="result-map-tab">
+							<a href="#map">Map View</a>
+						</li>
+					</ul>
+					<div>
+						<div id="list">
+							<!-- <h2>Results</h2> -->
+							<div id="result-loader" style="display:none" >
+								<div>
+									Loading...
+								</div>
+								<img src="http://ontologyonline.org/img/ajax-loader.gif" alt="Loading Image"/>
+							</div>
+							<div id="result-stats"></div>
+							<div id="results"></div>
+						</div>
+						<div id="map" style="width:940px; height:500px"></div>
+					</div>
+					</div>
+				</div>
+			        <div id="disclaimer">
+   				   For errors please contact <a href="mailto:pmika@yahoo-inc.com">Peter Mika</a> or <a href="mailto:krl@yahoo-inc.com">Carlo Curino</a>.
+			        </div>
+			</div>
+		</div>
+	</body>
+</html>

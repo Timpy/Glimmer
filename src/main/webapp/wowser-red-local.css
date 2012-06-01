@@ -1,0 +1,146 @@
+/* -- local specific -- */
+.source-AMACAI {
+	color: #228822;
+}
+
+.source-RR {
+	color: #FF0000;
+}
+
+.source-GS_FF {
+	color: #FFFF00;
+}
+
+.source-INFOUSA {
+	color: #0000FF;
+}
+
+.source-IUSA_CLOSED {
+	color: #00FF00;
+}
+
+.source-SDE {
+	color: #FF00FF;
+}
+
+.source-YTRAVEL_CRAWL {
+	color: #882222;
+}
+
+/* -- search specific -- */
+#searchBoxes {
+	margin-top: 10px;
+	/*        max-width: 650px;
+        min-width: 650px;*/
+	float: left;
+}
+
+#statisticsBox {
+	margin-top: 10px;
+	height: 470px;
+	float: right;
+}
+
+#statisticsTree {
+	margin-top: 10px;
+	height: 470px;
+	float: right;
+}
+
+#resultContainer {
+	position: relative;
+	clear: both;
+}
+
+.hidden {
+	display: none;
+}
+
+#id-text .param .query,#dataset,#loader,#class-message,#class-select select,#class-properties table
+	{
+	margin: 10px 5px 10px 10px;
+}
+
+#class-properties table {
+	border: 0px;
+}
+
+#class-properties td {
+	padding: 5px;
+}
+
+.button {
+	margin: 5px 5px 5px 0px;
+}
+
+table.result {
+	width: 100%;
+	margin-bottom: 20px;
+}
+
+table.result td {
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+
+table.result .odd {
+	background: #FFFFFF;
+}
+
+table.result .even {
+	background: #E4F2FF;
+}
+
+form {
+	margin: 10px 0px;
+}
+
+.label {
+	font-size: 120%;
+}
+
+.predicate {
+	width: 40%;
+	color: black;
+}
+
+.yui3-tabview-panel .yui3-tab-panel {
+	background: none repeat scroll 0 0 #FFFFFF;
+}
+
+/** Most specific **/
+#statisticsTree a:link {
+	border-bottom: none;
+}
+
+#statisticsTree {
+	line-height: 150%;
+}
+
+#statisticsTree ul {
+	margin-bottom: 6px;
+	margin-top: 6px;
+	padding-bottom: 0px;
+}
+
+#statisticsTree .yui3-treeleaf {
+	padding-top: 0px;
+	margin-bottom: 1px;
+	margin-top: 1px;
+}
+
+#statisticsTree .yui3-treeview-label-content {
+	top: 0px;
+}
+
+#resultContainer table .predicate-col {
+	column-width: 100px;
+	-moz-column-width: 100px; /* Firefox */
+	-webkit-column-width: 100px; /* Safari and Chrome */
+}
+
+#resultContainer table .value-col {
+	column-width: 450px;
+	-moz-column-width: 450px; /* Firefox */
+	-webkit-column-width: 450px; /* Safari and Chrome */
+}
