@@ -131,11 +131,12 @@
 			<artifactId>webgraph</artifactId>
 			<version>3.0.7</version>
 		</dependency>
-		<!-- <dependency> -->
-		<!-- <groupId>it.unimi.dsi</groupId> -->
-		<!-- <artifactId>webgraph</artifactId> -->
-		<!-- <version>3.0.7</version> -->
-		<!-- </dependency> -->
+		<dependency>
+			<groupId>colt</groupId>
+			<artifactId>colt</artifactId>
+			<version>1.2.0</version>
+			<scope>compile</scope>
+		</dependency>
 		<dependency>
 			<groupId>com.martiansoftware</groupId>
 			<artifactId>jsap</artifactId>
@@ -172,6 +173,12 @@
 			<version>2.1</version>
 		</dependency>
 		<dependency>
+			<groupId>commons-httpclient</groupId>
+  			<artifactId>commons-httpclient</artifactId>
+  			<version>3.1</version>
+  			<scope>compile</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.apache.tika</groupId>
 			<artifactId>tika-core</artifactId>
 			<version>1.1</version>
@@ -188,8 +195,19 @@
 		</dependency>
 		<dependency>
 			<groupId>org.openrdf.sesame</groupId>
+			<artifactId>sesame-rio-api</artifactId>
+			<version>2.3.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.openrdf.sesame</groupId>
+			<artifactId>sesame-rio-rdfxml</artifactId>
+			<version>2.3.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.openrdf.sesame</groupId>
 			<artifactId>sesame-runtime</artifactId>
 			<version>2.3.2</version>
+			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.google.guava</groupId>
@@ -202,9 +220,9 @@
 			<version>2.1</version>
 		</dependency>
 		<dependency>
-  			<groupId>net.sourceforge.owlapi</groupId>
-  			<artifactId>owlapi</artifactId>
-	  		<version>3.3</version>
+			<groupId>net.sourceforge.owlapi</groupId>
+			<artifactId>owlapi</artifactId>
+			<version>3.3</version>
 		</dependency>
 		<dependency>
 			<groupId>org.jmock</groupId>

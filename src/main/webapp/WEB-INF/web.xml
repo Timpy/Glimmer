@@ -1,151 +1,42 @@
-<web-app xmlns="http://java.sun.com/xml/ns/j2ee"
-      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"    
-      xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee 
-         web-app_2_4.xsd" version="2.4">
-         
-  <description>WOO search and browse</description>
-  
-  <jsp-config>
-    <jsp-property-group>
-        <url-pattern>*.jsp</url-pattern>
-        <el-enabled>true</el-enabled>
-        <scripting-enabled>true</scripting-enabled>
-        <deferred-syntax-allowed-as-literal>true</deferred-syntax-allowed-as-literal>
-    </jsp-property-group>
-  </jsp-config>
+<web-app xmlns="http://java.sun.com/xml/ns/j2ee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee web-app_2_4.xsd" version="2.4">
 
+	<description>Glimmer RDF Text Search Web App</description>
 
-   <context-param>
-    <param-name>yjava_yiv_servlet.parameter_yq</param-name>
-    <param-value>NONE</param-value>
-   </context-param>
+	<jsp-config>
+		<jsp-property-group>
+			<url-pattern>*.jsp</url-pattern>
+			<el-enabled>true</el-enabled>
+			<scripting-enabled>true</scripting-enabled>
+			<deferred-syntax-allowed-as-literal>true
+			</deferred-syntax-allowed-as-literal>
+		</jsp-property-group>
+	</jsp-config>
 
+	<context-param>
+		<param-name>yjava_yiv_servlet.parameter_yq</param-name>
+		<param-value>NONE</param-value>
+	</context-param>
 
-  <servlet>
+	<servlet>
+		<servlet-name>query</servlet-name>
+		<servlet-class>com.yahoo.glimmer.query.QueryServletCollection</servlet-class>
+		<init-param>
+			<param-name>config</param-name>
+			<param-value>config-generic.properties</param-value>
+			<description>Location of the properties file</description>
+		</init-param>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>query</servlet-name>
+		<url-pattern>/query.do</url-pattern>
+	</servlet-mapping>
 
-    <init-param>
-        <param-name>config</param-name>
-        <param-value>config-generic.properties</param-value>
-        <description>Location of the properties file</description>
-    </init-param>
+	<welcome-file-list>
+		<welcome-file>search.html</welcome-file>
+	</welcome-file-list>
 
-    <servlet-name>query</servlet-name>
-    <servlet-class>com.yahoo.glimmer.query.QueryServletCollection</servlet-class>
-  </servlet>
-
- <servlet-mapping>
-    <servlet-name>query</servlet-name>
-    <url-pattern>/query.do</url-pattern>
-  </servlet-mapping>  
-
-<!-- local_ppr15 
-
-  <servlet>
-
-    <init-param>
-        <param-name>config</param-name>
-        <param-value>config-local_ppr15.properties</param-value>
-        <description>Location of the properties file</description>
-    </init-param>
-
-    <servlet-name>query-local_ppr15</servlet-name>
-    <servlet-class>com.yahoo.glimmer.query.QueryServletCollection</servlet-class>
-  </servlet>
-
- <servlet-mapping>
-    <servlet-name>query-local_ppr15</servlet-name>
-    <url-pattern>/query-local_ppr15.do</url-pattern>
-  </servlet-mapping>  
--->
-
-<!-- local_bayarea_20120213 
-  <servlet>
-
-    <init-param>
-        <param-name>config</param-name>
-        <param-value>config-local_bayarea_20120213.properties</param-value>
-        <description>Location of the properties file</description>
-    </init-param>
-
-    <servlet-name>query-local_bayarea_20120213</servlet-name>
-    <servlet-class>com.yahoo.glimmer.query.QueryServletCollection</servlet-class>
-  </servlet>
-
- <servlet-mapping>
-    <servlet-name>query-local_bayarea_20120213</servlet-name>
-    <url-pattern>/query-local_bayarea_20120213.do</url-pattern>
-  </servlet-mapping>  
-
--->
-
-<!-- local_bayarea 
-
-  <servlet>
-
-    <init-param>
-        <param-name>config</param-name>
-        <param-value>config-local_bayarea.properties</param-value>
-        <description>Location of the properties file</description>
-    </init-param>
-
-    <servlet-name>query-local_bayarea</servlet-name>
-    <servlet-class>com.yahoo.glimmer.query.QueryServletCollection</servlet-class>
-  </servlet>
-
- <servlet-mapping>
-    <servlet-name>query-local_bayarea</servlet-name>
-    <url-pattern>/query-local_bayarea.do</url-pattern>
-  </servlet-mapping>  
--->
-
-<!-- local_yliu2 vertical
-
-  <servlet>
-
-    <init-param>
-        <param-name>config</param-name>
-        <param-value>config-local_yliu2.properties</param-value>
-        <description>Location of the properties file</description>
-    </init-param>
-
-    <servlet-name>query-local_yliu2</servlet-name>
-    <servlet-class>com.yahoo.glimmer.query.QueryServletCollection</servlet-class>
-  </servlet>
-
- <servlet-mapping>
-    <servlet-name>query-local_yliu2</servlet-name>
-    <url-pattern>/query-local_yliu2.do</url-pattern>
-  </servlet-mapping>  
-
--->
-
-<!-- yahookb vertical
-
-  <servlet>
-
-    <init-param>
-        <param-name>config</param-name>
-        <param-value>config-yahookb.properties</param-value>
-        <description>Location of the properties file</description>
-    </init-param>
-
-    <servlet-name>query-yahookb</servlet-name>
-    <servlet-class>com.yahoo.glimmer.query.QueryServletCollection</servlet-class>
-  </servlet>
-
- <servlet-mapping>
-    <servlet-name>query-yahookb</servlet-name>
-    <url-pattern>/query-yahookb.do</url-pattern>
-  </servlet-mapping>  
-
--->
-
-  <welcome-file-list>
-        <welcome-file>search.html</welcome-file>
-  </welcome-file-list>
-
-  <session-config>
-    <session-timeout>30</session-timeout>
-  </session-config>
-  
+	<session-config>
+		<session-timeout>30</session-timeout>
+	</session-config>
 </web-app> 

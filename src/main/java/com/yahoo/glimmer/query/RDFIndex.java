@@ -39,6 +39,7 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
@@ -358,8 +359,15 @@ public class RDFIndex {
 	// Load the ontology if provided
 	if (context.ontoPath != null) {
 	    OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
+	    File owlOntologyFile = new File(context.ontoPath);
+	    if (!owlOntologyFile.exists()) {
+		URL owlOntologyUrl = this.getClass().getClassLoader().getResource(context.ontoPath);
+		if (owlOntologyUrl != null) {
+		    owlOntologyFile = new File(owlOntologyUrl.getFile());
+		}
+	    }
 	    try {
-		OWLOntology onto = manager.loadOntologyFromOntologyDocument(new File(context.ontoPath));
+		OWLOntology onto = manager.loadOntologyFromOntologyDocument(owlOntologyFile);
 		stats.loadInfoFromOntology(onto);
 	    } catch (OWLOntologyCreationException e) {
 		throw new IllegalArgumentException("Ontology failed to load:" + e.getMessage());

@@ -129,20 +129,21 @@ public class QueryServletCollection extends HttpServlet {
 	    // In this case the config file is a template that we configure for
 	    // each index
 	    for (File file : new File(context.multiIndexPath).listFiles()) {
-		if (file.isDirectory()) {
+		if (file.isDirectory() && file.getName().matches("nq2index\\.\\w+")) {
+		    String indexName = file.getName().substring("nq2index.".length());
 		    context = (Context) context.clone();
-		    context.pathToIndex = file.getAbsolutePath() + File.separator + "vertical" + File.separator + "ALL" + File.separator;
-		    context.TOKEN_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "ALL" + File.separator + "token";
-		    context.PROPERTY_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "ALL" + File.separator + "property";
-		    context.WURI_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "ALL" + File.separator + "uri";
+		    context.pathToIndex = file.getAbsolutePath() + File.separator + "vertical" + File.separator;
+		    context.TOKEN_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "token";
+		    context.PROPERTY_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "property";
+		    context.WURI_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "uri";
 		    context.TITLE_LIST = file.getAbsolutePath() + File.separator + "subjects.txt";
 		    context.FIELD_LIST = file.getAbsolutePath() + File.separator + "predicates.txt";
 		    context.MPH = file.getAbsolutePath() + File.separator + "subjects.mph";
 		    context.COLLECTION = file.getAbsolutePath() + File.separator + "collection" + File.separator;
-		    context.ALIGNMENT_INDEX = file.getAbsolutePath() + File.separator + "vertical" + File.separator + "ALL" + File.separator + "alignment";
+		    context.ALIGNMENT_INDEX = file.getAbsolutePath() + File.separator + "vertical" + File.separator + "alignment";
 
 		    RDFIndex index = new RDFIndex(context);
-		    indexMap.put(file.getName(), index);
+		    indexMap.put(indexName, index);
 		}
 	    }
 	}
