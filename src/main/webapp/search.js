@@ -92,8 +92,9 @@ YUI({
 				'autocomplete-filters',
 				'autocomplete-highlighters',
 				function(Y) {
-
-					var myDataSource;
+					var dataSource = new Y.DataSource.Get({
+						source : webapp + "ajax/"
+					});
 
 					// Add one more parameter
 					function addMoreField() {
@@ -273,7 +274,7 @@ YUI({
 										'http_woo_corp_yahoo_com_1_7_1_ns_type:',
 										'http_www_w3_org_1999_02_22_rdf_syntax_ns_type:');
 
-						loadResults("yq=" + query);
+						loadResults(query);
 					}
 
 					function executeSearchByField(e) {
@@ -302,7 +303,7 @@ YUI({
 						if (field === "uuid")
 							loadResults("subject=urn:uuid:" + uuid);
 						else
-							loadResults("yq=" + query);
+							loadResults(query);
 					}
 
 					function executeSearchByClass(e) {
@@ -316,7 +317,7 @@ YUI({
 												+ thisNode.get('value');
 									}
 								});
-						loadResults("yq=" + query);
+						loadResults(query);
 					}
 
 					function executeSearchByID(e) {
@@ -327,14 +328,12 @@ YUI({
 					function loadResults(query) {
 						Y.one("#result-loader").show();
 
-						myDataSource
+						dataSource
 								.sendRequest({
-									request : query
-											+ '&m='
-											+ Y.one("#numresults").get('value')
-											+ "&deref="
-											+ Y.one("#dereference").get(
-													'checked'),
+									request : 'query?index=' + Y.one("#dataset").get('value')
+											+ '&query=' + query
+											+ '&pageSize=' + Y.one("#numresults").get('value')
+											+ '&deref='	+ Y.one("#dereference").get('checked'),
 									callback : {
 
 										success : function(e) {
@@ -424,15 +423,9 @@ YUI({
 						Y.one("#statistics-tree").setContent("");
 						Y.one("#statistics-loader").show();
 
-						var dataset = Y.one("#dataset").get('value');
-						myDataSource = new Y.DataSource.Get({
-							source : webapp + "query.do?index=" + dataset
-									+ "&format=json&"
-						});
-
-						myDataSource
+						dataSource
 								.sendRequest({
-
+									request : 'indexStatistics?index=' + Y.one("#dataset").get('value'),
 									callback : {
 										success : function(e) {
 											stats = e.response.results[0];

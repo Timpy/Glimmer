@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="
+        http://www.springframework.org/schema/beans 
+        http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+        http://www.springframework.org/schema/context 
+        http://www.springframework.org/schema/context/spring-context-3.1.xsd">
+
+	<context:component-scan base-package="com.yahoo.glimmer.web" />
+
+	<bean id="indexMap" class="com.yahoo.glimmer.web.IndexMap">
+		<property name="configFilename" value="config-generic.properties" />
+	</bean>
+	<bean id="querier" class="com.yahoo.glimmer.web.Querier" />
+
+	<bean id="docObjectView" class="com.yahoo.glimmer.web.TextObjectView" />
+	<bean id="jsObjectView" class="com.yahoo.glimmer.web.JsObjectView" />
+	<bean id="rbObjectView" class="com.yahoo.glimmer.web.RelationBrowserObjectView" />
+	<bean id="txtObjectView" class="com.yahoo.glimmer.web.TextObjectView">
+		<property name="includeUri" value="true"/>
+	</bean>
+	<bean id="xmlObjectView" class="com.yahoo.glimmer.web.XmlObjectView" />
+	<bean id="viewNameTranslator" class="com.yahoo.glimmer.web.FormatParameterToViewNameTranslator" />
+	<bean id="viewResolver"	class="org.springframework.web.servlet.view.BeanNameViewResolver" />
+</beans>

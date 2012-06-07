@@ -5,12 +5,11 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.mg4j.query.nodes.Query;
 
 public class RDFQueryResult {
-
-    private ObjectArrayList<RDFResultItem> resultItems;
-    private int numResults;
-    private long time;
-    private String query;
-    private String parsedQuery;
+    private final ObjectArrayList<RDFResultItem> resultItems;
+    private final int numResults;
+    private final long time;
+    private final String query;
+    private final String parsedQuery;
 
     public RDFQueryResult(String query, Query parsedQuery, int numResults, ObjectArrayList<RDFResultItem> resultItems, long time) {
 	super();
@@ -20,7 +19,7 @@ public class RDFQueryResult {
 	this.query = query != null ? query : "";
 	this.parsedQuery = parsedQuery != null ? parsedQuery.toString() : "";
     }
-
+    
     public ObjectArrayList<RDFResultItem> getResultItems() {
 	return resultItems;
     }
@@ -49,7 +48,5 @@ public class RDFQueryResult {
 	for (RDFResultItem item : resultItems) {
 	    item.dereference(mph);
 	}
-
     }
-
 }

@@ -7,18 +7,13 @@ import it.unimi.dsi.mg4j.index.Index;
 import it.unimi.dsi.mg4j.query.ResultItem;
 import it.unimi.dsi.mg4j.query.SelectedInterval;
 import it.unimi.dsi.mg4j.query.nodes.Query;
-import it.unimi.dsi.mg4j.query.parser.QueryParserException;
-import it.unimi.dsi.mg4j.query.parser.SimpleParser;
 import it.unimi.dsi.mg4j.search.score.DocumentScoreInfo;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.Type;
 import java.net.URLEncoder;
 import java.text.DateFormat;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -43,22 +38,9 @@ import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
 import com.yahoo.glimmer.disambiguation.RdfDisambiguator;
 import com.yahoo.glimmer.vocabulary.OwlUtils;
+import com.yahoo.glimmer.web.IndexMap;
 
-/**
- * A query servlet.
- * 
- * <p>
- * This class provides a basic servlet for searching a collection. It expects
- * some data (a collection, an index map and a path) in the
- * {@link javax.servlet.ServletContext} (see the code for {@link #init()}).
- * 
- * <p>
- * This servlet is thread safe. Each instance uses its own flyweight copies of
- * the {@linkplain it.unimi.dsi.mg4j.document.DocumentCollection collection} and
- * {@linkplain it.unimi.dsi.mg4j.query.QueryEngine query engine} to return the
- * result (in particular, snippets). In a production site it might be more
- * sensible to pool and reuse such classes.
- */
+@Deprecated
 public class QueryServletCollection extends HttpServlet {
 
     private static final long serialVersionUID = 1L;
@@ -102,58 +84,10 @@ public class QueryServletCollection extends HttpServlet {
 
     protected Context context;
     protected RdfDisambiguator disambiguator;
-    protected Map<String, RDFIndex> indexMap = new HashMap<String, RDFIndex>();
+    protected Map<String, RDFIndex> indexMap;
 
     public void init() throws ServletException {
-	// Load the context from the servlet param
-	try {
-	    context = new Context(getInitParameter("config"));
-	    init(context);
-
-	} catch (FileNotFoundException e) {
-	    throw new ServletException(e);
-	} catch (IOException e) {
-	    throw new ServletException(e);
-	}
-
-    }
-
-    public void init(Context context) throws IOException {
-
-	if (context.multiIndexPath == null) {
-	    // Single index, index.path property must be present
-	    RDFIndex index = new RDFIndex(context);
-	    indexMap.put(context.get("index.path"), index);
-	} else {
-	    // Multiple indices under a root directory
-	    // In this case the config file is a template that we configure for
-	    // each index
-	    for (File file : new File(context.multiIndexPath).listFiles()) {
-		if (file.isDirectory() && file.getName().matches("nq2index\\.\\w+")) {
-		    String indexName = file.getName().substring("nq2index.".length());
-		    context = (Context) context.clone();
-		    context.pathToIndex = file.getAbsolutePath() + File.separator + "vertical" + File.separator;
-		    context.TOKEN_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "token";
-		    context.PROPERTY_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "property";
-		    context.WURI_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "uri";
-		    context.TITLE_LIST = file.getAbsolutePath() + File.separator + "subjects.txt";
-		    context.FIELD_LIST = file.getAbsolutePath() + File.separator + "predicates.txt";
-		    context.MPH = file.getAbsolutePath() + File.separator + "subjects.mph";
-		    context.COLLECTION = file.getAbsolutePath() + File.separator + "collection" + File.separator;
-		    context.ALIGNMENT_INDEX = file.getAbsolutePath() + File.separator + "vertical" + File.separator + "alignment";
-
-		    RDFIndex index = new RDFIndex(context);
-		    indexMap.put(indexName, index);
-		}
-	    }
-	}
-
-	// Init disambiguator
-	/*
-	 * try { disambiguator = new SVMDisambiguator(); } catch (IOException e)
-	 * { throw new ServletException(e); }
-	 */
-
+	indexMap = IndexMap.getInstance();
     }
 
     /**
@@ -196,6 +130,7 @@ public class QueryServletCollection extends HttpServlet {
      * document for the given subject
      * 
      */
+    @SuppressWarnings("unused")
     protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 
 	String rawQuery = "";
@@ -224,82 +159,81 @@ public class QueryServletCollection extends HttpServlet {
 
 	    // Request for a document
 	    if (request.getParameter("id") != null || request.getParameter("subject") != null) {
-		String idString = Util.decodeEntities(request.getParameter("id"));
-		String subject = Util.decodeEntities(request.getParameter("subject"));
-		LOGGER.info("id=" + idString + " subject=" + subject);
-		Long id;
-		if (idString != null) {
-		    id = Long.parseLong(idString);
-		} else if (index.subjectsMPH != null) {
-		    id = index.subjectsMPH.get(subject);
-		} else {
-		    response.sendError(400, "mph needs to be loaded for subject to work.");
-		    return;
-		}
-		if (id == -1 || id >= index.subjectsMPH.size64()) {
-		    response.sendError(400, "subject not in collection.");
-		    return;
-		}
-
-		// HACK
-		final RDFResultItem resultItem = new RDFResultItem(index.getIndexedFields(), index.getCollection(), Integer.parseInt(id.toString()), 1.0d);
-		if (index.getCollection() != null && subject != null && !resultItem.uri().equals(subject)) {
-		    // Ignore the result if the MPH tricked us and returned a
-		    // result with a different URI
-		    numResults = 0;
-		} else {
-		    resultItems.add(resultItem);
-		    numResults = 1;
-		}
-		// Stop the timer
-		if (index.queryLogger != null)
-		    index.queryLogger.endQuery(query, numResults);
-		result = new RDFQueryResult(rawQuery, query, numResults, resultItems, (index.queryLogger != null) ? index.queryLogger.getTime() : 0l);
-
+//		String idString = Util.decodeEntities(request.getParameter("id"));
+//		String subject = Util.decodeEntities(request.getParameter("subject"));
+//		LOGGER.info("id=" + idString + " subject=" + subject);
+//		Long id;
+//		if (idString != null) {
+//		    id = Long.parseLong(idString);
+//		} else if (index.subjectsMPH != null) {
+//		    id = index.subjectsMPH.get(subject);
+//		} else {
+//		    response.sendError(400, "mph needs to be loaded for subject to work.");
+//		    return;
+//		}
+//		if (id == -1 || id >= index.subjectsMPH.size64()) {
+//		    response.sendError(400, "subject not in collection.");
+//		    return;
+//		}
+//
+//		// HACK
+//		final RDFResultItem resultItem = new RDFResultItem(index.getIndexedFields(), index.getCollection(), Integer.parseInt(id.toString()), 1.0d);
+//		if (index.getCollection() != null && subject != null && !resultItem.uri().equals(subject)) {
+//		    // Ignore the result if the MPH tricked us and returned a
+//		    // result with a different URI
+//		    numResults = 0;
+//		} else {
+//		    resultItems.add(resultItem);
+//		    numResults = 1;
+//		}
+//		// Stop the timer
+//		if (index.getQueryLogger() != null)
+//		    index.getQueryLogger().endQuery(query, numResults);
+//		result = new RDFQueryResult(rawQuery, query, numResults, resultItems, (index.getQueryLogger() != null) ? index.getQueryLogger().getTime() : 0l);
+		response.sendError(400, "Old get document.");
 	    } else if (request.getParameter("mq") != null) {
-		// We've got an MG4J query, use MG4J's SimpleParser
-		rawQuery = Util.decodeEntities(request.getParameter("mq"));
-		query = new SimpleParser().parse(rawQuery);
-
+//		// We've got an MG4J query, use MG4J's SimpleParser
+//		rawQuery = Util.decodeEntities(request.getParameter("mq"));
+//		query = new SimpleParser().parse(rawQuery);
+		response.sendError(400, "Old MG4J query.");
 	    } else if (request.getParameter("q") != null || request.getParameter("yq") != null) {
-		// We've got a Yahoo query, use our own query parser
-		if (request.getParameter("q") != null) {
-		    rawQuery = Util.decodeEntities(request.getParameter("q"));
-		} else {
-		    rawQuery = Util.decodeEntities(request.getParameter("yq"));
-		}
-
-		/*
-		 * ArrayList<String> segments = null; if
-		 * (request.getParameter("noQLAS") != null) { segments = new
-		 * ArrayList<String>(); } else { segments =
-		 * QLASService.toStringSegments
-		 * (QLASService.segmentator(rawQuery)); }
-		 * segments.add(rawQuery);
-		 */
-		try {
-		    query = index.getParser().parse(rawQuery);
-		} catch (QueryParserException e) {
-		    response.sendError(400, "Query failed to parse");
-		    return;
-		}
-
+//		// We've got a Yahoo query, use our own query parser
+//		if (request.getParameter("q") != null) {
+//		    rawQuery = Util.decodeEntities(request.getParameter("q"));
+//		} else {
+//		    rawQuery = Util.decodeEntities(request.getParameter("yq"));
+//		}
+//
+//		/*
+//		 * ArrayList<String> segments = null; if
+//		 * (request.getParameter("noQLAS") != null) { segments = new
+//		 * ArrayList<String>(); } else { segments =
+//		 * QLASService.toStringSegments
+//		 * (QLASService.segmentator(rawQuery)); }
+//		 * segments.add(rawQuery);
+//		 */
+//		try {
+//		    query = index.getParser().parse(rawQuery);
+//		} catch (QueryParserException e) {
+//		    response.sendError(400, "Query failed to parse");
+//		    return;
+//		}
+		response.sendError(400, "Old Yahoo query.");
 	    } else {
-		// No subject or query parameter
-		// Return statistics of the index and the collection
-		String callback = request.getParameter("callback");
-		if (callback != null && !callback.equals("")) {
-		    response.setContentType("text/javascript");
-		    response.setCharacterEncoding("UTF-8");
-		    PrintWriter out = response.getWriter();
-
-		    out.write(callback + "(" + gson.toJson(index.getStatistics()) + ");");
-		    out.close();
-		} else {
-		    response.sendError(400, "callback is required");
-		}
-		return;
-
+//		// No subject or query parameter
+//		// Return statistics of the index and the collection
+//		String callback = request.getParameter("callback");
+//		if (callback != null && !callback.equals("")) {
+//		    response.setContentType("text/javascript");
+//		    response.setCharacterEncoding("UTF-8");
+//		    PrintWriter out = response.getWriter();
+//
+//		    out.write(callback + "(" + gson.toJson(index.getStatistics()) + ");");
+//		    out.close();
+//		} else {
+//		    response.sendError(400, "callback is required");
+//		}
+		response.sendError(400, "Old no action.");
 	    }
 
 	    if (query != null) {
@@ -369,12 +303,12 @@ public class QueryServletCollection extends HttpServlet {
 		    }
 
 		    // Stop the timer
-		    if (index.queryLogger != null)
-			index.queryLogger.endQuery(query, numResults);
+		    if (index.getQueryLogger() != null)
+			index.getQueryLogger().endQuery(query, numResults);
 
 		    // Generating result items
 		    long time = System.currentTimeMillis();
-		    result = new RDFQueryResult(rawQuery, query, numResults, resultItems, (index.queryLogger != null) ? index.queryLogger.getTime() : 0l);
+		    result = new RDFQueryResult(rawQuery, query, numResults, resultItems, (index.getQueryLogger() != null) ? index.getQueryLogger().getTime() : 0l);
 		    LOGGER.info("Generating results took " + (System.currentTimeMillis() - time) + " ms");
 
 		    // Dereferencing
@@ -406,24 +340,24 @@ public class QueryServletCollection extends HttpServlet {
 
 	    } else if (format != null && format.equals("xml")) {
 		// FIXME: this is not XML!!!!
-		response.setContentType("text/plain");
-		response.setCharacterEncoding("UTF-8");
-		PrintWriter out = response.getWriter();
-		for (int i = 0; i < resultItems.size(); i++) {
-		    ResultItem r = resultItems.get(i);
-		    out.println("<result> " + (i + 1) + "</result>");
-		    if (index.index_idfs != null) {
-			out.println("<documentSize> " + index.index_idfs.sizes.getInt(r.doc) + "</documentSize>");
-		    }
-		    out.println("<score>" + r.score + "</score>");
-		    out.println("<uri>" + r.uri + "</uri>");
-
-		    Document d = index.getCollection().document(r.doc);
-		    out.println("<contents>" + Util.getText(d) + "</contents>");
-		    d.close();
-
-		}
-		out.close();
+//		response.setContentType("text/plain");
+//		response.setCharacterEncoding("UTF-8");
+//		PrintWriter out = response.getWriter();
+//		for (int i = 0; i < resultItems.size(); i++) {
+//		    ResultItem r = resultItems.get(i);
+//		    out.println("<result> " + (i + 1) + "</result>");
+//		    if (index.index_idfs != null) {
+//			out.println("<documentSize> " + index.index_idfs.sizes.getInt(r.doc) + "</documentSize>");
+//		    }
+//		    out.println("<score>" + r.score + "</score>");
+//		    out.println("<uri>" + r.uri + "</uri>");
+//
+//		    Document d = index.getCollection().document(r.doc);
+//		    out.println("<contents>" + Util.getText(d) + "</contents>");
+//		    d.close();
+//
+//		}
+//		out.close();
 		return;
 	    } else if (format != null && format.equals("txt")) {
 		// Return URIs and docs separated by tab

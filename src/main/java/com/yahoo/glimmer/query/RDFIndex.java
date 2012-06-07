@@ -2,7 +2,6 @@ package com.yahoo.glimmer.query;
 
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.io.BinIO;
-import it.unimi.dsi.fastutil.objects.Object2LongFunction;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
@@ -19,8 +18,8 @@ import it.unimi.dsi.mg4j.document.DocumentCollection;
 import it.unimi.dsi.mg4j.index.BitStreamIndex;
 import it.unimi.dsi.mg4j.index.DiskBasedIndex;
 import it.unimi.dsi.mg4j.index.Index;
-import it.unimi.dsi.mg4j.index.TermProcessor;
 import it.unimi.dsi.mg4j.index.Index.UriKeys;
+import it.unimi.dsi.mg4j.index.TermProcessor;
 import it.unimi.dsi.mg4j.query.QueryEngine;
 import it.unimi.dsi.mg4j.query.SelectedInterval;
 import it.unimi.dsi.mg4j.query.nodes.Query;
@@ -81,7 +80,7 @@ public class RDFIndex {
     /** The predicate index **/
     protected Index predicateIndex;
     /** Query logger for performance measurement */
-    protected QueryLogger queryLogger;
+    private QueryLogger queryLogger;
     protected String tokenField = "token";
     protected String uriField;
     /**
@@ -582,7 +581,7 @@ public class RDFIndex {
 	return (BitStreamIndex) precompIndex;
     }
 
-    public Object2LongFunction<CharSequence> getSubjectsMPH() {
+    public LcpMonotoneMinimalPerfectHashFunction<CharSequence> getSubjectsMPH() {
 	return subjectsMPH;
     }
 
@@ -629,4 +628,7 @@ public class RDFIndex {
 	}
     }
 
+    public QueryLogger getQueryLogger() {
+	return queryLogger;
+    }
 }
