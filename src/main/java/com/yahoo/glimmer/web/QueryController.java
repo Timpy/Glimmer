@@ -119,7 +119,7 @@ public class QueryController {
 	    throw new HttpMessageNotReadableException("No query type given.");
 	}
 
-	RDFQueryResult result = querier.doQuery(index, query, command.getPageStart(), command.getPageSize(), command.isDedupe(), command.isDeref());
+	RDFQueryResult result = querier.doQuery(index, query, command.getPageStart(), command.getPageSize(), command.isDeref());
 	return Collections.singletonMap(OBJECT_KEY, result);
     }
 

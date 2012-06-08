@@ -9,11 +9,9 @@ import it.unimi.dsi.mg4j.query.nodes.QueryBuilderVisitorException;
 import it.unimi.dsi.mg4j.search.score.DocumentScoreInfo;
 
 import java.io.IOException;
-import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import com.yahoo.glimmer.disambiguation.RdfDisambiguator;
 import com.yahoo.glimmer.query.QueryLogger;
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.query.RDFQueryResult;
@@ -26,17 +24,9 @@ import com.yahoo.glimmer.query.RDFResultItem;
 public class Querier {
     private final static Logger LOGGER = Logger.getLogger(Querier.class);
     
-    private RdfDisambiguator disambiguator;
-    
-    public RDFQueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean dedupe, boolean deref) throws QueryBuilderVisitorException, IOException {
+    public RDFQueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref) throws QueryBuilderVisitorException, IOException {
 	if (startItem < 0 || maxNumItems < 0 || maxNumItems > 10000) {
 	    throw new IllegalArgumentException("Bad item range - start:" + startItem + " maxNumItems:" + maxNumItems);
-	}
-
-	// When deduping, we ask for twice as many results
-	// We will later reduce this to the original amount
-	if (dedupe) {
-	    maxNumItems *= 2;
 	}
 
 	// Reconfigure scorer
@@ -70,15 +60,6 @@ public class Querier {
 		resultItems.add(resultItem);
 
 	    }
-	    // Dedupe results if requested
-	    if (dedupe) {
-		// This would replace the result list with the
-		// disambiguated list
-		resultItems = dedupe(disambiguator, resultItems, maxNumItems);
-		// This just marks the duplicates
-		// dedupe(disambiguator, resultItems, maxNumItems /
-		// 2 );
-	    }
 	}
 
 	// Stop the timer
@@ -97,41 +78,5 @@ public class Querier {
 	    LOGGER.info("Dereferencing took " + (System.currentTimeMillis() - time) + " ms");
 	}
 	return result;
-    }
-    
-    /**
-     * Remove duplicates from a result list until at least max unique results
-     * are found or the list is exhausted
-     * 
-     * @return
-     */
-    public static ObjectArrayList<RDFResultItem> dedupe(RdfDisambiguator dis, List<RDFResultItem> list, int max) {
-	ObjectArrayList<RDFResultItem> result = new ObjectArrayList<RDFResultItem>();
-	for (RDFResultItem item : list) {
-	    // Compare it with all existing items
-	    boolean found = false;
-	    for (RDFResultItem current : result) {
-		if (dis.compare(current, item)) {
-		    found = true;
-		    // System.out.println(current.getText() + "SAMEAS\n" +
-		    // item.getText());
-		    // Store decisions in the items
-		    current.addDuplicate(item);
-		    item.addDuplicate(current);
-		    break;
-		}
-	    }
-	    if (!found) {
-		result.add(item);
-		if (result.size() >= max) {
-		    break;
-		}
-	    }
-	}
-	return result;
-    }
-    
-    public void setDisambiguator(RdfDisambiguator disambiguator) {
-	this.disambiguator = disambiguator;
     }
 }

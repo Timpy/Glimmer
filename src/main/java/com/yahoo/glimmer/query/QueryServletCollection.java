@@ -14,7 +14,6 @@ import java.io.PrintWriter;
 import java.lang.reflect.Type;
 import java.net.URLEncoder;
 import java.text.DateFormat;
-import java.util.List;
 import java.util.Map;
 
 import javax.servlet.ServletException;
@@ -36,7 +35,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
-import com.yahoo.glimmer.disambiguation.RdfDisambiguator;
 import com.yahoo.glimmer.vocabulary.OwlUtils;
 import com.yahoo.glimmer.web.IndexMap;
 
@@ -83,7 +81,6 @@ public class QueryServletCollection extends HttpServlet {
 	    .create();
 
     protected Context context;
-    protected RdfDisambiguator disambiguator;
     protected Map<String, RDFIndex> indexMap;
 
     public void init() throws ServletException {
@@ -96,31 +93,31 @@ public class QueryServletCollection extends HttpServlet {
      * 
      * @return
      */
-    private ObjectArrayList<RDFResultItem> dedupe(RdfDisambiguator dis, List<RDFResultItem> list, int max) {
-	ObjectArrayList<RDFResultItem> result = new ObjectArrayList<RDFResultItem>();
-	for (RDFResultItem item : list) {
-	    // Compare it with all existing items
-	    boolean found = false;
-	    for (RDFResultItem current : result) {
-		if (dis.compare(current, item)) {
-		    found = true;
-		    // System.out.println(current.getText() + "SAMEAS\n" +
-		    // item.getText());
-		    // Store decisions in the items
-		    current.addDuplicate(item);
-		    item.addDuplicate(current);
-		    break;
-		}
-	    }
-	    if (!found) {
-		result.add(item);
-		if (result.size() >= max) {
-		    break;
-		}
-	    }
-	}
-	return result;
-    }
+//    private ObjectArrayList<RDFResultItem> dedupe(RdfDisambiguator dis, List<RDFResultItem> list, int max) {
+//	ObjectArrayList<RDFResultItem> result = new ObjectArrayList<RDFResultItem>();
+//	for (RDFResultItem item : list) {
+//	    // Compare it with all existing items
+//	    boolean found = false;
+//	    for (RDFResultItem current : result) {
+//		if (dis.compare(current, item)) {
+//		    found = true;
+//		    // System.out.println(current.getText() + "SAMEAS\n" +
+//		    // item.getText());
+//		    // Store decisions in the items
+//		    current.addDuplicate(item);
+//		    item.addDuplicate(current);
+//		    break;
+//		}
+//	    }
+//	    if (!found) {
+//		result.add(item);
+//		if (result.size() >= max) {
+//		    break;
+//		}
+//	    }
+//	}
+//	return result;
+//    }
 
     /**
      * There are the following operations:
@@ -293,14 +290,14 @@ public class QueryServletCollection extends HttpServlet {
 
 			}
 			// Dedupe results if requested
-			if (dedupe) {
-			    // This would replace the result list with the
-			    // disambiguated list
-			    resultItems = dedupe(disambiguator, resultItems, maxNumItems / 2);
-			    // This just marks the duplicates
-			    // dedupe(disambiguator, resultItems, maxNumItems /
-			    // 2 );
-			}
+//			if (dedupe) {
+//			    // This would replace the result list with the
+//			    // disambiguated list
+//			    resultItems = dedupe(disambiguator, resultItems, maxNumItems / 2);
+//			    // This just marks the duplicates
+//			    // dedupe(disambiguator, resultItems, maxNumItems /
+//			    // 2 );
+//			}
 		    }
 
 		    // Stop the timer

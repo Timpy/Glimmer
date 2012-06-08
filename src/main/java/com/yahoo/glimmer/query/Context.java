@@ -14,15 +14,12 @@ public class Context extends Properties {
     private static final String ALIGNMENT_INDEX_KEY = "alignment.index";
     private static final String B_TAG = "b";
     private static final String BLACKLIST_FILENAME_KEY = "blacklist.filename";
-//    private static final String bS = B_TAG;
     private static final String COLLECTION_KEY = "collection";
     private static final String DL_CUTOFF_TAG = "dl.cutoff";
-//    private static final String dlCutS = "dl_cutoff";
     private static final String DOCUMENT_PRIORS_KEY = "document.priors";
     private static final String FIELD_LIST_KEY = "field.list";
     private static final String INDEX_PATH_KEY = "index.path";
     private static final String K1_TAG = "k1";
-//    private static final String k1S = K1_TAG;
     private static final String LOAD_MEMORY_TAG = "load.memory";
     private static final String LOAD_SIZES_TAG = "load.sizes";
     private static final String MAX_NORM_TAG = "max.norm";
@@ -49,19 +46,11 @@ public class Context extends Properties {
     private static final String WF_IMPORTANT_TAG = "wf.important";
     private static final String WF_NEUTRAL_TAG = "wf.neutral";
     private static final String WF_UNIMPORTANT_TAG = "wf.unimportant";
-//    private static final String wfImportantS = "wf_important";
-//    private static final String wfNeutralS = "wf_neutral";
-//    private static final String wfUnimportantS = "wf_unimportant";
-//    private static final String wMatchS = "w_matches";
     private static final String WS_IMPORTANT_TAG = "ws.important";
     private static final String WS_NEUTRAL_TAG = "ws.neutral";
     private static final String WS_UNIMPORTANT_TAG = "ws.unimportant";
-//    private static final String wsImportantS = "ws_important";
-//    private static final String wsNeutralS = "ws_neutral";
-//    private static final String wsUnimportantS = "ws_unimportant";
     private static final String WURI_INDEX_KEY = "wuri.index";
     private static final String WURI_TAG = "wuri";
-//    private static final String wUriS = WURI_TAG;
 
     public Context(Context that) {
 	super(that);
@@ -240,6 +229,7 @@ public class Context extends Properties {
 
     @Deprecated
     public void reload() throws FileNotFoundException, IOException {
+	throw new RuntimeException("This shouldn't be called.");
 	// must be loaded first
 //	if (config_name != null)
 //	    load(config_name);
@@ -313,54 +303,4 @@ public class Context extends Properties {
 	setProperty(COLLECTION_KEY, indexPath + File.separator + COLLECTION_KEY + File.separator);
 	setProperty(ALIGNMENT_INDEX_KEY, indexPath + File.separator + "vertical" + File.separator + "alignment");
     }
-
-//    public void update(HttpServletRequest request) {
-//	// Override context based on request params
-//	if (request != null) {
-//	    String sk1 = request.getParameter(k1S);
-//	    if (sk1 != null && !sk1.equals("")) {
-//		setProperty("k1",  sk1);
-//	    }
-//	    String sb = request.getParameter(bS);
-//	    if (sb != null && !sb.equals("")) {
-//		setProperty("b", sb);
-//	    }
-//	    String sw_matches = request.getParameter(wMatchS);
-//	    if (sw_matches != null && !sw_matches.equals("")) {
-//		w_matches = Double.parseDouble(sw_matches);
-//	    }
-//	    String swf_important = request.getParameter(wfImportantS);
-//	    if (swf_important != null && !swf_important.equals("")) {
-//		wf_important = Double.parseDouble(swf_important);
-//	    }
-//	    String swf_unimportant = request.getParameter(wfUnimportantS);
-//	    if (swf_unimportant != null && !swf_unimportant.equals("")) {
-//		wf_unimportant = Double.parseDouble(swf_unimportant);
-//	    }
-//	    String swf_neutral = request.getParameter(wfNeutralS);
-//	    if (swf_neutral != null && !swf_neutral.equals("")) {
-//		wf_neutral = Double.parseDouble(swf_neutral);
-//	    }
-//	    String swuri = request.getParameter(wUriS);
-//	    if (swuri != null && !swuri.equals("")) {
-//		wuri = Double.parseDouble(swuri);
-//	    }
-//	    String sws_important = request.getParameter(wsImportantS);
-//	    if (sws_important != null && !sws_important.equals("")) {
-//		ws_important = Double.parseDouble(sws_important);
-//	    }
-//	    String sws_unimportant = request.getParameter(wsUnimportantS);
-//	    if (sws_unimportant != null && !sws_unimportant.equals("")) {
-//		ws_unimportant = Double.parseDouble(sws_unimportant);
-//	    }
-//	    String sws_neutral = request.getParameter(wsNeutralS);
-//	    if (sws_neutral != null && !sws_neutral.equals("")) {
-//		ws_neutral = Double.parseDouble(sws_neutral);
-//	    }
-//	    String sdl_cutoff = request.getParameter(dlCutS);
-//	    if (sdl_cutoff != null && !sdl_cutoff.equals("")) {
-//		dl_cutoff = Double.parseDouble(sdl_cutoff);
-//	    }
-//	}
-//    }
 }

@@ -17,7 +17,6 @@
 
 	<bean id="docObjectView" class="com.yahoo.glimmer.web.TextObjectView" />
 	<bean id="jsObjectView" class="com.yahoo.glimmer.web.JsObjectView" />
-	<bean id="rbObjectView" class="com.yahoo.glimmer.web.RelationBrowserObjectView" />
 	<bean id="txtObjectView" class="com.yahoo.glimmer.web.TextObjectView">
 		<property name="includeUri" value="true"/>
 	</bean>

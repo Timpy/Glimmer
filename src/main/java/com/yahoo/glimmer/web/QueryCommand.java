@@ -17,7 +17,6 @@ public class QueryCommand {
     @Min(1)
     @Max(10000)
     public int pageSize = 10;
-    public boolean dedupe;
     public boolean deref;
     public String format;
     
@@ -50,12 +49,6 @@ public class QueryCommand {
     }
     public void setPageSize(int pageSize) {
         this.pageSize = pageSize;
-    }
-    public boolean isDedupe() {
-        return dedupe;
-    }
-    public void setDedupe(boolean dedupe) {
-        this.dedupe = dedupe;
     }
     public boolean isDeref() {
         return deref;
