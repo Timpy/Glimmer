@@ -39,7 +39,7 @@ public class QueryController {
     
     /// For every request populate the index model attribute from the request parameter.
     @ModelAttribute(INDEX_KEY)
-    public RDFIndex getIndex(@RequestParam("index") String indexName) {
+    public RDFIndex getIndex(@RequestParam(INDEX_KEY) String indexName) {
         RDFIndex index = indexMap.get(indexName);
         return index;
     }

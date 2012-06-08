@@ -266,8 +266,9 @@ public class QueryServletCollection extends HttpServlet {
 		    // Reconfigure scorer
 		    if (context != null) {
 			try {
-			    context.reload();
-			    context.update(request);
+			    // TODO do we need this? tep.
+			    //context.reload();
+			    //context.update(request);
 			    LOGGER.info("Reconfiguring scorer");
 			    index.reconfigure(context);
 			} catch (Exception e) {

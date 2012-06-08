@@ -83,22 +83,6 @@ public class RDFQueryParser implements QueryParser {
 	parser = new SimpleParser(fields, defaultField, termProcessors);
     }
 
-    // private static class QueryPart {
-    // String query;
-    // String field;
-    // boolean phrase;
-    //
-    // public QueryPart(String query, String field, boolean phrase) {
-    // this.query = query;
-    // this.field = field;
-    // this.phrase = phrase;
-    // }
-    //
-    // public String toString() {
-    // return "(" + query + "," + field + "," + phrase+ ")";
-    // }
-    // }
-
     public final static String cleanQuery(String query) {
 	// Replace a dotted word such as www.yahoo.com with a phrase query
 	// without dots
@@ -127,10 +111,7 @@ public class RDFQueryParser implements QueryParser {
 		result.append(yahooQuery.charAt(i));
 	    }
 	}
-	// Lowercase
-	// Separate parenthesis from terms with at least one space
-	// result = result.replaceAll("\"", " \" ");
-
+	
 	// Normalize whitespace
 	return result.toString().trim().toLowerCase().replaceAll("[\\s]+", " ");
     }
@@ -190,99 +171,6 @@ public class RDFQueryParser implements QueryParser {
 	return new RDFQueryParser(precompIndex, properties, fields, defaultField, uriField, termProcessors, mph);
     }
 
-    /*
-     * public static Query parseQuery(String raw, boolean vertical, Index
-     * precompIndex, List<String> properties, ObjectSet<String> fields, Context
-     * context) throws IOException { //Normalize whitespace. Encode special
-     * characters String temp = cleanQuery(raw);
-     * 
-     * //TODO: segment each field query using QLAS
-     * 
-     * //TODO: remove terms in a blacklist final ObjectArrayList<Query>
-     * conjuncts = new ObjectArrayList<Query>();
-     * 
-     * 
-     * for(QueryPart part:parts){ final ObjectArrayList<Query> disjuncts = new
-     * ObjectArrayList<Query>();
-     * 
-     * String[] tokens = part.query.split( "[ ]+" ); ObjectArrayList<Term> terms
-     * = new ObjectArrayList<Term>(); for( int i = 0; i < tokens.length; i++ )
-     * if ( tokens[ i ].length() != 0 ) terms.add( new Term( tokens[ i ].trim()
-     * ) );
-     * 
-     * if(part.phrase){ //Phrase query
-     * 
-     * DocumentIterator[] precompIterator = new DocumentIterator[ terms.size()
-     * ]; for( int i = precompIterator.length; i-- != 0; ) if ( ! (
-     * precompIterator[ i ] = precompIndex.documents( terms.get( i ).toString()
-     * ) ).hasNext() ) throw new NoSuchElementException( "Term " + terms.get( i
-     * ) + " is not part of the precomputed index " ); if(terms.size() > 0){
-     * DocumentIterator ii = AndDocumentIterator.getInstance( precompIterator );
-     * //TODO: here we might be adding terms that are not in the index and
-     * WOOScorer might fail, because they don't have an IDF
-     * 
-     * //for( int f = -1; ( f = ii.nextDocument() ) !=
-     * precompIndex.numberOfDocuments - 1; ) { for( int f = -1; ( f =
-     * ii.nextDocument() ) != - 1; ) { ObjectArrayList<Align> alignedTerms = new
-     * ObjectArrayList<Align>(); if ( vertical) { if ( fields.contains(
-     * properties.get( f ) ) ) { disjuncts.add( new Select( properties.get( f ),
-     * new Consecutive( terms.toArray( new Term[ terms.size() ] ) ) ) ); } else
-     * { throw new NoSuchElementException( "indexMap does not contain" +
-     * properties.get( f ) ); } } else { for( Term t: terms ) alignedTerms.add(
-     * new Align( new Select( "token", t ), new Select( "property", new Term( f
-     * ) ) ) ); disjuncts.add( new Consecutive( alignedTerms.toArray( new Align[
-     * alignedTerms.size() ] ) ) ); } }
-     * 
-     * disjuncts.add( new Select( context.WURI_INDEX , new Consecutive(
-     * terms.toArray( new Term[ terms.size() ] ) ) ));
-     * 
-     * ii.dispose(); } } else { //Not a phrase query for (Term term : terms) {
-     * 
-     * IndexIterator ii = precompIndex.documents( term.term );
-     * 
-     * //if ( ! ii.hasNext() ) throw new NoSuchElementException( "Term " +
-     * token.trim() + " is not part of the precomputed index " );
-     * 
-     * //TODO: we are dropping terms from the query that are not in the
-     * collection...is this the right thing to do? //Skip terms that are not in
-     * the precomputed index //if (! ii.hasNext() ) continue;
-     * 
-     * //for( int f = -1; ( f = ii.nextDocument() ) !=
-     * precompIndex.numberOfDocuments - 1; ) { if (ii.hasNext() ) {
-     * 
-     * for( int f = -1; ( f = ii.nextDocument() ) != - 1; ) {
-     * 
-     * if ( vertical ) { if(fields.contains( properties.get( f ) ) ) { //
-     * System.err.println( "From vertical index: " + properties.get( f ) );
-     * disjuncts.add( new Select( properties.get( f ), term ) ); } else {
-     * //System.err.println( "From horizontal  index: " + properties.get( f ) );
-     * disjuncts.add( new Align( new Select( "token", term ), new Select(
-     * "property", new Term ( f ) ) ) ); } }
-     * 
-     * 
-     * } } else { //If the term is not in the fields that we indexed using the
-     * vertical index, we look for it in the horizontal index disjuncts.add( new
-     * Select( "token", term ) ); }
-     * 
-     * //ALERT NEW //if ( VERTICAL ) { disjuncts.add( new Select(
-     * context.WURI_INDEX, term ) ); // disjuncts.add( new Select( "token", new
-     * Term( token ) ) ); // disjuncts.add( new Select( "property", new Term(
-     * token ) ) ); //} //else { // disjuncts.add( new Align( new Select(
-     * "token", new Term( token ) ), new Select( "property", new Term (
-     * context.WURI_INDEX) ) ) ); //} ii.dispose(); } }
-     * 
-     * if(disjuncts.size() > 0) conjuncts.add( new Or( disjuncts.toArray( new
-     * Query[ disjuncts.size() ] ) ) ); }
-     * 
-     * 
-     * 
-     * 
-     * // System.err.println( result );
-     * 
-     * return new And( conjuncts.toArray( new Query[ conjuncts.size() ] ) );
-     * 
-     * }
-     */
     public class MyVisitor extends AbstractQueryBuilderVisitor<Query> {
 	private boolean insideConsecutive = false;
 	private boolean insideSelect = false;
@@ -339,33 +227,28 @@ public class RDFQueryParser implements QueryParser {
 		disjuncts.add(new Select(defaultField, term));
 		disjuncts.add(new Select(uriField, term));
 	    } catch (IOException e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
+		throw new QueryBuilderVisitorException(e);
 	    }
 	    return new Or(disjuncts.toArray(new Query[disjuncts.size()]));
 	}
 
 	@Override
 	public Query visit(Prefix node) throws QueryBuilderVisitorException {
-	    // TODO Auto-generated method stub
 	    return node;
 	}
 
 	@Override
 	public Query visit(Range node) throws QueryBuilderVisitorException {
-	    // TODO Auto-generated method stub
 	    return node;
 	}
 
 	@Override
 	public Query visit(True node) throws QueryBuilderVisitorException {
-	    // TODO Auto-generated method stub
 	    return node;
 	}
 
 	@Override
 	public Query visit(False node) throws QueryBuilderVisitorException {
-	    // TODO Auto-generated method stub
 	    return node;
 	}
 
@@ -417,7 +300,6 @@ public class RDFQueryParser implements QueryParser {
 	}
 
 	public Query visitPost(MultiTerm node, Query[] subNode) throws QueryBuilderVisitorException {
-	    // TODO: is this semantics sensible?
 	    return new Or(subNode);
 	}
 
@@ -434,16 +316,8 @@ public class RDFQueryParser implements QueryParser {
 	    return new Weight(node.weight, subNode);
 	}
 
-	// @Override
-	// public Query visitPost(Expand node, Query subNodeResult)
-	// throws QueryBuilderVisitorException {
-	//
-	// return new Expand(subNodeResult);
-	// }
-
 	@Override
 	public MyVisitor copy() {
-	    // TODO Auto-generated method stub
 	    return new MyVisitor();
 	}
 

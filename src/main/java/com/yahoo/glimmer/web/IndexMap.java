@@ -15,6 +15,7 @@ public class IndexMap extends HashMap<String, RDFIndex> {
 
     private static IndexMap instance;
 
+    @Deprecated
     public static IndexMap getInstance() {
 	if (instance == null) {
 	    throw new IllegalStateException("IndexMap not initialised!");
@@ -36,29 +37,20 @@ public class IndexMap extends HashMap<String, RDFIndex> {
     public void load() throws IOException {
 	Context context = new Context(configFilename);
 
-	if (context.multiIndexPath == null) {
+	if (context.getMultiIndexPath() == null) {
 	    // Single index, index.path property must be present
 	    RDFIndex index = new RDFIndex(context);
-	    put(context.get("index.path"), index);
+	    put(context.getPathToIndex(), index);
 	} else {
 	    // Multiple indices under a root directory
 	    // In this case the config file is a template that we configure for
 	    // each index
-	    for (File file : new File(context.multiIndexPath).listFiles()) {
+	    for (File file : new File(context.getMultiIndexPath()).listFiles()) {
 		if (file.isDirectory() && file.getName().matches("nq2index\\.\\w+")) {
 		    String indexName = file.getName().substring("nq2index.".length());
-		    context = (Context) context.clone();
-		    context.pathToIndex = file.getAbsolutePath() + File.separator + "vertical" + File.separator;
-		    context.TOKEN_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "token";
-		    context.PROPERTY_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "property";
-		    context.WURI_INDEX = file.getAbsolutePath() + File.separator + "horizontal" + File.separator + "uri";
-		    context.TITLE_LIST = file.getAbsolutePath() + File.separator + "subjects.txt";
-		    context.FIELD_LIST = file.getAbsolutePath() + File.separator + "predicates.txt";
-		    context.MPH = file.getAbsolutePath() + File.separator + "subjects.mph";
-		    context.COLLECTION = file.getAbsolutePath() + File.separator + "collection" + File.separator;
-		    context.ALIGNMENT_INDEX = file.getAbsolutePath() + File.separator + "vertical" + File.separator + "alignment";
-
-		    RDFIndex index = new RDFIndex(context);
+		    Context contextCopy = new Context(context);
+		    contextCopy.setIndexPath(file.getAbsolutePath());
+		    RDFIndex index = new RDFIndex(contextCopy);
 		    put(indexName, index);
 		}
 	    }

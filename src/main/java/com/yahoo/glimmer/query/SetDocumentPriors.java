@@ -93,7 +93,7 @@ public class SetDocumentPriors {
 	      * nonhosts.keySet()){ System.out.println("NON HOST	"+hostS); }
 	      */
 	    System.out.print("Serializing priors...");
-	    BinIO.storeObject(priors, context.pathToDocumentPriors);
+	    BinIO.storeObject(priors, context.getPathToDocumentPriors());
 	    System.out.println("done");
 	} catch (IOException e) {
 	    e.printStackTrace();
@@ -102,7 +102,7 @@ public class SetDocumentPriors {
 
     public void readPriorRules() {
 	try {
-	    BufferedReader br = new BufferedReader(new InputStreamReader(new DataInputStream(new FileInputStream(context.pathToPriorRules))));
+	    BufferedReader br = new BufferedReader(new InputStreamReader(new DataInputStream(new FileInputStream(context.getPathToPriorRules()))));
 	    String line;
 	    while ((line = br.readLine()) != null) {
 		if (!line.trim().equals("")) {

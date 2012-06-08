@@ -8,199 +8,359 @@ import java.io.InputStream;
 import java.net.URL;
 import java.util.Properties;
 
-import javax.servlet.http.HttpServletRequest;
-
 public class Context extends Properties {
     private static final long serialVersionUID = 8416864704849882837L;
+    
+    private static final String ALIGNMENT_INDEX_KEY = "alignment.index";
+    private static final String B_TAG = "b";
+    private static final String BLACKLIST_FILENAME_KEY = "blacklist.filename";
+//    private static final String bS = B_TAG;
+    private static final String COLLECTION_KEY = "collection";
+    private static final String DL_CUTOFF_TAG = "dl.cutoff";
+//    private static final String dlCutS = "dl_cutoff";
+    private static final String DOCUMENT_PRIORS_KEY = "document.priors";
+    private static final String FIELD_LIST_KEY = "field.list";
+    private static final String INDEX_PATH_KEY = "index.path";
+    private static final String K1_TAG = "k1";
+//    private static final String k1S = K1_TAG;
+    private static final String LOAD_MEMORY_TAG = "load.memory";
+    private static final String LOAD_SIZES_TAG = "load.sizes";
+    private static final String MAX_NORM_TAG = "max.norm";
+    private static final String MIN_RESULTS_TAG = "min.results";
+    private static final String MPH_KEY = "mph";
+    private static final String MULTIINDEX_PATH_KEY = "multiindex.path";
+    private static final String ONTOLOGY_PATH_KEY = "ontology.path";
+    private static final String PRIOR_RULES_KEY = "prior.rules";
+    private static final String PROPERTY_INDEX_KEY = "property.index";
+    private static final String QRELS_KEY = "qrels";
+    private static final String QUERY_FILE_KEY = "query.file";
+    private static final String REMOVE_STOPWORDS_TAG = "remove.stopwords";
+    private static final String RUN_NAME_TAG = "run.name";
+    private static final String RUNS_FILE_KEY = "runs.file";
+    private static final String SEGMENTATION_CACHE_KEY = "segmentation.cache";
+    private static final String STORE_CACHE_TAG = "store.cache";
+    private static final String SW_LIST_KEY = "sw.list";
+    private static final String TITLE_LIST_KEY = "title.list";
+    private static final String TOKEN_INDEX_KEY = "token.index";
+    private static final String TOP_K_KEY = "top.k";
+    private static final String USE_SEGMENTS_KEY = "use.segments";
+    private static final String USE_TIES_KEY = "use.ties";
+    private static final String W_MATCHES_TAG = "w.matches";
+    private static final String WF_IMPORTANT_TAG = "wf.important";
+    private static final String WF_NEUTRAL_TAG = "wf.neutral";
+    private static final String WF_UNIMPORTANT_TAG = "wf.unimportant";
+//    private static final String wfImportantS = "wf_important";
+//    private static final String wfNeutralS = "wf_neutral";
+//    private static final String wfUnimportantS = "wf_unimportant";
+//    private static final String wMatchS = "w_matches";
+    private static final String WS_IMPORTANT_TAG = "ws.important";
+    private static final String WS_NEUTRAL_TAG = "ws.neutral";
+    private static final String WS_UNIMPORTANT_TAG = "ws.unimportant";
+//    private static final String wsImportantS = "ws_important";
+//    private static final String wsNeutralS = "ws_neutral";
+//    private static final String wsUnimportantS = "ws_unimportant";
+    private static final String WURI_INDEX_KEY = "wuri.index";
+    private static final String WURI_TAG = "wuri";
+//    private static final String wUriS = WURI_TAG;
 
-    public static final String k1S = "k1";
-    public static final String bS = "b";
-    public static final String wMatchS = "w_matches";
-    public static final String wfImportantS = "wf_important";
-    public static final String wfUnimportantS = "wf_unimportant";
-    public static final String wfNeutralS = "wf_neutral";
-    public static final String wUriS = "wuri";
-    public static final String wsImportantS = "ws_important";
-    public static final String wsUnimportantS = "ws_unimportant";
-    public static final String wsNeutralS = "ws_neutral";
-    public static final String dlCutS = "dl_cutoff";
-
-    // Config file location
-    private String config_name;
-
-    // NEEDED
-    public String RUNS_FILE;
-    public int RESULTS_CUTOFF;
-    public String RUNS_NAME;
-    public boolean NORMALISE_LENGTHS = false;
-    public boolean USE_TIES;
-    public String PROPERTY_INDEX;
-    public String FIELD_LIST;
-    public String QUERY_FILE;
-    public boolean BREAK_TIES;
-    public boolean LOAD_TFS;
-    public boolean INCLUDE_CONTEXT;
-    public boolean PRINT_ALL;
-    public int REL_THRESHOLD;
-    public int SIZE_TOP_K;
-    public double b;
-    public double k1;
-    public String pathToIndex;
-    public String pathToPriorRules;
-    public String pathToDocumentPriors;
-    public boolean remove_stopwords;
-    public String SW_LIST;
-    public String TITLE_LIST;
-    public boolean LOAD_INDEXES_INTO_MEMORY;
-    public String LOAD_DOCUMENT_SIZES;
-    public double w_matches;
-    private Properties pro = new Properties();
-    public String TOKEN_INDEX;
-    public String WURI_INDEX;
-
-    public double wf_important;
-    public int max_number_of_fields_norm;
-    public double wf_unimportant;
-    public double wf_neutral;
-    public double wuri;
-    public double ws_important;
-    public double ws_unimportant;
-    public double ws_neutral;
-    public double dl_cutoff;
-    public String COLLECTION;
-    public String SEGMENTATION_CACHE;
-    public String BLACKLIST_FILENAME;
-    public String QRELS;
-    public String MPH;
-    public boolean store_cache;
-    public String ALIGNMENT_INDEX;
-    public boolean USE_SEGMENTS;
-    public String ontoPath;
-    public String multiIndexPath;
-
-    public void load(String args) throws FileNotFoundException, IOException {
-	config_name = args;
+    public Context(Context that) {
+	super(that);
+    }
+    public Context(String filename) throws FileNotFoundException, IOException{
+	super();
 	InputStream fs;
 	try {
-	    fs = new FileInputStream(args);
+	    fs = new FileInputStream(filename);
 	} catch (FileNotFoundException fnfe) {
-	    URL resource = Context.class.getClassLoader().getResource(args);
+	    URL resource = Context.class.getClassLoader().getResource(filename);
 	    fs = new FileInputStream(new File(resource.getFile()));
 	}
-
-	pro.load(fs);
-	USE_TIES = Boolean.parseBoolean(pro.getProperty("use.ties", "true"));
-	USE_SEGMENTS = Boolean.parseBoolean(pro.getProperty("use.segments", "true"));
-	SIZE_TOP_K = Integer.parseInt(pro.getProperty("top.k", "1000"));
-	pathToIndex = pro.getProperty("index.path");
-	pathToPriorRules = pro.getProperty("prior.rules");
-	pathToDocumentPriors = pro.getProperty("document.priors");
-	QUERY_FILE = pro.getProperty("query.file");
-	ALIGNMENT_INDEX = pro.getProperty("alignment.index");
-	MPH = pro.getProperty("mph");
-	b = Double.parseDouble(pro.getProperty("b", "0.75"));
-	k1 = Double.parseDouble(pro.getProperty("k1", "1.2"));
-	SW_LIST = pro.getProperty("sw.list");
-	TITLE_LIST = pro.getProperty("title.list");
-	remove_stopwords = Boolean.parseBoolean(pro.getProperty("remove.stopwords", "false"));
-	// LOAD_DOCUMENT_SIZES =
-	// Boolean.parseBoolean(pro.getProperty("load.sizes", "false"));
-	LOAD_DOCUMENT_SIZES = pro.getProperty("load.sizes", "false");
-	LOAD_INDEXES_INTO_MEMORY = Boolean.parseBoolean(pro.getProperty("load.memory", "false"));
-	w_matches = Double.parseDouble(pro.getProperty("w.matches", "1"));
-	TOKEN_INDEX = pro.getProperty("token.index");
-	WURI_INDEX = pro.getProperty("wuri.index");
-	PROPERTY_INDEX = pro.getProperty("property.index");
-	FIELD_LIST = pro.getProperty("field.list");
-	COLLECTION = pro.getProperty("collection");
-	wf_important = Double.parseDouble(pro.getProperty("wf.important", "1"));
-	wf_unimportant = Double.parseDouble(pro.getProperty("wf.unimportant", "1"));
-	wf_neutral = Double.parseDouble(pro.getProperty("wf.neutral", "1"));
-	wuri = Double.parseDouble(pro.getProperty("wuri", "1"));
-	ws_important = Double.parseDouble(pro.getProperty("ws.important", "1"));
-	ws_unimportant = Double.parseDouble(pro.getProperty("ws.unimportant", "1"));
-	ws_neutral = Double.parseDouble(pro.getProperty("ws.neutral", "1"));
-	dl_cutoff = Double.parseDouble(pro.getProperty("dl.cutoff", "100"));
-	max_number_of_fields_norm = Integer.parseInt(pro.getProperty("max.norm", "5"));
-	RESULTS_CUTOFF = Integer.parseInt(pro.getProperty("min.results", "100"));
-	SEGMENTATION_CACHE = pro.getProperty("segmentation.cache");
-	BLACKLIST_FILENAME = pro.getProperty("blacklist.filename", "blacklist.txt");
-	QRELS = pro.getProperty("qrels");
-	RUNS_FILE = pro.getProperty("runs.file");
-	RUNS_NAME = pro.getProperty("run.name", "Y!NLRABCN");
-	store_cache = Boolean.parseBoolean(pro.getProperty("store.cache", "true"));
-	ontoPath = pro.getProperty("ontology.path");
-	multiIndexPath = pro.getProperty("multiindex.path");
+	super.load(fs);
+    }
+    
+    public String getAlignmentIndex() {
+	return getProperty(ALIGNMENT_INDEX_KEY);
+    }
+    
+    public double getB() {
+	return getDouble(B_TAG, 0.75);
     }
 
+    public String getBLACKLIST_FILENAME() {
+	return getProperty(BLACKLIST_FILENAME_KEY, "blacklist.txt");
+    }
+
+    public String getCollection() {
+	return getProperty(COLLECTION_KEY);
+    }
+
+    public double getdl_cutoff() {
+	return getDouble(DL_CUTOFF_TAG, 100);
+    }
+
+    public String getFieldList() {
+	return getProperty(FIELD_LIST_KEY);
+    }
+
+    public double getK1() {
+	return getDouble(K1_TAG, 1.2);
+    }
+
+    public boolean getLOAD_DOCUMENT_SIZES() {
+	return getBoolean(LOAD_SIZES_TAG, false);
+    }
+
+    public boolean getLOAD_INDEXES_INTO_MEMORY() {
+	return getBoolean(LOAD_MEMORY_TAG, false);
+    }
+
+    public int getmax_number_of_fields_norm() {
+	return getInt(MAX_NORM_TAG, 5);
+    }
+
+    public String getMph() {
+	return getProperty(MPH_KEY);
+    }
+
+    public String getMultiIndexPath() {
+	return getProperty(MULTIINDEX_PATH_KEY);
+    }
+
+    public String getOntoPath() {
+	return getProperty(ONTOLOGY_PATH_KEY);
+    }
+
+    public String getPathToDocumentPriors() {
+	return getProperty(DOCUMENT_PRIORS_KEY);
+    }
+
+    public String getPathToIndex() {
+	return getProperty(INDEX_PATH_KEY);
+    }
+
+    public String getPathToPriorRules() {
+	return getProperty(PRIOR_RULES_KEY);
+    }
+
+    public String getPropertyIndex() {
+	return getProperty(PROPERTY_INDEX_KEY);
+    }
+
+    public String getQRels() {
+	return getProperty(QRELS_KEY);
+    }
+
+    public String getQueryFile() {
+	return getProperty(QUERY_FILE_KEY);
+    }
+
+    public boolean getRemoveStopwords() {
+	return getBoolean(REMOVE_STOPWORDS_TAG, false);
+    }
+
+    public int getresultsCutoff() {
+	return getInt(MIN_RESULTS_TAG, 100);
+    }
+
+    public String getRunsFile() {
+	return getProperty(RUNS_FILE_KEY);
+    }
+
+    public String getRunsName() {
+	return getString(RUN_NAME_TAG, "Y!NLRABCN");
+    }
+
+    public String getSegmentationCache() {
+	return getProperty(SEGMENTATION_CACHE_KEY);
+    }
+
+    public int getSizeTopK() {
+	return getInt(TOP_K_KEY, 1000);
+    }
+
+    public boolean getstore_cache() {
+	return getBoolean(STORE_CACHE_TAG, true);
+    }
+
+    public String getSwList() {
+	return getProperty(SW_LIST_KEY);
+    }
+
+    public String getTitleList() {
+	return getProperty(TITLE_LIST_KEY);
+    }
+
+    public String getTokenIndex() {
+	return getProperty(TOKEN_INDEX_KEY);
+    }
+
+    public boolean getUseSegements() {
+	return getBoolean(USE_SEGMENTS_KEY, true);
+    }
+
+    public boolean getUseTies() {
+	return getBoolean(USE_TIES_KEY, true);
+    }
+
+    public double getw_matches() {
+	return getDouble(W_MATCHES_TAG, 1);
+    }
+
+    public double getwf_important() {
+	return getDouble(WF_IMPORTANT_TAG, 1);
+    }
+
+    public double getwf_neutral() {
+	return getDouble(WF_NEUTRAL_TAG, 1);
+    }
+
+    public double getwf_unimportant() {
+	return getDouble(WF_UNIMPORTANT_TAG, 1);
+    }
+
+    public double getws_important() {
+	return getDouble(WS_IMPORTANT_TAG, 1);
+    }
+
+    public double getws_neutral() {
+	return getDouble(WS_NEUTRAL_TAG, 1);
+    }
+
+    public double getws_unimportant() {
+	return getDouble(WS_UNIMPORTANT_TAG, 1);
+    }
+
+    public double getwuri() {
+	return getDouble(WURI_TAG, 1);
+    }
+
+    public String getWuriIndex() {
+	return getProperty(WURI_INDEX_KEY);
+    }
+
+    @Deprecated
     public void reload() throws FileNotFoundException, IOException {
 	// must be loaded first
-	if (config_name != null)
-	    load(config_name);
+//	if (config_name != null)
+//	    load(config_name);
+//    }
     }
 
-    public Context(String args) throws FileNotFoundException, IOException {
-	load(args);
-    }
-
-    public String get(String key) {
-
-	return pro.getProperty(key);
-    }
-
-    public void put(String key, String value) {
-	pro.setProperty(key, value);
-    }
-
-    public void update(HttpServletRequest request) {
-	// Override context based on request params
-	if (request != null) {
-	    String sk1 = request.getParameter(k1S);
-	    if (sk1 != null && !sk1.equals("")) {
-		k1 = Double.parseDouble(sk1);
-	    }
-	    String sb = request.getParameter(bS);
-	    if (sb != null && !sb.equals("")) {
-		b = Double.parseDouble(sb);
-	    }
-	    String sw_matches = request.getParameter(wMatchS);
-	    if (sw_matches != null && !sw_matches.equals("")) {
-		w_matches = Double.parseDouble(sw_matches);
-	    }
-	    String swf_important = request.getParameter(wfImportantS);
-	    if (swf_important != null && !swf_important.equals("")) {
-		wf_important = Double.parseDouble(swf_important);
-	    }
-	    String swf_unimportant = request.getParameter(wfUnimportantS);
-	    if (swf_unimportant != null && !swf_unimportant.equals("")) {
-		wf_unimportant = Double.parseDouble(swf_unimportant);
-	    }
-	    String swf_neutral = request.getParameter(wfNeutralS);
-	    if (swf_neutral != null && !swf_neutral.equals("")) {
-		wf_neutral = Double.parseDouble(swf_neutral);
-	    }
-	    String swuri = request.getParameter(wUriS);
-	    if (swuri != null && !swuri.equals("")) {
-		wuri = Double.parseDouble(swuri);
-	    }
-	    String sws_important = request.getParameter(wsImportantS);
-	    if (sws_important != null && !sws_important.equals("")) {
-		ws_important = Double.parseDouble(sws_important);
-	    }
-	    String sws_unimportant = request.getParameter(wsUnimportantS);
-	    if (sws_unimportant != null && !sws_unimportant.equals("")) {
-		ws_unimportant = Double.parseDouble(sws_unimportant);
-	    }
-	    String sws_neutral = request.getParameter(wsNeutralS);
-	    if (sws_neutral != null && !sws_neutral.equals("")) {
-		ws_neutral = Double.parseDouble(sws_neutral);
-	    }
-	    String sdl_cutoff = request.getParameter(dlCutS);
-	    if (sdl_cutoff != null && !sdl_cutoff.equals("")) {
-		dl_cutoff = Double.parseDouble(sdl_cutoff);
-	    }
+    public Boolean getBoolean(String key) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return null;
 	}
-
+	return Boolean.parseBoolean(value);
     }
 
+    public boolean getBoolean(String key, boolean defaultValue) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return defaultValue;
+	}
+	return Boolean.parseBoolean(value);
+    }
+    
+    public Double getDouble(String key) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return null;
+	}
+	return Double.parseDouble(value);
+    }
+
+    public double getDouble(String key, double defaultValue) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return defaultValue;
+	}
+	return Double.parseDouble(value);
+    }
+    
+    public int getInt(String key, int defaultValue) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return defaultValue;
+	}
+	return Integer.parseInt(value);
+    }
+
+    public Integer getInteger(String key) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return null;
+	}
+	return Integer.parseInt(value);
+    }
+    
+    public String getString(String key) {
+	return getProperty(key);
+    }
+
+    public String getString(String key, String defaultValue) {
+	return getProperty(key, defaultValue);
+    }
+    
+    public void setIndexPath(String indexPath) {
+	setProperty(INDEX_PATH_KEY, indexPath + File.separator + "vertical" + File.separator);
+	setProperty(TOKEN_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "token");
+	setProperty(PROPERTY_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "property");
+	setProperty(WURI_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "uri");
+	setProperty(TITLE_LIST_KEY, indexPath + File.separator + "subjects.txt");
+	setProperty(FIELD_LIST_KEY, indexPath + File.separator + "predicates.txt");
+	setProperty(MPH_KEY, indexPath + File.separator + "subjects.mph");
+	setProperty(COLLECTION_KEY, indexPath + File.separator + COLLECTION_KEY + File.separator);
+	setProperty(ALIGNMENT_INDEX_KEY, indexPath + File.separator + "vertical" + File.separator + "alignment");
+    }
+
+//    public void update(HttpServletRequest request) {
+//	// Override context based on request params
+//	if (request != null) {
+//	    String sk1 = request.getParameter(k1S);
+//	    if (sk1 != null && !sk1.equals("")) {
+//		setProperty("k1",  sk1);
+//	    }
+//	    String sb = request.getParameter(bS);
+//	    if (sb != null && !sb.equals("")) {
+//		setProperty("b", sb);
+//	    }
+//	    String sw_matches = request.getParameter(wMatchS);
+//	    if (sw_matches != null && !sw_matches.equals("")) {
+//		w_matches = Double.parseDouble(sw_matches);
+//	    }
+//	    String swf_important = request.getParameter(wfImportantS);
+//	    if (swf_important != null && !swf_important.equals("")) {
+//		wf_important = Double.parseDouble(swf_important);
+//	    }
+//	    String swf_unimportant = request.getParameter(wfUnimportantS);
+//	    if (swf_unimportant != null && !swf_unimportant.equals("")) {
+//		wf_unimportant = Double.parseDouble(swf_unimportant);
+//	    }
+//	    String swf_neutral = request.getParameter(wfNeutralS);
+//	    if (swf_neutral != null && !swf_neutral.equals("")) {
+//		wf_neutral = Double.parseDouble(swf_neutral);
+//	    }
+//	    String swuri = request.getParameter(wUriS);
+//	    if (swuri != null && !swuri.equals("")) {
+//		wuri = Double.parseDouble(swuri);
+//	    }
+//	    String sws_important = request.getParameter(wsImportantS);
+//	    if (sws_important != null && !sws_important.equals("")) {
+//		ws_important = Double.parseDouble(sws_important);
+//	    }
+//	    String sws_unimportant = request.getParameter(wsUnimportantS);
+//	    if (sws_unimportant != null && !sws_unimportant.equals("")) {
+//		ws_unimportant = Double.parseDouble(sws_unimportant);
+//	    }
+//	    String sws_neutral = request.getParameter(wsNeutralS);
+//	    if (sws_neutral != null && !sws_neutral.equals("")) {
+//		ws_neutral = Double.parseDouble(sws_neutral);
+//	    }
+//	    String sdl_cutoff = request.getParameter(dlCutS);
+//	    if (sdl_cutoff != null && !sdl_cutoff.equals("")) {
+//		dl_cutoff = Double.parseDouble(sdl_cutoff);
+//	    }
+//	}
+//    }
 }

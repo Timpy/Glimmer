@@ -86,7 +86,6 @@ public class RDFResultItem extends ResultItem {
 	    Document d = collection.document(id);
 	    title = d.title();
 	    uri = d.uri();
-	    // resultItem.text = Util.getText(d);
 	    this.parseData(Util.getText(d).toString(), fieldNames);
 	    d.close();
 	} else {

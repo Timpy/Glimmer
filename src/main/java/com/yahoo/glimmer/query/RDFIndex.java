@@ -68,7 +68,7 @@ public class RDFIndex {
     private DocumentCollection documentCollection = null;
     /** An optional title list if the document collection is not present. */
     /** The token index */
-    protected BitStreamIndex index_idfs;
+    protected BitStreamIndex indexIdfs;
     /** Term counts in the token index */
     protected SemiExternalGammaList frequencies = null;
     /** Document priors */
@@ -97,18 +97,16 @@ public class RDFIndex {
 	init(context);
     }
 
-    private void init(Context context) {
-	init(context, context.COLLECTION, context.TITLE_LIST, context.pathToIndex, context.LOAD_DOCUMENT_SIZES, context.MPH);
-    }
-
     @SuppressWarnings("unchecked")
-    private void init(Context context, String collectionString, String titleListString, String indexString, String loadSizesString, String mphString) {
+    private void init(Context context){
+	
 	// Load the collection or titlelist
 	try {
-	    if (collectionString != null) {
-		LOGGER.info("Loading collection from " + collectionString);
+	    if (context.getCollection() != null) {
+		LOGGER.info("Loading collection from " + context.getCollection());
 
 		// Check if collection is a file or directory
+		String collectionString = context.getCollection();
 		if (new File(collectionString).isFile()) {
 		    documentCollection = (it.unimi.dsi.mg4j.document.SimpleCompressedDocumentCollection) BinIO.loadObject(collectionString);
 		    documentCollection.filename(collectionString);
@@ -161,11 +159,11 @@ public class RDFIndex {
 	if (documentCollection == null) {
 	    LOGGER.info("No collection specified, we will try to use a title list...");
 
-	    if (titleListString != null && !titleListString.equals("")) {
+	    if (context.getTitleList() != null && !context.getTitleList().equals("")) {
 		LOGGER.info("Loading titlelist...");
 		List<MutableString> titleList;
 		try {
-		    titleList = new FileLinesList(titleListString, "ASCII");
+		    titleList = new FileLinesList(context.getTitleList(), "ASCII");
 		    LOGGER.info("Loaded titlelist of size " + titleList.size() + ".");
 		    documentCollection = new TitleListDocumentCollection(titleList);
 		} catch (Exception e) {
@@ -175,12 +173,12 @@ public class RDFIndex {
 	}
 
 	// Load MPH
-	if (mphString == null || mphString.equals("")) {
+	if (context.getMph() == null || context.getMph().equals("")) {
 	    LOGGER.warn("Warning, no mph specified!");
 	} else {
 	    LOGGER.info("Loading Minimal Perfect Hash (MPH)...");
 	    try {
-		subjectsMPH = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) BinIO.loadObject(mphString);
+		subjectsMPH = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) BinIO.loadObject(context.getMph());
 	    } catch (IOException e) {
 		e.printStackTrace();
 	    } catch (ClassNotFoundException e) {
@@ -191,20 +189,20 @@ public class RDFIndex {
 
 	EnumMap<UriKeys, String> map = new EnumMap<UriKeys, String>(UriKeys.class);
 
-	if (context.LOAD_INDEXES_INTO_MEMORY)
+	if (context.getLOAD_INDEXES_INTO_MEMORY())
 	    map.put(UriKeys.INMEMORY, "true");
 	else
 	    map.put(UriKeys.MAPPED, "true");
 
 	// Load the indices
-	if (indexString == null || indexString.equals("")) {
+	if (context.getPathToIndex() == null || context.getPathToIndex().equals("")) {
 	    throw new IllegalArgumentException("<index> is a mandatory servlet init parameter");
 	}
 
 	final String[] basenameWeight;
-	if (indexString.endsWith(System.getProperty("file.separator"))) {
+	if (context.getPathToIndex().endsWith(System.getProperty("file.separator"))) {
 	    // List .index files in directory
-	    File[] indexFiles = new File(indexString).listFiles(new FilenameFilter() {
+	    File[] indexFiles = new File(context.getPathToIndex()).listFiles(new FilenameFilter() {
 		public boolean accept(File dir, String name) {
 		    if (name.endsWith(".properties"))
 			return true;
@@ -220,89 +218,85 @@ public class RDFIndex {
 	    }
 	} else {
 	    // Single base name
-	    basenameWeight = new String[] { indexString };
+	    basenameWeight = new String[] { context.getPathToIndex() };
 	}
 
 	Object2ReferenceMap<String, Index> indexMap;
 	try {
-	    boolean loadSizes = false;
-	    if (loadSizesString != null && !loadSizesString.equals("")) {
-		loadSizes = Boolean.parseBoolean(loadSizesString);
-	    }
 	    // This method also loads weights from the index URI
 	    // We ignore these weights
 	    Reference2DoubleOpenHashMap<Index> index2Weight = new Reference2DoubleOpenHashMap<Index>();
-	    indexMap = loadIndicesFromSpec(basenameWeight, loadSizes, documentCollection, index2Weight, loadSizes, map);
+	    indexMap = loadIndicesFromSpec(basenameWeight, context.getLOAD_DOCUMENT_SIZES(), documentCollection, index2Weight, context.getLOAD_DOCUMENT_SIZES(), map);
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(e);
 	}
 
 	LOGGER.info("Loaded " + basenameWeight.length + " indices.");
 
-	if (context != null && context.TOKEN_INDEX != null) {
-	    index_idfs = (BitStreamIndex) indexMap.get(context.TOKEN_INDEX);
-	    if (index_idfs == null) {
+	if (context != null && context.getTokenIndex() != null) {
+	    indexIdfs = (BitStreamIndex) indexMap.get(context.getTokenIndex());
+	    if (indexIdfs == null) {
 		// could always load sizes!
 		try {
 		    LOGGER.info("Loading token index.");
-		    index_idfs = (BitStreamIndex) DiskBasedIndex.getInstance(context.TOKEN_INDEX, true, true, true, map);
+		    indexIdfs = (BitStreamIndex) DiskBasedIndex.getInstance(context.getTokenIndex(), true, true, true, map);
 		} catch (Exception e) {
 		    throw new RuntimeException(e);
 
 		}
-		indexMap.put(tokenField, index_idfs);
+		indexMap.put(tokenField, indexIdfs);
 	    }
 	}
 
 	// Load field list
-	if (context != null && context.FIELD_LIST != null) {
+	if (context != null && context.getFieldList() != null) {
 	    fields = new ArrayList<String>();
-	    LOGGER.info("Loading field list from " + context.FIELD_LIST);
-	    for (java.util.Iterator<it.unimi.dsi.lang.MutableString> iterator = new it.unimi.dsi.io.FileLinesCollection(context.FIELD_LIST, "UTF-8").iterator(); iterator
+	    LOGGER.info("Loading field list from " + context.getFieldList());
+	    for (java.util.Iterator<it.unimi.dsi.lang.MutableString> iterator = new it.unimi.dsi.io.FileLinesCollection(context.getFieldList(), "UTF-8").iterator(); iterator
 		    .hasNext();)
 		fields.add(RDFDocumentFactory.encodeFieldName(iterator.next().toString()));
 	}
 
 	// Load the alignment index
 	try {
-	    LOGGER.info("Loading alignment index from " + context.ALIGNMENT_INDEX);
-	    precompIndex = Index.getInstance(context.ALIGNMENT_INDEX + "?mapped=1");
+	    LOGGER.info("Loading alignment index from " + context.getAlignmentIndex());
+	    precompIndex = Index.getInstance(context.getAlignmentIndex() + "?mapped=1");
 	} catch (Exception e) {
 	    LOGGER.error("Failed to load alignment index", e);
 	}
 
 	// Load the predicate index
 	try {
-	    LOGGER.info("Loading predicate index from " + context.PROPERTY_INDEX);
-	    predicateIndex = Index.getInstance(context.PROPERTY_INDEX + "?mapped=1");
+	    LOGGER.info("Loading predicate index from " + context.getPropertyIndex());
+	    predicateIndex = Index.getInstance(context.getPropertyIndex() + "?mapped=1");
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(e);
 	}
 
-	if (context != null && context.WURI_INDEX != null && indexMap.get(context.WURI_INDEX) == null) {
+	if (context != null && context.getWuriIndex() != null && indexMap.get(context.getWuriIndex()) == null) {
 	    try {
-		LOGGER.info("Loading uri index from " + context.WURI_INDEX);
-		uriField = context.WURI_INDEX;
+		LOGGER.info("Loading uri index from " + context.getWuriIndex());
+		uriField = context.getWuriIndex();
 		Index index_wuri = (BitStreamIndex) DiskBasedIndex.getInstance(uriField, true, false, true, map);
 		indexMap.put(uriField, index_wuri);
 	    } catch (Exception e) {
 		e.printStackTrace();
 	    }
 	} else {
-	    LOGGER.warn("WURI_INDEX is null, tried to load from " + context.WURI_INDEX);
+	    LOGGER.warn("WURI Index is null, tried to load from " + context.getWuriIndex());
 	}
 
 	// Loading frequencies
-	if (context != null && context.TOKEN_INDEX != null) {
+	if (context != null && context.getTokenIndex() != null) {
 	    try {
-		LOGGER.info("Loading frequencies from " + context.TOKEN_INDEX + DiskBasedIndex.FREQUENCIES_EXTENSION);
-		frequencies = new SemiExternalGammaList(new InputBitStream(context.TOKEN_INDEX + DiskBasedIndex.FREQUENCIES_EXTENSION), 1,
-			index_idfs.termMap.size());
-		if (frequencies.size() != index_idfs.numberOfDocuments) {
-		    LOGGER.warn("Loaded " + frequencies.size() + " frequency values but index_idfs.numberOfDocuments is " + index_idfs.numberOfDocuments);
+		LOGGER.info("Loading frequencies from " + context.getTokenIndex() + DiskBasedIndex.FREQUENCIES_EXTENSION);
+		frequencies = new SemiExternalGammaList(new InputBitStream(context.getTokenIndex() + DiskBasedIndex.FREQUENCIES_EXTENSION), 1,
+			indexIdfs.termMap.size());
+		if (frequencies.size() != indexIdfs.numberOfDocuments) {
+		    LOGGER.warn("Loaded " + frequencies.size() + " frequency values but index_idfs.numberOfDocuments is " + indexIdfs.numberOfDocuments);
 		}
 	    } catch (Exception e) {
-		LOGGER.error("Failed to load token index: " + context.TOKEN_INDEX);
+		LOGGER.error("Failed to load token index: " + context.getTokenIndex());
 		throw new IllegalArgumentException(e);
 	    }
 	} else {
@@ -325,10 +319,10 @@ public class RDFIndex {
 	queryEngine.intervalSelector = null;
 
 	// Load priors
-	if (context != null && context.pathToDocumentPriors != null) {
-	    LOGGER.info("Loading priors from " + context.pathToDocumentPriors);
+	if (context != null && context.getPathToDocumentPriors() != null) {
+	    LOGGER.info("Loading priors from " + context.getPathToDocumentPriors());
 	    try {
-		documentPriors = (HashMap<Integer, Integer>) BinIO.loadObject(context.pathToDocumentPriors);
+		documentPriors = (HashMap<Integer, Integer>) BinIO.loadObject(context.getPathToDocumentPriors());
 	    } catch (Exception e) {
 		LOGGER.warn("Failed to load priors", e);
 	    }
@@ -346,7 +340,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), "token", context.WURI_INDEX, termProcessors, getSubjectsMPH());
+	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), "token", context.getWuriIndex(), termProcessors, getSubjectsMPH());
 
 	// Compute stats
 	try {
@@ -356,11 +350,11 @@ public class RDFIndex {
 	}
 
 	// Load the ontology if provided
-	if (context.ontoPath != null) {
+	if (context.getOntoPath() != null) {
 	    OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
-	    File owlOntologyFile = new File(context.ontoPath);
+	    File owlOntologyFile = new File(context.getOntoPath());
 	    if (!owlOntologyFile.exists()) {
-		URL owlOntologyUrl = this.getClass().getClassLoader().getResource(context.ontoPath);
+		URL owlOntologyUrl = this.getClass().getClassLoader().getResource(context.getOntoPath());
 		if (owlOntologyUrl != null) {
 		    owlOntologyFile = new File(owlOntologyUrl.getFile());
 		}
@@ -454,13 +448,13 @@ public class RDFIndex {
     private Reference2DoubleOpenHashMap<Index> loadB(Context context) {
 	Reference2DoubleOpenHashMap<Index> b = new Reference2DoubleOpenHashMap<Index>();
 
-	double db = context.b;
+	double db = context.getB();
 
 	for (String indexName : getIndexedFields()) {
 	    // TODO load from file if needed
 	    b.put(getField(indexName), db);
 	}
-	b.put(index_idfs, db);
+	b.put(indexIdfs, db);
 	return b;
     }
 
@@ -477,20 +471,20 @@ public class RDFIndex {
 	Object2ReferenceMap<String, Index> indexMap = queryEngine.indexMap;
 
 	for (String index : indexMap.keySet()) {
-	    String w = context.get("w." + index);
+	    String w = context.getString("w." + index);
 	    if (w == null) { // unimportant
-		index2Weight.put((Index) indexMap.get(index), context.wf_unimportant * indexMap.keySet().size());
+		index2Weight.put((Index) indexMap.get(index), context.getwf_unimportant() * indexMap.keySet().size());
 	    } else {
 		if (w.equals(SetDocumentPriors.IMPORTANT))
-		    index2Weight.put((Index) indexMap.get(index), context.wf_important * indexMap.keySet().size());
+		    index2Weight.put((Index) indexMap.get(index), context.getwf_important() * indexMap.keySet().size());
 		else if (w.equals(SetDocumentPriors.UNIMPORTANT))
-		    index2Weight.put((Index) indexMap.get(index), context.wf_unimportant * indexMap.keySet().size());
+		    index2Weight.put((Index) indexMap.get(index), context.getwf_unimportant() * indexMap.keySet().size());
 		else if (w.equals(SetDocumentPriors.NEUTRAL))
-		    index2Weight.put((Index) indexMap.get(index), context.wf_neutral * indexMap.keySet().size());
+		    index2Weight.put((Index) indexMap.get(index), context.getwf_neutral() * indexMap.keySet().size());
 	    }
 	}
-	if (context.WURI_INDEX != null) {
-	    index2Weight.put((Index) indexMap.get(context.WURI_INDEX), context.wuri * indexMap.keySet().size());
+	if (context.getWuriIndex() != null) {
+	    index2Weight.put((Index) indexMap.get(context.getWuriIndex()), context.getwuri() * indexMap.keySet().size());
 
 	}
 	// System.out.println("Final weights:"+index2Weight);
@@ -502,13 +496,13 @@ public class RDFIndex {
 	Reference2DoubleOpenHashMap<Index> bByIndex = loadB(context);
 
 	double[] documentWeights = new double[3];
-	documentWeights[Integer.parseInt(SetDocumentPriors.IMPORTANT)] = context.ws_important;
-	documentWeights[Integer.parseInt(SetDocumentPriors.UNIMPORTANT)] = context.ws_unimportant;
-	documentWeights[Integer.parseInt(SetDocumentPriors.NEUTRAL)] = context.ws_neutral;
+	documentWeights[Integer.parseInt(SetDocumentPriors.IMPORTANT)] = context.getws_important();
+	documentWeights[Integer.parseInt(SetDocumentPriors.UNIMPORTANT)] = context.getws_unimportant();
+	documentWeights[Integer.parseInt(SetDocumentPriors.NEUTRAL)] = context.getws_neutral();
 
-	return new WOOScorer(context.k1, bByIndex, index_idfs.termMap, frequencies, index_idfs.sizes, (double) index_idfs.numberOfOccurrences
-		/ index_idfs.numberOfDocuments, index_idfs.numberOfDocuments, context.w_matches, documentWeights, context.dl_cutoff, documentPriors,
-		context.max_number_of_fields_norm);
+	return new WOOScorer(context.getK1(), bByIndex, indexIdfs.termMap, frequencies, indexIdfs.sizes, (double) indexIdfs.numberOfOccurrences
+		/ indexIdfs.numberOfDocuments, indexIdfs.numberOfDocuments, context.getw_matches(), documentWeights, context.getdl_cutoff(), documentPriors,
+		context.getmax_number_of_fields_norm());
 
     }
 
@@ -630,5 +624,9 @@ public class RDFIndex {
 
     public QueryLogger getQueryLogger() {
 	return queryLogger;
+    }
+    
+    public BitStreamIndex getIndexIdfs() {
+	return indexIdfs;
     }
 }
