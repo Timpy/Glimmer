@@ -2,15 +2,9 @@
 #
 #
 
-if [ -z $1 ] ; then
-	echo "Please give the name of the nquads file to to build the index for."
-	echo "The name should be absolute or relative to your hadoop home dir in HDFS."
-	exit 1
-fi
-
 INPUT_ARG=${1}
 if [ -z ${INPUT_ARG} ] ; then
-	echo Usage: "${0} <tuple file on local disk or HDFS> [build name] [pig parallel] [sub indedices]"
+	echo Usage: "${0} <tuple file on local disk or HDFS> [build name] [pig parallel] [no. sub indices]"
 	exit 1
 fi
 
@@ -48,7 +42,7 @@ COMPRESSION_CODECS="\
 org.apache.hadoop.io.compress.DefaultCodec,\
 org.apache.hadoop.io.compress.BZip2Codec"
 
-MPH_EXTENSION=".mph"
+HASH_EXTENSION=".smap"
 
 OUTPUT_NAMES[0]="bysubject"
 OUTPUT_NAMES[1]="subjects"
@@ -187,14 +181,15 @@ function groupBySubject () {
 	fi	
 }
 
-function computeMpHashes () {
+function computeHashes () {
 	echo
-	echo Generating MPHashes..
+	echo Generating Hashes..
 	echo
-	# Generate Minimal Perfect Hashes for subjects, predicates and objects.
+	# Generate Hashes for subjects, predicates and objects.
 	# On which machine does this actually get run?
-	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.ComputeMphTool \
+	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.util.ComputeMphTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
+		-s \
 		${OUTPUT_NAMES[1]}${COMPRESSION_EXTENSION} ${OUTPUT_NAMES[2]} ${OUTPUT_NAMES[3]}${COMPRESSION_EXTENSION}"
 	echo ${CMD}; ${CMD}
 		
@@ -207,7 +202,7 @@ function computeMpHashes () {
 
 function getNumberOfDocs() {
 	# The number of docs is equal to the number of subjects.
-	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${OUTPUT_NAMES[1]}${MPH_EXTENSION}.info | grep size | cut -f 2`
+	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${OUTPUT_NAMES[1]}${HASH_EXTENSION}.info | grep size | cut -f 2`
 	if [ -z "${NUMBER_OF_DOCS}" -o $? -ne "0" ] ; then
 		echo "Failed to get the number of documents. exiting.."
 		exit 1
@@ -251,7 +246,7 @@ function generateIndex () {
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-files ${GENERATE_INDEX_FILES},${OUTPUT_NAMES[2]}/part-r-00000 \
-		-m ${METHOD} -f ntuples -p part-r-00000 ${OUTPUT_NAMES[0]}${COMPRESSION_EXTENSION} $NUMBER_OF_DOCS ${DFS_SUB_INDEX_DIR} ${OUTPUT_NAMES[1]}${MPH_EXTENSION} ${OUTPUT_NAMES[2]}${MPH_EXTENSION}"
+		-m ${METHOD} -f ntuples -p part-r-00000 ${OUTPUT_NAMES[0]}${COMPRESSION_EXTENSION} $NUMBER_OF_DOCS ${DFS_SUB_INDEX_DIR} ${OUTPUT_NAMES[1]}${HASH_EXTENSION} ${OUTPUT_NAMES[2]}${HASH_EXTENSION}"
 	echo ${CMD}
 	${CMD}
 		
@@ -380,7 +375,7 @@ function generateDocSizes () {
 		-Dmapred.job.map.memory.mb=2000 \
 		-D=mapred.job.reduce.memory.mb=2000 \
 		-files ${GENERATE_INDEX_FILES},${OUTPUT_NAMES[2]}/part-r-00000 \
-		-m ${METHOD} -f ntuples -p part-r-00000 ${OUTPUT_NAMES[0]}${COMPRESSION_EXTENSION} $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${OUTPUT_NAMES[1]}${MPH_EXTENSION}"
+		-m ${METHOD} -f ntuples -p part-r-00000 ${OUTPUT_NAMES[0]}${COMPRESSION_EXTENSION} $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${OUTPUT_NAMES[1]}${HASH_EXTENSION}"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
@@ -417,9 +412,10 @@ function buildCollection () {
 }
 
 #groupBySubject ${IN_FILE} ${PIG_PARALLEL}
-#computeMpHashes
+computeHashes
 getNumberOfDocs
 NUMBER_OF_DOCS=$?
+exit 1
 
 generateIndex horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
 getSubIndexes horizontal

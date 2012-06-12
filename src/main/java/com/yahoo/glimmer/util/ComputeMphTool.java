@@ -1,6 +1,8 @@
 package com.yahoo.glimmer.util;
 
+import it.unimi.dsi.big.util.ShiftAddXorSignedStringMap;
 import it.unimi.dsi.bits.TransformationStrategies;
+import it.unimi.dsi.fastutil.objects.Object2LongFunction;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.SafelyCloseable;
 import it.unimi.dsi.lang.MutableString;
@@ -12,6 +14,7 @@ import java.io.ObjectOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
 import java.io.SequenceInputStream;
+import java.nio.charset.Charset;
 import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.Iterator;
@@ -26,24 +29,63 @@ import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.log4j.Logger;
+
+import cern.colt.Arrays;
+
+import com.martiansoftware.jsap.FlaggedOption;
+import com.martiansoftware.jsap.JSAP;
+import com.martiansoftware.jsap.JSAPResult;
+import com.martiansoftware.jsap.Parameter;
+import com.martiansoftware.jsap.SimpleJSAP;
+import com.martiansoftware.jsap.Switch;
+import com.martiansoftware.jsap.UnflaggedOption;
+import com.martiansoftware.jsap.stringparsers.ForNameStringParser;
+import com.martiansoftware.jsap.stringparsers.IntegerStringParser;
 
 public class ComputeMphTool extends Configured implements Tool {
+    private final static Logger LOGGER = Logger.getLogger(ComputeMphTool.class);
+    private static final String SRC_FILES_ARG = "srcFilenames";
+    private static final String SIGNED_ARG = "signed";
+    private static final String SIGNATURE_WIDTH_ARG = "signatureWidth";
+    private static final String FILE_ENCODING_ARG = "encoding";
     public static final FsPermission ALL_PERMISSIONS = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
 
     @Override
     public int run(String[] args) throws Exception {
+	final SimpleJSAP jsap = new SimpleJSAP(HashLookup.class.getName(), "Lookup hash value for 'cleaned' URI", new Parameter[] {
+	    	new Switch(SIGNED_ARG, 's', SIGNED_ARG, "Sign the hashes."),
+		new FlaggedOption(SIGNATURE_WIDTH_ARG, IntegerStringParser.getParser() , "32", JSAP.NOT_REQUIRED, 'w', "width", "Sign the hash with a hash width of w bits."),
+		new FlaggedOption(FILE_ENCODING_ARG, ForNameStringParser.getParser(Charset.class) , "UTF-8", JSAP.NOT_REQUIRED, 'e', "encoding", "Set the input file encoding(default is UTF-8)."),
+		new UnflaggedOption(SRC_FILES_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.REQUIRED, JSAP.GREEDY,
+			"The filenames (or HDFS dirs if building hashes) to work with.") });
+
+	JSAPResult jsapResult = jsap.parse(args);
+	if (jsap.messagePrinted()) {
+	    throw new IllegalArgumentException("");
+	}
+
+	String[] srcFilenames = jsapResult.getStringArray(SRC_FILES_ARG);
+	Charset srcFileCharset = (Charset) jsapResult.getObject(FILE_ENCODING_ARG);
+	int signatureWidth = 0;
+	if (jsapResult.getBoolean(SIGNED_ARG)) {
+	    signatureWidth = jsapResult.getInt(SIGNATURE_WIDTH_ARG);
+	    LOGGER.info("Building signed hash with signature width of " + signatureWidth + " bits for " + srcFileCharset.displayName() + " files:" + Arrays.toString(srcFilenames));
+	} else {
+	    LOGGER.info("Building unsigned hash for " + srcFileCharset.displayName() + " files:" + srcFilenames);
+	}
+	
+	
 	JobConf job = new JobConf(getConf(), ComputeMphTool.class);
-	String[] filenames = args;
-
 	FileSystem fs = FileSystem.get(job);
-
-	for (String filename : filenames) {
-	    buildMph(fs, filename);
+	for (String filename : srcFilenames) {
+	    LOGGER.info("Building hash of " + filename);
+	    buildHash(fs, filename, signatureWidth, srcFileCharset);
 	}
 	return 0;
     }
 
-    public long buildMph(final FileSystem fs, final String srcFilename) throws IOException {
+    public int buildHash(final FileSystem fs, final String srcFilename, final int signatureWidth, final Charset charset) throws IOException {
 	final MapReducePartInputStreamEnumeration inputStreamEnumeration;
 	try {
 	    inputStreamEnumeration = new MapReducePartInputStreamEnumeration(fs, new Path(srcFilename));
@@ -55,39 +97,48 @@ public class ComputeMphTool extends Configured implements Tool {
 	    @Override
 	    public Reader newReader() {
 		inputStreamEnumeration.reset();
-		return new InputStreamReader(new SequenceInputStream(inputStreamEnumeration));
+		return new InputStreamReader(new SequenceInputStream(inputStreamEnumeration), charset);
 	    }
 	});
 
-	LcpMonotoneMinimalPerfectHashFunction<CharSequence> mph = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection,
+	Object2LongFunction<? extends CharSequence> map = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection,
 		TransformationStrategies.prefixFreeUtf16());
+	String filenameExtention = ".map";
+	if (signatureWidth > 0) {
+	    map = new ShiftAddXorSignedStringMap(inCollection.iterator(), map, signatureWidth);
+	    filenameExtention = ".smap";
+	}
 
 	String destFilename = inputStreamEnumeration.removeCompressionSuffixIfAny(srcFilename);
-	Path outPath = new Path(destFilename + ".mph");
+	Path outPath = new Path(destFilename + filenameExtention);
 	FSDataOutputStream outStream = fs.create(outPath, true);// overwrite
 	fs.setPermission(outPath, ALL_PERMISSIONS);
 	ObjectOutputStream outOs = new ObjectOutputStream(outStream);
-	outOs.writeObject(mph);
+	outOs.writeObject(map);
+	outOs.close();
 
-	Path infoPath = new Path(destFilename + ".mph.info");
+	Path infoPath = new Path(destFilename + filenameExtention + ".info");
 	FSDataOutputStream infoStream = fs.create(infoPath, true);// overwrite
 	fs.setPermission(infoPath, ALL_PERMISSIONS);
 	OutputStreamWriter infoWriter = new OutputStreamWriter(infoStream);
 	infoWriter.write("size\t");
-	infoWriter.write(Long.toString(mph.size64()));
-	infoWriter.write("\nbits\t");
-	infoWriter.write(Long.toString(mph.numBits()));
+	infoWriter.write(Integer.toString(map.size()));
 	infoWriter.write("\n");
+	if (map instanceof LcpMonotoneMinimalPerfectHashFunction<?>) {
+        	infoWriter.write("bits\t");
+        	infoWriter.write(Long.toString(((LcpMonotoneMinimalPerfectHashFunction<?>)map).numBits()));
+        	infoWriter.write("\n");
+	}
 	infoWriter.close();
 	infoStream.close();
 
-	return mph.size64();
+	return map.size();
     }
 
     /**
-     * For static invocation from pig via define mph InvokeForLong(
-     * 'com.yahoo.glimmer.util.ComputeMph.pigInvoker', filename);
-     * The hash function itself will be serialized to DFS as filename.mph
+     * For static invocation from pig via define mph InvokeForInt(
+     * 'com.yahoo.glimmer.util.ComputeMph.pigInvoker', filename, signed); The hash
+     * function itself will be serialized to DFS as filename.<s>map
      * 
      * TODO Test it.
      * 
@@ -95,8 +146,8 @@ public class ComputeMphTool extends Configured implements Tool {
      * @return size of generated hash
      * @throws IOException
      */
-    public static long pigInvoker(String filename) throws IOException {
-	return new ComputeMphTool().buildMph(FileSystem.get(null), filename);
+    public static int pigInvoker(String filename, int signatureWidth, String charsetName) throws IOException {
+	return new ComputeMphTool().buildHash(FileSystem.get(null), filename, signatureWidth, Charset.forName(charsetName));
     }
 
     public static void main(String[] args) throws Exception {
