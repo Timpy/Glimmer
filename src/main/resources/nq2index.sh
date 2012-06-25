@@ -4,7 +4,7 @@
 
 INPUT_ARG=${1}
 if [ -z ${INPUT_ARG} ] ; then
-	echo Usage: "${0} <tuple file on local disk or HDFS> [build name] [pig parallel] [no. sub indices]"
+	echo Usage: "${0} <tuple file on local disk or HDFS> [build name] [no. sub indices]"
 	exit 1
 fi
 
@@ -13,14 +13,9 @@ if [ ! -z ${2} ] ; then
 	BUILD_NAME=${2}
 fi
 
-PIG_PARALLEL=100
-if [ ! -z ${3} ] ; then
-	PIG_PARALLEL=${3}
-fi
-
 SUBINDICES=20
-if [ ! -z ${4} ] ; then
-	SUBINDICES=${4}
+if [ ! -z ${3} ] ; then
+	SUBINDICES=${3}
 fi
 
 
@@ -38,9 +33,8 @@ PROJECT_JAR="../Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
 GENERATE_INDEX_FILES="blacklist.txt,fixDataRSS.xsl,RDFa2RDFXML.xsl,t_namespaces.html"
 
 COMPRESSION_EXTENSION=".bz2"
-COMPRESSION_CODECS="\
-org.apache.hadoop.io.compress.DefaultCodec,\
-org.apache.hadoop.io.compress.BZip2Codec"
+COMPRESSION_CODEC="org.apache.hadoop.io.compress.BZip2Codec"
+COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,${COMPRESSION_CODEC}"
 
 HASH_EXTENSION=".smap"
 
@@ -60,17 +54,6 @@ if [ -z ${HADOOP_CMD} ] ; then
 	echo "Can't find the hadoop command."
 	exit 1
 fi
-
-PIG_CMD=`which pig`
-if [ -z ${PIG_CMD} ] ; then
-	echo "Can't find the pig command."
-	exit 1
-fi
-if [ ! -z ${MAPRED_QUEUE} ] ; then
-	PIG_CMD="${PIG_CMD} -Dmapred.job.queue.name=${MAPRED_QUEUE}"
-	HADOOP_CMD="${HADOOP_CMD} -Dmapred.job.queue.name=${MAPRED_QUEUE}"
-fi
-PIG_CMD="${PIG_CMD} -Dmapred.speculative.execution=true"
 
 BZCAT_CMD=`which bzcat`
 if [ -z ${BZCAT_CMD} ] ; then
@@ -155,28 +138,23 @@ fi
 
 function groupBySubject () {
 	INPUT=${1}
-	PIG_PARALLEL=${2}
-	if [ -z ${PIG_PARALLEL} ] ; then
-		PIG_PARALLEL=100
-	fi
-	echo
 	echo Grouping tulpes by subject from file ${INPUT_FILENAME}...
 	echo
-	CMD="${PIG_CMD} \
-		-param swaJar=${PROJECT_JAR} \
-		-param nTasks=${PIG_PARALLEL}
-		-param input=${INPUT} \
-		-param output=${OUTPUT_NAMES[0]}${COMPRESSION_EXTENSION} \
-		-param subjects=${OUTPUT_NAMES[1]}${COMPRESSION_EXTENSION} \
-		-param predicates=${OUTPUT_NAMES[2]} \
-		-param contexts=${OUTPUT_NAMES[3]}${COMPRESSION_EXTENSION} \
-		-param objects=${OUTPUT_NAMES[4]}${COMPRESSION_EXTENSION} \
-		group-by-subject.pig"
-	echo ${CMD}; ${CMD}
+	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.TuplesTool \
+		-Dio.compression.codecs=${COMPRESSION_CODECS} \
+		-Dmapred.map.tasks.speculative.execution=true \
+		-Dmapred.child.java.opts=-Xmx800m \
+		-Dmapred.job.map.memory.mb=2000 \
+		-Dmapred.job.reduce.memory.mb=2000 \
+		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
+		-Dmapred.output.compress=true \
+		${INPUT} ${DFS_BUILD_DIR}/out"
+	echo ${CMD}
+	${CMD}
 		
 	EXIT_CODE=$?
 	if [ $EXIT_CODE -ne "0" ] ; then
-		echo "Group by subect pig script exited with code $EXIT_CODE. exiting.."
+		echo "TuplesTool exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi	
 }
@@ -411,11 +389,11 @@ function buildCollection () {
 	${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/collection" "${LOCAL_BUILD_DIR}"
 }
 
-#groupBySubject ${IN_FILE} ${PIG_PARALLEL}
+groupBySubject ${IN_FILE}
+exit 1
 computeHashes
 getNumberOfDocs
 NUMBER_OF_DOCS=$?
-exit 1
 
 generateIndex horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
 getSubIndexes horizontal

@@ -53,7 +53,7 @@ public class ComputeMphTool extends Configured implements Tool {
 
     @Override
     public int run(String[] args) throws Exception {
-	final SimpleJSAP jsap = new SimpleJSAP(HashLookup.class.getName(), "Lookup hash value for 'cleaned' URI", new Parameter[] {
+	final SimpleJSAP jsap = new SimpleJSAP(ComputeMphTool.class.getName(), "Builds a hash function.", new Parameter[] {
 	    	new Switch(SIGNED_ARG, 's', SIGNED_ARG, "Sign the hashes."),
 		new FlaggedOption(SIGNATURE_WIDTH_ARG, IntegerStringParser.getParser() , "32", JSAP.NOT_REQUIRED, 'w', "width", "Sign the hash with a hash width of w bits."),
 		new FlaggedOption(FILE_ENCODING_ARG, ForNameStringParser.getParser(Charset.class) , "UTF-8", JSAP.NOT_REQUIRED, 'e', "encoding", "Set the input file encoding(default is UTF-8)."),
