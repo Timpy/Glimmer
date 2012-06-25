@@ -15,6 +15,11 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 
+/**
+ * Writes to different output files depending on the contents of the value.
+ * @author tep
+ *
+ */
 public class ResourceRecordWriter extends RecordWriter<Text, Text> {
     private static final char BY_SUBJECT_DELIMITER = '\t';
     private static final String ALL = "all";

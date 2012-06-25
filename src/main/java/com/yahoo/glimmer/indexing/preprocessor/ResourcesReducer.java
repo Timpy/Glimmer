@@ -5,6 +5,13 @@ import java.io.IOException;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 
+/**
+ * Reducer(and Combiner)
+ * 
+ * For the given Subject resource key concatanates all <predicate> <object> <context> . for that key 
+ * + appends PREDICATE, OBJECT and/or CONTEXT keywords if that keyword occurs once or more as a value.
+ *
+ */
 public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
     public static final String VALUE_DELIMITER = "  ";
     private boolean keyPredicate;

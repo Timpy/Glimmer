@@ -13,6 +13,27 @@ import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.parser.NxParser;
 import org.semanticweb.yars.nx.parser.ParseException;
 
+
+/**
+ * Maps each input line containing a tuple of 3 or more elements to
+ * Key/Value pairs of the following form
+ * KEY				VALUE
+ * "subject"			"&lt;predicate&gt; &lt;object&gt; &lt;context&gt; ."
+ * "predicate			"PREDICATE"
+ * "object"			"OBJECT"
+ * "context"			"CONTEXT"
+ * 
+ * If the object is a literal no key/value with a value of "OBJECT" is written.
+ * 
+ * Eg. for the tuple "&lt;http://subject/&gt; &lt;http://predicate/&gt; &lt;http://object/&gt; &lt;http://context/&gt; ."
+ * 
+ * KEY				VALUE
+ * http://subject/		&lt;http://predicate/&gt; &lt;http://object/&gt; &lt;http://context/&gt; .
+ * http://predicate/		PREDICATE
+ * http://object/		OBJECT
+ * http://context/		CONTEXT
+ * 
+ */
 public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Text> {
     private static final Log LOG = LogFactory.getLog(TuplesToResourcesMapper.class);
     private static final int SUBJECT_IDX = 0;
@@ -102,7 +123,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	context.write(subject, new Text(relations.toString()));
     };
 
-    private enum MapCounters {
+    static enum MapCounters {
 	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, SHORT_TUPLE, INVALID_RESOURCE;
     }
 }

@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.jmock.Expectations;
 import org.jmock.Mockery;
@@ -16,6 +17,7 @@ import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper;
 public class TuplesToResourcesMapperTest {
     private Mockery context;
     private Mapper<LongWritable,Text,Text,Text>.Context mrContext;
+    private Counter nxParserExceptionCounter;
     
     @SuppressWarnings("unchecked")
     @Before
@@ -23,6 +25,7 @@ public class TuplesToResourcesMapperTest {
 	context = new Mockery();
 	context.setImposteriser(ClassImposteriser.INSTANCE);
 	mrContext = context.mock(Mapper.Context.class, "mrContext");
+	nxParserExceptionCounter = context.mock(Counter.class, "nxParserExceptionCounter");
     }
     
     @Test
@@ -56,6 +59,9 @@ public class TuplesToResourcesMapperTest {
     @Test
     public void qualifiedIntTest() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
+	    one(mrContext).getCounter(TuplesToResourcesMapper.MapCounters.NX_PARSER_EXCEPTION);
+	    will(returnValue(nxParserExceptionCounter));
+	    one(nxParserExceptionCounter).increment(1l);
 	    one(mrContext).write(with(new TextMatcher("<http://www.example.org/terms/age>")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
 	    one(mrContext).write(with(new TextMatcher("<http://www.example.org/staffid/85740>")), with(new TextMatcher("<http://www.example.org/staffid/85740> <http://www.example.org/terms/age> \"27\" .")));
 	}});
