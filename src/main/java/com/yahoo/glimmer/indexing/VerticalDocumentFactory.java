@@ -108,22 +108,18 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 
     public VerticalDocumentFactory(final Properties properties) throws ConfigurationException {
 	super(properties);
-	init();
     }
 
     public VerticalDocumentFactory(final Reference2ObjectMap<Enum<?>, Object> defaultMetadata) {
 	super(defaultMetadata);
-	init();
     }
 
     public VerticalDocumentFactory(final String[] property) throws ConfigurationException {
 	super(property);
-	init();
     }
 
     public VerticalDocumentFactory() {
 	super();
-	init();
     }
 
     public int numberOfFields() {

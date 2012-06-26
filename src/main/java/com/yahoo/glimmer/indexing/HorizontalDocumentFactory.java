@@ -43,22 +43,18 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 
     public HorizontalDocumentFactory(final Properties properties) throws ConfigurationException {
 	super(properties);
-	init();
     }
 
     public HorizontalDocumentFactory(final Reference2ObjectMap<Enum<?>, Object> defaultMetadata) {
 	super(defaultMetadata);
-	init();
     }
 
     public HorizontalDocumentFactory(final String[] property) throws ConfigurationException {
 	super(property);
-	init();
     }
 
     public HorizontalDocumentFactory() {
 	super();
-	init();
     }
 
     public int numberOfFields() {
@@ -109,6 +105,13 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	}
     }
 
+
+    public Document getDocument(final InputStream rawContent, final Reference2ObjectMap<Enum<?>, Object> metadata) throws IOException {
+	RDFDocument result = new HorizontalDataRSSDocument(metadata);
+	result.setContent(rawContent);
+	return result;
+    }
+    
     /**
      * A DataRSS document.
      * 
@@ -326,31 +329,6 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	    ensureFieldIndex(field);
 	    return wordReader;
 	}
-    }
-
-    public Document getDocument(final InputStream rawContent, final Reference2ObjectMap<Enum<?>, Object> metadata) throws IOException {
-	RDFDocument result = new HorizontalDataRSSDocument(metadata);
-	result.setContent(rawContent);
-	return result;
-    }
-
-    /**
-     * Debug only
-     * 
-     * @param args
-     * @throws Exception
-     */
-    public static void main(String[] args) throws Exception {
-
-	FastBufferedReader fbr = new FastBufferedReader(new StringReader("http://www.example.org/peter#something"));
-	MutableString word = new MutableString(""), nonWord = new MutableString("");
-	while (fbr.next(word, nonWord)) {
-	    if (word != null && !word.equals("")) {
-		System.out.println(word);
-
-	    }
-	}
-
     }
 
 }
