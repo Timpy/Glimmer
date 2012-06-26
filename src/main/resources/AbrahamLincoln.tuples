@@ -28,8 +28,8 @@
 <http://dbpedia.org/resource/Robert_Todd_Lincoln> <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Springfield,_Illinois> <http://en.wikipedia.org/wiki/Robert_Todd_Lincoln#absolute-line=21> .
 <http://dbpedia.org/resource/Robert_Todd_Lincoln> <http://dbpedia.org/ontology/birthDate> "1843-08-01"^^<http://www.w3.org/2001/XMLSchema#date> <http://en.wikipedia.org/wiki/Robert_Todd_Lincoln#absolute-line=20> .
 <http://dbpedia.org/resource/Robert_Todd_Lincoln> <http://xmlns.com/foaf/0.1/name> "Robert Todd Lincoln"@en <http://en.wikipedia.org/wiki/Robert_Todd_Lincoln#absolute-line=2> .
-<http://dbpedia.org/resource/Edward_Baker_Lincoln> <http://dbpedia.org/ontology/deathDate> "1850-02-01"^^<http://www.w3.org/2001/XMLSchema#date> <http://en.wikipedia.org/wiki/Edward_Baker_Lincoln#absolute-line=8> .
-<http://dbpedia.org/resource/Edward_Baker_Lincoln> <http://dbpedia.org/ontology/birthDate> "1846-03-10"^^<http://www.w3.org/2001/XMLSchema#date> <http://en.wikipedia.org/wiki/Edward_Baker_Lincoln#absolute-line=6> .
+<http://dbpedia.org/resource/Edward_Baker_Lincoln> <http://dbpedia.org/ontology/deathDate> "1850-02-01"^^<http://www.w3.org/2001/XMLSchema#date> <http://en.wikipedia.org/wiki/Edward_Baker_Lincoln#absolute-line=> .
+<http://dbpedia.org/resource/Edward_Baker_Lincoln> <http://dbpedia.org/ontology/birthDate> "1846-03-10"^^<http://www.w3.org/2001/XMLSchema#date> <http://en.wikipedia.org/wiki/Edward_Baker_Lincoln#absolute-line=%23> .
 <http://dbpedia.org/resource/Edward_Baker_Lincoln> <http://xmlns.com/foaf/0.1/name> "Edward Baker Lincoln"@en <http://en.wikipedia.org/wiki/Edward_Baker_Lincoln#absolute-line=2> .
 <http://dbpedia.org/resource/William_Wallace_Lincoln> <http://xmlns.com/foaf/0.1/name> "William Wallace Lincoln"@en <http://en.wikipedia.org/wiki/William_Wallace_Lincoln#absolute-line=2> .
 <http://dbpedia.org/resource/Tad_Lincoln> <http://xmlns.com/foaf/0.1/name> "Tad Lincoln"@en <http://en.wikipedia.org/wiki/Tad_Lincoln#absolute-line=3> .
