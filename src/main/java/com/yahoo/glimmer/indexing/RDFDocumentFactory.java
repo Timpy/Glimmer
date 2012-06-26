@@ -13,7 +13,6 @@ import it.unimi.dsi.util.Properties;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.nio.charset.Charset;
 
 import javax.xml.transform.TransformerConfigurationException;
@@ -57,7 +56,7 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
      * 
      */
     public static enum MetadataKeys {
-	MAPPER_CONTEXT, RDFFORMAT, INDEXED_PROPERTIES, INDEXED_PROPERTIES_FILENAME, SUBJECTS_MPH
+	MAPPER_CONTEXT, INDEXED_PROPERTIES, INDEXED_PROPERTIES_FILENAME, SUBJECTS_MPH
     };
 
     public RDFDocumentFactory(final Properties properties) throws ConfigurationException {
@@ -101,50 +100,12 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	} else if (sameKey(MetadataKeys.MAPPER_CONTEXT, key)) {
 	    metadata.put(MetadataKeys.MAPPER_CONTEXT, ensureJustOne(key, values));
 	    return true;
-	} else if (sameKey(MetadataKeys.RDFFORMAT, key)) {
-	    metadata.put(MetadataKeys.RDFFORMAT, ensureJustOne(key, values));
-	    return true;
 	}
 	return super.parseProperty(key, values, metadata);
     }
 
-    /*
-     * public String predicateToName(String predicate) { String result = null;
-     * 
-     * //Look up predicate in the namespaces table or null if not in table
-     * String prefix = null, localName = null; for (String key :
-     * prefixToNSMap.keySet()) { String ns = prefixToNSMap.get(key); if
-     * (predicate.startsWith(ns)) { prefix = key; localName =
-     * predicate.substring(ns.length()); break; } } if (prefix != null &&
-     * localName != null) { result = localName + NAMESPACE_SEPARATOR + prefix; }
-     * //System.out.println(predicate + "->" + (result==null? "NULL": result));
-     * 
-     * 
-     * else { //Generate a short name from the URI if (predicate != null &&
-     * predicate.startsWith("http://")) { URI pred = new URIImpl(predicate);
-     * result =
-     * pred.getNamespace().substring("http://".length()).replaceAll("[\\./#\\-\\~]+"
-     * , "_"); if (result != null && result.length() > 0) { if
-     * (result.charAt(result.length()-1) != NAMESPACE_SEPARATOR) { result +=
-     * NAMESPACE_SEPARATOR; } result +=
-     * pred.getLocalName().replaceAll("[\\./#\\-\\~]+", "_"); } else {
-     * //something strange is going on result = null; } }
-     * 
-     * } return result; }
-     * 
-     * 
-     * protected String nameToPredicate(String name) { String result = null;
-     * String prefix = name.substring(name.lastIndexOf(NAMESPACE_SEPARATOR) +
-     * 1); String localName = name.substring(0,
-     * name.lastIndexOf(NAMESPACE_SEPARATOR)); result =
-     * prefixToNSMap.get(prefix) + localName;; //System.out.println(name + "->"
-     * + (result==null? "NULL": result)); return result; }
-     */
-
     public static String encodeFieldName(String name) {
-
 	return name.replaceAll("[^a-zA-Z0-9]+", "_");
-
     }
 
     protected boolean onPredicateBlackList(String name) {
@@ -157,23 +118,13 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	return false;
     }
 
-    protected StatementCollectorHandler parseStatements(String url, String data, String format) throws TransformerConfigurationException, RDFParseException,
+    protected StatementCollectorHandler parseStatements(String url, String data) throws TransformerConfigurationException, RDFParseException,
 	    RDFHandlerException, MalformedURLException, IOException, TransformerException, ParseException {
 	StatementCollectorHandler handler = new StatementCollectorHandler();
-	if (format.equals(TripleIndexGenerator.DATARSS_FORMAT)) {
-	    // DataRSS format
-
-	    converter.convert(new URL(url), data, true, handler); // remove
-								  // datatypes
-
-	} else {
-	    // NTuples format where tuples are separated by double spaces
-	    String[] lines = data.split("  ");
-	    for (String line : lines) {
-
-		handler.handleStatement(Util.parseStatement(line));
-	    }
-
+	// NTuples format where tuples are separated by double spaces
+	String[] lines = data.split("  ");
+	for (String line : lines) {
+	    handler.handleStatement(Util.parseStatement(line));
 	}
 	return handler;
     }
@@ -197,11 +148,13 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	}
 	// Retrieve MPH for objects encoding
 	subjectsMph = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) resolve(MetadataKeys.SUBJECTS_MPH, defaultMetadata);
+	if (subjectsMph == null) {
+	    throw new IllegalStateException("No subject MPH set in metadata map.");
+	}
     }
 
     private void readObject(final ObjectInputStream s) throws IOException, ClassNotFoundException {
 	s.defaultReadObject();
 	init();
     }
-
 }

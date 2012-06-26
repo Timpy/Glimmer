@@ -209,7 +209,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	    try {
 
 		// TODO: sort by subject
-		StatementCollectorHandler handler = parseStatements(url, data, (String) resolve(RDFDocumentFactory.MetadataKeys.RDFFORMAT, metadata));
+		StatementCollectorHandler handler = parseStatements(url, data);
 
 		for (Statement stmt : handler.getStatements()) {
 

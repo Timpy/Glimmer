@@ -18,17 +18,14 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.openrdf.model.Resource;
+import org.openrdf.model.Literal;
 import org.openrdf.model.Statement;
-import org.openrdf.rio.RDFHandlerException;
-import org.openrdf.rio.RDFParseException;
+import org.openrdf.model.Resource;
+import org.openrdf.model.Value;
 import org.semanticweb.yars.nx.namespace.RDF;
-import org.semanticweb.yars.nx.parser.ParseException;
 
 /**
  * The fields to be indexed are read from the file INDEXED_PROPERTIES_FILENAME,
@@ -196,8 +193,11 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void ensureParsed() throws IOException {
-	    if (parsed)
+	    if (parsed) {
 		return;
+	    }
+	    parsed = true;
+	    
 
 	    if (rawContent == null) {
 		throw new IOException("Trying to parse null rawContent");
@@ -212,7 +212,6 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 	    if (line == null || line.trim().equals("")) {
 		if (mapContext != null)
 		    mapContext.getCounter(TripleIndexGenerator.Counters.EMPTY_LINES).increment(1);
-		parsed = true;
 		return;
 	    }
 	    // First part is URL, second part is docfeed
@@ -220,96 +219,85 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 	    String data = line.substring(line.indexOf('\t')).trim();
 
 	    if (data.trim().equals("")) {
-		if (mapContext != null)
+		if (mapContext != null) {
 		    mapContext.getCounter(TripleIndexGenerator.Counters.EMPTY_DOCUMENTS).increment(1);
-		parsed = true;
+		}
 		return;
 	    }
 
 	    // Docfeed parsing
+	    StatementCollectorHandler handler;
 	    try {
-		StatementCollectorHandler handler = parseStatements(url, data, (String) resolve(RDFDocumentFactory.MetadataKeys.RDFFORMAT, metadata));
+		handler = parseStatements(url, data);
+	    } catch (IOException e) {
+		throw e;
+	    } catch (Exception e) {
+		System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
+		return;
+	    }
+	    
+	    for (Statement stmt : handler.getStatements()) {
 
-		// TODO: sort by subject
+		String predicate = stmt.getPredicate().toString();
 
-		for (Statement stmt : handler.getStatements()) {
+		String fieldName = predicate;
 
-		    String predicate = stmt.getPredicate().toString();
+		// Check if prefix is on blacklist
+		if (onPredicateBlackList(fieldName)) {
+		    if (mapContext != null)
+			mapContext.getCounter(TripleIndexGenerator.Counters.BLACKLISTED_TRIPLES).increment(1);
+		    continue;
+		}
 
-		    String fieldName = predicate;
+		// Determine whether we need to index, and the field
+		int fieldIndex = fieldIndex(fieldName);
+		if (fieldIndex == -1) {
+		    System.err.println("Field not indexed: " + fieldName);
+		    if (mapContext != null)
+			mapContext.getCounter(TripleIndexGenerator.Counters.UNINDEXED_PREDICATE_TRIPLES).increment(1);
+		    continue;
+		}
 
-		    /*
-		     * if (fieldName == null) {
-		     * System.err.println("Could not convert URI to field name: "
-		     * + predicate); if (reporter != null)
-		     * reporter.incrCounter(Counters
-		     * .CANNOT_CREATE_FIELDNAME_TRIPLES, 1); //Not in table,
-		     * don't index continue; }
-		     */
-
-		    // Check if prefix is on blacklist
-		    if (onPredicateBlackList(fieldName)) {
+		if (stmt.getObject() instanceof Resource) {
+		    // For all fields except type, encode the resource URI
+		    // or bnode ID using the MPH for subjects
+		    if (predicate.equals(RDF.TYPE.toString())) {
 			if (mapContext != null)
-			    mapContext.getCounter(TripleIndexGenerator.Counters.BLACKLISTED_TRIPLES).increment(1);
-			continue;
-		    }
-
-		    // Determine whether we need to index, and the field
-		    int fieldIndex = fieldIndex(fieldName);
-		    if (fieldIndex == -1) {
-			System.err.println("Field not indexed: " + fieldName);
-			if (mapContext != null)
-			    mapContext.getCounter(TripleIndexGenerator.Counters.UNINDEXED_PREDICATE_TRIPLES).increment(1);
-			continue;
-		    }
-
-		    if (stmt.getObject() instanceof Resource) {
-			// For all fields except type, encode the resource URI
-			// or bnode ID using the MPH for subjects
-			if (predicate.equals(RDF.TYPE.toString())) {
-			    if (mapContext != null)
-				mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
-			    fields.get(fieldIndex).add(stmt.getObject().toString());
-			} else {
-			    fields.get(fieldIndex).add(subjectsMph.get(stmt.getObject().toString()).toString());
-			}
+			    mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
+			fields.get(fieldIndex).add(stmt.getObject().toString());
 		    } else {
+			fields.get(fieldIndex).add(subjectsMph.get(stmt.getObject().stringValue()).toString());
+		    }
+		} else {
+		    Value object = stmt.getObject();
+		    String objectAsString;
+		    if (object instanceof Literal) {
+			// If we treat a Literal as just a Value we index the @lang and ^^<type> too
+			objectAsString = ((Literal)object).stringValue();
+		    } else {
+			objectAsString = object.stringValue();
+		    }
+		    
+		    // Iterate over the words of the value
+		    FastBufferedReader fbr = new FastBufferedReader(new StringReader(objectAsString));
+		    MutableString word = new MutableString();
+		    MutableString nonWord = new MutableString();
 
-			// Iterate over the words of the value
-			FastBufferedReader fbr = new FastBufferedReader(new StringReader(stmt.getObject().toString()));
-			MutableString word = new MutableString(""), nonWord = new MutableString("");
-
-			while (fbr.next(word, nonWord)) {
-			    if (word != null && !word.equals("")) {
-
-				if (TERMPROCESSOR.processTerm(word)) {
-				    fields.get(fieldIndex).add(word.toString());
-				    // System.out.println("Adding to field " +
-				    // fieldIndex + " " + word.toString());
-				}
+		    while (fbr.next(word, nonWord)) {
+			if (word != null && !word.equals("")) {
+			    if (TERMPROCESSOR.processTerm(word)) {
+				fields.get(fieldIndex).add(word.toString());
 			    }
 			}
-			fbr.close();
 		    }
-
-		    if (mapContext != null)
-			mapContext.getCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES).increment(1);
-
+		    fbr.close();
 		}
-	    } catch (TransformerConfigurationException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage());
-	    } catch (RDFParseException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage());
-	    } catch (RDFHandlerException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage());
-	    } catch (TransformerException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
-	    } catch (ParseException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
-	    } catch (IllegalArgumentException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
+
+		if (mapContext != null) {
+		    Counter counter = mapContext.getCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES);
+		    counter.increment(1);
+		}
 	    }
-	    parsed = true;
 	}
 
 	public CharSequence title() {
@@ -353,18 +341,4 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 	result.setContent(rawContent);
 	return result;
     }
-
-    /*
-     * public final static void main(String[] args) { String result = null;
-     * String predicate = "http://creativecommons.org/ns#attributionName"; if
-     * (predicate != null && predicate.startsWith("http://")) { URI pred = new
-     * URIImpl(predicate); result =
-     * pred.getNamespace().substring("http://".length()).replaceAll("[\\./#]",
-     * "_"); if (result != null && result.length() > 0) { if
-     * (result.charAt(result.length()-1) != NAMESPACE_SEPARATOR) { result +=
-     * NAMESPACE_SEPARATOR; } result += pred.getLocalName(); } else {
-     * //something strange is going on result = null; } }
-     * System.out.println(result); }
-     */
-
 }

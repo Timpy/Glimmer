@@ -506,7 +506,6 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	try {
 	    Reference2ObjectMap<Enum<?>, Object> defaultMetadata = new Reference2ObjectArrayMap<Enum<?>, Object>();
 	    defaultMetadata.put(PropertyBasedDocumentFactory.MetadataKeys.ENCODING, "UTF-8");
-	    defaultMetadata.put(RDFDocumentFactory.MetadataKeys.RDFFORMAT, job.get(TripleIndexGenerator.RDFFORMAT_KEY));
 	    if (job.get(TripleIndexGenerator.INDEXEDPROPERTIES_FILENAME_KEY) != null) {
 		defaultMetadata.put(RDFDocumentFactory.MetadataKeys.INDEXED_PROPERTIES_FILENAME, job.get(TripleIndexGenerator.INDEXEDPROPERTIES_FILENAME_KEY));
 

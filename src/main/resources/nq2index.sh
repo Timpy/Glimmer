@@ -43,6 +43,7 @@ OUTPUT_NAMES[1]="subjects"
 OUTPUT_NAMES[2]="predicates"
 OUTPUT_NAMES[3]="objects"
 OUTPUT_NAMES[4]="contexts"
+OUTPUT_NAMES[5]="all"
 
 if [ ! -f ${PROJECT_JAR} ] ; then
 	echo "Projects jar file missing!! ${PROJECT_JAR}"
@@ -163,12 +164,11 @@ function computeHashes () {
 	echo
 	echo Generating Hashes..
 	echo
-	# Generate Hashes for subjects, predicates and objects.
-	# On which machine does this actually get run?
+	# Generate Hashes for subjects, predicates and objects and all
 	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.util.ComputeMphTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-s \
-		${OUTPUT_NAMES[1]}${COMPRESSION_EXTENSION} ${OUTPUT_NAMES[2]} ${OUTPUT_NAMES[3]}${COMPRESSION_EXTENSION}"
+		${OUTPUT_NAMES[1]}${COMPRESSION_EXTENSION} ${OUTPUT_NAMES[2]}${COMPRESSION_EXTENSION} ${OUTPUT_NAMES[3]}${COMPRESSION_EXTENSION} ${OUTPUT_NAMES[5]}${COMPRESSION_EXTENSION}"
 	echo ${CMD}; ${CMD}
 		
 	EXIT_CODE=$?
