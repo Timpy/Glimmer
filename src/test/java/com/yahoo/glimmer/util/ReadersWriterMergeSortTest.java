@@ -56,7 +56,7 @@ public class ReadersWriterMergeSortTest {
 	sourceReaders.add(new BufferedReader(new StringReader("Baa\nBaz\nFoo")));
 	sourceReaders.add(new BufferedReader(new StringReader("2\n6\n8\nZ\n")));
 	StringBuilderWriter writer = new StringBuilderWriter();
-	
+
 	ReadersWriterMergeSort.mergeSort(sourceReaders, writer);
 	assertEquals("2\n" +
 			"6\n" +
@@ -81,5 +81,17 @@ public class ReadersWriterMergeSortTest {
 
 	ReadersWriterMergeSort.mergeSort(sourceReaders, writer);
 	assertEquals("1\nA\nB\n", writer.toString());
+    }
+
+    @Test
+    public void newLinesFirstTest() throws IOException {
+	List<BufferedReader> sourceReaders = new ArrayList<BufferedReader>();
+	sourceReaders.add(new BufferedReader(new StringReader("A%1")));
+	sourceReaders.add(new BufferedReader(new StringReader("A1")));
+	sourceReaders.add(new BufferedReader(new StringReader("A")));
+	StringBuilderWriter writer = new StringBuilderWriter();
+
+	ReadersWriterMergeSort.mergeSort(sourceReaders, writer);
+	assertEquals("A\nA%1\nA1\n", writer.toString());
     }
 }
