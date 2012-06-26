@@ -67,13 +67,13 @@ public class ResourceRecordWriterTest {
 
     @Test
     public void writeSubjectAndObjectTest() throws IOException, InterruptedException {
-	e.one(allOs).write(e.with(new ByteMatcher("<http://a/key>", true)), e.with(1), e.with(12));
+	e.one(allOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
 	e.one(allOs).write('\n');
-	e.one(subjectOs).write(e.with(new ByteMatcher("<http://a/key>", true)), e.with(1), e.with(12));
+	e.one(subjectOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
 	e.one(subjectOs).write('\n');
-	e.one(objectOs).write(e.with(new ByteMatcher("<http://a/key>", true)), e.with(1), e.with(12));
+	e.one(objectOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
 	e.one(objectOs).write('\n');
-	e.one(bySubjectOs).write(e.with(new ByteMatcher("<http://a/key>", true)), e.with(1), e.with(12));
+	e.one(bySubjectOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
 	e.one(bySubjectOs).write('\t');
 	e.one(bySubjectOs).write(e.with(new ByteMatcher("<http://a/key> <http://predicate/> <http://Object> .", true)), e.with(0), e.with(52));
 	e.one(bySubjectOs).write('\n');
@@ -82,21 +82,21 @@ public class ResourceRecordWriterTest {
 	
 	ResourceRecordWriter writer = new ResourceRecordWriter(fs, new Path("/somepath"), null);
 	
-	writer.write(new Text("<http://a/key>"), new Text("<http://a/key> <http://predicate/> <http://Object> .  OBJECT"));
+	writer.write(new Text("http://a/key"), new Text("<http://a/key> <http://predicate/> <http://Object> .  OBJECT"));
     }
     
     @Test
     public void writeContextTest() throws IOException, InterruptedException {
-	e.one(allOs).write(e.with(new ByteMatcher("<http://a/key>", true)), e.with(1), e.with(12));
+	e.one(allOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
 	e.one(allOs).write('\n');
-	e.one(contextOs).write(e.with(new ByteMatcher("<http://a/key>", true)), e.with(1), e.with(12));
+	e.one(contextOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
 	e.one(contextOs).write('\n');
 
 	context.checking(e);
 
 	ResourceRecordWriter writer = new ResourceRecordWriter(fs, new Path("/somepath"), null);
 
-	writer.write(new Text("<http://a/key>"), new Text("CONTEXT"));
+	writer.write(new Text("http://a/key"), new Text("CONTEXT"));
     }
 
     private static class ByteMatcher extends BaseMatcher<byte[]> {

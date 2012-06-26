@@ -34,7 +34,7 @@ public class ResourcesReducerTest {
 	context.checking(new Expectations() {
 	    {
 		one(mrContext).write(
-			with(new TextMatcher("<http://some/resource/uri>")),
+			with(new TextMatcher("http://some/subject/uri")),
 			with(new TextMatcher("<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .  "
 				+ "<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .  "
 				+ "<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .")));
@@ -47,7 +47,7 @@ public class ResourcesReducerTest {
 		"<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .",
 		"<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .");
 
-	reducer.reduce(new Text("<http://some/resource/uri>"), values, mrContext);
+	reducer.reduce(new Text("http://some/subject/uri"), values, mrContext);
     }
 
     @Test
@@ -103,7 +103,7 @@ public class ResourcesReducerTest {
 	context.checking(new Expectations() {
 	    {
 		one(mrContext).write(
-			with(new TextMatcher("<http://some/resource/uri>")),
+			with(new TextMatcher("http://some/resource/uri")),
 			with(new TextMatcher("<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .  "
 				+ "<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .  "
 				+ "OBJECT")));
@@ -118,7 +118,7 @@ public class ResourcesReducerTest {
 		TuplesToResourcesMapper.OBJECT_VALUE
 		);
 
-	reducer.reduce(new Text("<http://some/resource/uri>"), values, mrContext);
+	reducer.reduce(new Text("http://some/resource/uri"), values, mrContext);
     }
     
     private static class TextReuseIterable implements Iterable<Text> {

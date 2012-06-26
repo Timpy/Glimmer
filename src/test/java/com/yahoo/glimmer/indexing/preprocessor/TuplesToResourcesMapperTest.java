@@ -31,8 +31,8 @@ public class TuplesToResourcesMapperTest {
     @Test
     public void literalObjectText() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
-	    one(mrContext).write(with(new TextMatcher("<http://www.example.org/terms/name>")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("<http://www.example.org/staffid/85740>")), with(new TextMatcher("<http://www.example.org/staffid/85740> <http://www.example.org/terms/name> \"Smith\" .")));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/name")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher("<http://www.example.org/staffid/85740> <http://www.example.org/terms/name> \"Smith\" .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
 	
@@ -43,9 +43,9 @@ public class TuplesToResourcesMapperTest {
     @Test
     public void resourceObjectTest() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
-	    one(mrContext).write(with(new TextMatcher("<http://purl.org/dc/elements/1.1/creator>")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("<http://www.example.org/staffid/85740>")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("<http://www.example.org/index.html>")), with(new TextMatcher("<http://www.example.org/index.html> <http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> .")));
+	    one(mrContext).write(with(new TextMatcher("http://purl.org/dc/elements/1.1/creator")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/index.html")), with(new TextMatcher("<http://www.example.org/index.html> <http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
 	
@@ -62,8 +62,8 @@ public class TuplesToResourcesMapperTest {
 	    one(mrContext).getCounter(TuplesToResourcesMapper.MapCounters.NX_PARSER_EXCEPTION);
 	    will(returnValue(nxParserExceptionCounter));
 	    one(nxParserExceptionCounter).increment(1l);
-	    one(mrContext).write(with(new TextMatcher("<http://www.example.org/terms/age>")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("<http://www.example.org/staffid/85740>")), with(new TextMatcher("<http://www.example.org/staffid/85740> <http://www.example.org/terms/age> \"27\" .")));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/age")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher("<http://www.example.org/staffid/85740> <http://www.example.org/terms/age> \"27\" .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
 	mapper.map(new LongWritable(5l), new Text(

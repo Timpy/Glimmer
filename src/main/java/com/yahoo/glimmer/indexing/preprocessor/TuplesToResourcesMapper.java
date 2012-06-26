@@ -91,20 +91,20 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	Node node = nodes[SUBJECT_IDX];
 	String nodeN3 = node.toN3();
 	assert node instanceof org.semanticweb.yars.nx.Resource;
-	subject = new Text(nodeN3);
+	subject = new Text(node.toString());
 	relations.append(nodeN3);
 
 	node = nodes[PREDICATE_IDX];
 	nodeN3 = node.toN3();
 	assert node instanceof org.semanticweb.yars.nx.Resource;
-	context.write(new Text(nodeN3), new Text(PREDICATE_VALUE));
+	context.write(new Text(node.toString()), new Text(PREDICATE_VALUE));
 	relations.append(' ');
 	relations.append(nodeN3);
 
 	node = nodes[OBJECT_IDX];
 	nodeN3 = node.toN3();
 	if (node instanceof org.semanticweb.yars.nx.Resource) {
-	    context.write(new Text(nodeN3), new Text(OBJECT_VALUE));
+	    context.write(new Text(node.toString()), new Text(OBJECT_VALUE));
 	}
 	relations.append(' ');
 	relations.append(nodeN3);
@@ -113,7 +113,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	    node = nodes[CONTEXT_IDX];
 	    nodeN3 = node.toN3();
 	    assert node instanceof org.semanticweb.yars.nx.Resource;
-	    context.write(new Text(nodeN3), new Text(CONTEXT_VALUE));
+	    context.write(new Text(node.toString()), new Text(CONTEXT_VALUE));
 	    relations.append(' ');
 	    relations.append(nodeN3);
 	}

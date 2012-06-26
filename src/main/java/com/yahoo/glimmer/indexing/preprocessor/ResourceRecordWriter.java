@@ -56,7 +56,7 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
     @Override
     public void write(Text key, Text value) throws IOException, InterruptedException {
 	OutputStream out = outputStreamsMap.get(ALL);
-	out.write(key.getBytes(), 1, key.getLength() - 2);
+	out.write(key.getBytes(), 0, key.getLength());
 	out.write('\n');
 
 	byte[] valueBytes = value.getBytes();
@@ -76,11 +76,11 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 
 	// Bytes left in value after cutting CONTEXT/OBJECT/PREDICATE off the end..  Write subject and bySubject.
 	out = outputStreamsMap.get(SUBJECT);
-	out.write(key.getBytes(), 1, key.getLength() - 2);
+	out.write(key.getBytes(), 0, key.getLength());
 	out.write('\n');
 
 	out = outputStreamsMap.get(BY_SUBJECT);
-	out.write(key.getBytes(), 1, key.getLength() - 2);
+	out.write(key.getBytes(), 0, key.getLength());
 	out.write(BY_SUBJECT_DELIMITER);
 	out.write(valueBytes, 0, subjectsEndIdx);
 	out.write('\n');
@@ -90,7 +90,7 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 	byte[] typeBytes = type.getBytes();
 	if (byteArrayRegionMatches(valueBytes, subjectsEndIdx - typeBytes.length, typeBytes, typeBytes.length)) {
 	    OutputStream out = outputStreamsMap.get(type);
-	    out.write(key.getBytes(), 1, key.getLength() - 2);
+	    out.write(key.getBytes(), 0, key.getLength());
 	    out.write('\n');
 	    return subjectsEndIdx - typeBytes.length - ResourcesReducer.VALUE_DELIMITER.length();
 	}

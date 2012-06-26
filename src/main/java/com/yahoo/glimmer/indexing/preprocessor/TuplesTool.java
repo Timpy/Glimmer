@@ -86,6 +86,8 @@ public class TuplesTool extends Configured implements Tool {
 	// 	One file per reducer that contains the subjects + all <predicate> <object>|"Literal" <context> on that subject.
 	// All the files are sorted but we need to merge each reducers output into one file that is also sorted.
 	
+	// Maybe quicker to use a MR job with one reducer..  Currently decompression, merge and compression are all done in this thread..
+	
 	FileSystem fs = FileSystem.get(getConf());
 	
 	Map<String, List<Path>> filenamesToPartPaths = new HashMap<String, List<Path>>();
