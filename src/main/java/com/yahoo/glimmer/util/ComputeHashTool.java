@@ -42,8 +42,8 @@ import com.martiansoftware.jsap.UnflaggedOption;
 import com.martiansoftware.jsap.stringparsers.ForNameStringParser;
 import com.martiansoftware.jsap.stringparsers.IntegerStringParser;
 
-public class ComputeMphTool extends Configured implements Tool {
-    private final static Logger LOGGER = Logger.getLogger(ComputeMphTool.class);
+public class ComputeHashTool extends Configured implements Tool {
+    private final static Logger LOGGER = Logger.getLogger(ComputeHashTool.class);
     private static final String SRC_FILES_ARG = "srcFilenames";
     private static final String SIGNED_ARG = "signed";
     private static final String UNSIGNED_ARG = "unsigned";
@@ -56,7 +56,7 @@ public class ComputeMphTool extends Configured implements Tool {
 
     @Override
     public int run(String[] args) throws Exception {
-	final SimpleJSAP jsap = new SimpleJSAP(ComputeMphTool.class.getName(), "Builds a hash function.", new Parameter[] {
+	final SimpleJSAP jsap = new SimpleJSAP(ComputeHashTool.class.getName(), "Builds a hash function.", new Parameter[] {
 		new Switch(SIGNED_ARG, 's', SIGNED_ARG, "Generate signed hashes."),
 		new Switch(UNSIGNED_ARG, 'u', SIGNED_ARG, "Generate unsiged hashes."),
 		new FlaggedOption(SIGNATURE_WIDTH_ARG, IntegerStringParser.getParser(), "32", JSAP.NOT_REQUIRED, 'w', "width",
@@ -90,7 +90,7 @@ public class ComputeMphTool extends Configured implements Tool {
 	    LOGGER.info("Building unsigned hashes for " + srcFileCharset.displayName() + " files:" + srcFilenames);
 	}
 
-	JobConf job = new JobConf(getConf(), ComputeMphTool.class);
+	JobConf job = new JobConf(getConf(), ComputeHashTool.class);
 	FileSystem fs = FileSystem.get(job);
 	for (String filename : srcFilenames) {
 	    LOGGER.info("Building hash of " + filename);
@@ -172,11 +172,11 @@ public class ComputeMphTool extends Configured implements Tool {
      * @throws IOException
      */
     public static long pigInvoker(String filename, int signatureWidth, boolean keepUnsigned, String charsetName) throws IOException {
-	return new ComputeMphTool().buildHash(FileSystem.get(null), filename, signatureWidth, keepUnsigned, Charset.forName(charsetName));
+	return new ComputeHashTool().buildHash(FileSystem.get(null), filename, signatureWidth, keepUnsigned, Charset.forName(charsetName));
     }
 
     public static void main(String[] args) throws Exception {
-	int ret = ToolRunner.run(new ComputeMphTool(), args);
+	int ret = ToolRunner.run(new ComputeHashTool(), args);
 	System.exit(ret);
     }
 

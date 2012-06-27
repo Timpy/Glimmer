@@ -31,7 +31,7 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 import org.junit.Test;
 
-public class ComputeMphTest {
+public class ComputeHashTest {
     private static final String SOME_LINES = "a\nb\ncc\nd\n\u2200";
 
     private Mockery context;
@@ -43,7 +43,7 @@ public class ComputeMphTest {
     private ByteArrayOutputStream unsignedStream;
     private ByteArrayOutputStream signedStream;
     private ByteArrayOutputStream infoStream;
-    private ComputeMphTool computeMph;
+    private ComputeHashTool computeMph;
 
     @Before
     public void before() throws IOException {
@@ -85,16 +85,16 @@ public class ComputeMphTest {
 		});
 		oneOf(fs).create(with(infoPath), with(true));
 		will(returnValue(new FSDataOutputStream(infoStream, new Statistics("infoStats"))));
-		oneOf(fs).setPermission(with(infoPath), with(ComputeMphTool.ALL_PERMISSIONS));
+		oneOf(fs).setPermission(with(infoPath), with(ComputeHashTool.ALL_PERMISSIONS));
 	}};
-	computeMph = new ComputeMphTool();
+	computeMph = new ComputeHashTool();
     }
 
     @Test
     public void unsignedTest() throws IOException, ClassNotFoundException {
 	expectations.oneOf(fs).create(expectations.with(unsignedPath), expectations.with(true));
 	expectations.will(Expectations.returnValue(new FSDataOutputStream(unsignedStream, new Statistics("outStats"))));
-	expectations.oneOf(fs).setPermission(expectations.with(unsignedPath), expectations.with(ComputeMphTool.ALL_PERMISSIONS));
+	expectations.oneOf(fs).setPermission(expectations.with(unsignedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
 	context.checking(expectations);
 	
 	long hashSize = computeMph.buildHash(fs, "filename", 0, true, Charset.forName("UTF-8"));
@@ -122,7 +122,7 @@ public class ComputeMphTest {
     public void signedTest() throws IOException, ClassNotFoundException {
 	expectations.oneOf(fs).create(expectations.with(signedPath), expectations.with(true));
 	expectations.will(Expectations.returnValue(new FSDataOutputStream(signedStream, new Statistics("outStats"))));
-	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeMphTool.ALL_PERMISSIONS));
+	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
 	context.checking(expectations);
 	long hashSize = computeMph.buildHash(fs, "filename", 32, false, Charset.forName("UTF-8"));
 
@@ -155,10 +155,10 @@ public class ComputeMphTest {
     public void signedAndUnsignedTest() throws IOException, ClassNotFoundException {
 	expectations.oneOf(fs).create(expectations.with(unsignedPath), expectations.with(true));
 	expectations.will(Expectations.returnValue(new FSDataOutputStream(unsignedStream, new Statistics("outStats"))));
-	expectations.oneOf(fs).setPermission(expectations.with(unsignedPath), expectations.with(ComputeMphTool.ALL_PERMISSIONS));
+	expectations.oneOf(fs).setPermission(expectations.with(unsignedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
 	expectations.oneOf(fs).create(expectations.with(signedPath), expectations.with(true));
 	expectations.will(Expectations.returnValue(new FSDataOutputStream(signedStream, new Statistics("outStats"))));
-	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeMphTool.ALL_PERMISSIONS));
+	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
 	context.checking(expectations);
 	long hashSize = computeMph.buildHash(fs, "filename", 16, true, Charset.forName("UTF-8"));
 
