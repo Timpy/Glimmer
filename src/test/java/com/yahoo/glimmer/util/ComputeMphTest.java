@@ -37,9 +37,11 @@ public class ComputeMphTest {
     private Mockery context;
     private Expectations expectations;
     private FileSystem fs;
-    private PathMatcher outPath = new PathMatcher();
-    private PathMatcher infoPath = new PathMatcher();
-    private ByteArrayOutputStream outStream;
+    private PathMatcher unsignedPath;
+    private PathMatcher signedPath;
+    private PathMatcher infoPath;
+    private ByteArrayOutputStream unsignedStream;
+    private ByteArrayOutputStream signedStream;
     private ByteArrayOutputStream infoStream;
     private ComputeMphTool computeMph;
 
@@ -53,10 +55,12 @@ public class ComputeMphTest {
 
 	
 	final Path inPath = new Path("filename");
-	outPath = new PathMatcher();
-	infoPath = new PathMatcher();
+	unsignedPath = new PathMatcher("filename.map");
+	signedPath = new PathMatcher("filename.smap");
+	infoPath = new PathMatcher("filename.mapinfo");
 	
-	outStream = new ByteArrayOutputStream(4096);
+	unsignedStream = new ByteArrayOutputStream(4096);
+	signedStream = new ByteArrayOutputStream(4096);
 	infoStream = new ByteArrayOutputStream(4096);
 	expectations = new Expectations() {{
 		one(fs).getFileStatus(with(inPath));
@@ -79,30 +83,29 @@ public class ComputeMphTest {
 			return new FSDataInputStream(in);
 		    }
 		});
-		oneOf(fs).create(with(outPath), with(true));
-		will(returnValue(new FSDataOutputStream(outStream, new Statistics("outStats"))));
-		oneOf(fs).setPermission(with(outPath), with(ComputeMphTool.ALL_PERMISSIONS));
 		oneOf(fs).create(with(infoPath), with(true));
 		will(returnValue(new FSDataOutputStream(infoStream, new Statistics("infoStats"))));
 		oneOf(fs).setPermission(with(infoPath), with(ComputeMphTool.ALL_PERMISSIONS));
 	}};
-	context.checking(expectations);
 	computeMph = new ComputeMphTool();
     }
 
     @Test
     public void unsignedTest() throws IOException, ClassNotFoundException {
-	outPath.setFilename("filename.map");
-	infoPath.setFilename("filename.map.info");
-	long hashSize = computeMph.buildHash(fs, "filename", 0, Charset.forName("UTF-8"));
+	expectations.oneOf(fs).create(expectations.with(unsignedPath), expectations.with(true));
+	expectations.will(Expectations.returnValue(new FSDataOutputStream(unsignedStream, new Statistics("outStats"))));
+	expectations.oneOf(fs).setPermission(expectations.with(unsignedPath), expectations.with(ComputeMphTool.ALL_PERMISSIONS));
+	context.checking(expectations);
+	
+	long hashSize = computeMph.buildHash(fs, "filename", 0, true, Charset.forName("UTF-8"));
 
 	assertEquals(5, hashSize);
 	context.assertIsSatisfied();
 
-	assertEquals("size\t5\nbits\t391\n", infoStream.toString());
+	assertTrue(infoStream.toString().matches("^size\t5\nunsignedBits\t3\\d\\d\n$"));
 
 	// unmarshal the hash and check the values..
-	ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(outStream.toByteArray()));
+	ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(unsignedStream.toByteArray()));
 	Object readObject = ois.readObject();
 	assertTrue(readObject instanceof LcpMonotoneMinimalPerfectHashFunction);
 	@SuppressWarnings("unchecked")
@@ -117,17 +120,19 @@ public class ComputeMphTest {
 
     @Test
     public void signedTest() throws IOException, ClassNotFoundException {
-	outPath.setFilename("filename.smap");
-	infoPath.setFilename("filename.smap.info");
-	long hashSize = computeMph.buildHash(fs, "filename", 32, Charset.forName("UTF-8"));
+	expectations.oneOf(fs).create(expectations.with(signedPath), expectations.with(true));
+	expectations.will(Expectations.returnValue(new FSDataOutputStream(signedStream, new Statistics("outStats"))));
+	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeMphTool.ALL_PERMISSIONS));
+	context.checking(expectations);
+	long hashSize = computeMph.buildHash(fs, "filename", 32, false, Charset.forName("UTF-8"));
 
 	assertEquals(5, hashSize);
 	context.assertIsSatisfied();
 
-	assertEquals("size\t5\n", infoStream.toString());
+	assertEquals("size\t5\nsignedWidth\t32\n", infoStream.toString());
 
 	// unmarshal the hash and check the values..
-	ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(outStream.toByteArray()));
+	ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(signedStream.toByteArray()));
 	Object readObject = ois.readObject();
 	assertTrue(readObject instanceof ShiftAddXorSignedStringMap);
 	ShiftAddXorSignedStringMap map = (ShiftAddXorSignedStringMap) readObject;
@@ -146,10 +151,27 @@ public class ComputeMphTest {
 	assertEquals(-1, map.getLong("\u2201"));
     }
     
+    @Test
+    public void signedAndUnsignedTest() throws IOException, ClassNotFoundException {
+	expectations.oneOf(fs).create(expectations.with(unsignedPath), expectations.with(true));
+	expectations.will(Expectations.returnValue(new FSDataOutputStream(unsignedStream, new Statistics("outStats"))));
+	expectations.oneOf(fs).setPermission(expectations.with(unsignedPath), expectations.with(ComputeMphTool.ALL_PERMISSIONS));
+	expectations.oneOf(fs).create(expectations.with(signedPath), expectations.with(true));
+	expectations.will(Expectations.returnValue(new FSDataOutputStream(signedStream, new Statistics("outStats"))));
+	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeMphTool.ALL_PERMISSIONS));
+	context.checking(expectations);
+	long hashSize = computeMph.buildHash(fs, "filename", 16, true, Charset.forName("UTF-8"));
+
+	assertEquals(5, hashSize);
+	context.assertIsSatisfied();
+
+	assertTrue(infoStream.toString().matches("^size\t5\nunsignedBits\t3\\d\\d\nsignedWidth\t16\n$"));
+    }
+    
     private class PathMatcher extends BaseMatcher<Path> {
-	private String filename;
+	private final String filename;
 	
-	public void setFilename(String filename) {
+	public PathMatcher(String filename) {
 	    this.filename = filename;
 	};
 	

@@ -2,7 +2,6 @@ package com.yahoo.glimmer.util;
 
 import it.unimi.dsi.big.util.ShiftAddXorSignedStringMap;
 import it.unimi.dsi.bits.TransformationStrategies;
-import it.unimi.dsi.fastutil.objects.Object2LongFunction;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.SafelyCloseable;
 import it.unimi.dsi.lang.MutableString;
@@ -47,16 +46,23 @@ public class ComputeMphTool extends Configured implements Tool {
     private final static Logger LOGGER = Logger.getLogger(ComputeMphTool.class);
     private static final String SRC_FILES_ARG = "srcFilenames";
     private static final String SIGNED_ARG = "signed";
+    private static final String UNSIGNED_ARG = "unsigned";
     private static final String SIGNATURE_WIDTH_ARG = "signatureWidth";
     private static final String FILE_ENCODING_ARG = "encoding";
     public static final FsPermission ALL_PERMISSIONS = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
+    private static final String DOT_UNSIGNED = ".map";
+    private static final String DOT_SIGNED = ".smap";
+    private static final String DOT_MAPINFO = ".mapinfo";
 
     @Override
     public int run(String[] args) throws Exception {
 	final SimpleJSAP jsap = new SimpleJSAP(ComputeMphTool.class.getName(), "Builds a hash function.", new Parameter[] {
-	    	new Switch(SIGNED_ARG, 's', SIGNED_ARG, "Sign the hashes."),
-		new FlaggedOption(SIGNATURE_WIDTH_ARG, IntegerStringParser.getParser() , "32", JSAP.NOT_REQUIRED, 'w', "width", "Sign the hash with a hash width of w bits."),
-		new FlaggedOption(FILE_ENCODING_ARG, ForNameStringParser.getParser(Charset.class) , "UTF-8", JSAP.NOT_REQUIRED, 'e', "encoding", "Set the input file encoding(default is UTF-8)."),
+		new Switch(SIGNED_ARG, 's', SIGNED_ARG, "Generate signed hashes."),
+		new Switch(UNSIGNED_ARG, 'u', SIGNED_ARG, "Generate unsiged hashes."),
+		new FlaggedOption(SIGNATURE_WIDTH_ARG, IntegerStringParser.getParser(), "32", JSAP.NOT_REQUIRED, 'w', "width",
+			"Sign the hash with a hash width of w bits."),
+		new FlaggedOption(FILE_ENCODING_ARG, ForNameStringParser.getParser(Charset.class), "UTF-8", JSAP.NOT_REQUIRED, 'e', "encoding",
+			"Set the input file encoding(default is UTF-8)."),
 		new UnflaggedOption(SRC_FILES_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.REQUIRED, JSAP.GREEDY,
 			"The filenames (or HDFS dirs if building hashes) to work with.") });
 
@@ -68,24 +74,32 @@ public class ComputeMphTool extends Configured implements Tool {
 	String[] srcFilenames = jsapResult.getStringArray(SRC_FILES_ARG);
 	Charset srcFileCharset = (Charset) jsapResult.getObject(FILE_ENCODING_ARG);
 	int signatureWidth = 0;
+	boolean keepUnsigned = true;
 	if (jsapResult.getBoolean(SIGNED_ARG)) {
 	    signatureWidth = jsapResult.getInt(SIGNATURE_WIDTH_ARG);
-	    LOGGER.info("Building signed hash with signature width of " + signatureWidth + " bits for " + srcFileCharset.displayName() + " files:" + Arrays.toString(srcFilenames));
+
+	    if (jsapResult.getBoolean(UNSIGNED_ARG)) {
+		LOGGER.info("Building unsigned and signed hashes with signature width of " + signatureWidth + " bits for " + srcFileCharset.displayName()
+			+ " files:" + Arrays.toString(srcFilenames));
+	    } else {
+		LOGGER.info("Building signed hashes with signature width of " + signatureWidth + " bits for " + srcFileCharset.displayName() + " files:"
+			+ Arrays.toString(srcFilenames));
+		keepUnsigned = false;
+	    }
 	} else {
-	    LOGGER.info("Building unsigned hash for " + srcFileCharset.displayName() + " files:" + srcFilenames);
+	    LOGGER.info("Building unsigned hashes for " + srcFileCharset.displayName() + " files:" + srcFilenames);
 	}
-	
-	
+
 	JobConf job = new JobConf(getConf(), ComputeMphTool.class);
 	FileSystem fs = FileSystem.get(job);
 	for (String filename : srcFilenames) {
 	    LOGGER.info("Building hash of " + filename);
-	    buildHash(fs, filename, signatureWidth, srcFileCharset);
+	    buildHash(fs, filename, signatureWidth, keepUnsigned, srcFileCharset);
 	}
 	return 0;
     }
 
-    public int buildHash(final FileSystem fs, final String srcFilename, final int signatureWidth, final Charset charset) throws IOException {
+    public long buildHash(FileSystem fs, String srcFilename, int signatureWidth, boolean keepUnsigned, final Charset charset) throws IOException {
 	final MapReducePartInputStreamEnumeration inputStreamEnumeration;
 	try {
 	    inputStreamEnumeration = new MapReducePartInputStreamEnumeration(fs, new Path(srcFilename));
@@ -101,44 +115,55 @@ public class ComputeMphTool extends Configured implements Tool {
 	    }
 	});
 
-	Object2LongFunction<? extends CharSequence> map = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection,
+	LcpMonotoneMinimalPerfectHashFunction<CharSequence> unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection,
 		TransformationStrategies.prefixFreeUtf16());
-	String filenameExtention = ".map";
+	
+	String destFilename = inputStreamEnumeration.removeCompressionSuffixIfAny(srcFilename);
+	
+	if (signatureWidth <= 0 || keepUnsigned) {
+	    writeObjectToFile(unsignedHash, fs, new Path(destFilename + DOT_UNSIGNED));
+	}
+	
 	if (signatureWidth > 0) {
-	    map = new ShiftAddXorSignedStringMap(inCollection.iterator(), map, signatureWidth);
-	    filenameExtention = ".smap";
+	    ShiftAddXorSignedStringMap signedHash = new ShiftAddXorSignedStringMap(inCollection.iterator(), unsignedHash, signatureWidth);
+	    writeObjectToFile(signedHash, fs, new Path(destFilename + DOT_SIGNED));
 	}
 
-	String destFilename = inputStreamEnumeration.removeCompressionSuffixIfAny(srcFilename);
-	Path outPath = new Path(destFilename + filenameExtention);
-	FSDataOutputStream outStream = fs.create(outPath, true);// overwrite
-	fs.setPermission(outPath, ALL_PERMISSIONS);
-	ObjectOutputStream outOs = new ObjectOutputStream(outStream);
-	outOs.writeObject(map);
-	outOs.close();
-
-	Path infoPath = new Path(destFilename + filenameExtention + ".info");
+	Path infoPath = new Path(destFilename + DOT_MAPINFO);
 	FSDataOutputStream infoStream = fs.create(infoPath, true);// overwrite
 	fs.setPermission(infoPath, ALL_PERMISSIONS);
 	OutputStreamWriter infoWriter = new OutputStreamWriter(infoStream);
 	infoWriter.write("size\t");
-	infoWriter.write(Integer.toString(map.size()));
+	infoWriter.write(Long.toString(unsignedHash.size64()));
 	infoWriter.write("\n");
-	if (map instanceof LcpMonotoneMinimalPerfectHashFunction<?>) {
-        	infoWriter.write("bits\t");
-        	infoWriter.write(Long.toString(((LcpMonotoneMinimalPerfectHashFunction<?>)map).numBits()));
-        	infoWriter.write("\n");
+	if (keepUnsigned) {
+	    infoWriter.write("unsignedBits\t");
+	    infoWriter.write(Long.toString((unsignedHash).numBits()));
+	    infoWriter.write("\n");
+	}
+	if (signatureWidth > 0) {
+	    infoWriter.write("signedWidth\t");
+	    infoWriter.write(Integer.toString(signatureWidth));
+	    infoWriter.write("\n");
 	}
 	infoWriter.close();
 	infoStream.close();
 
-	return map.size();
+	return unsignedHash.size64();
+    }
+
+    private static void writeObjectToFile(Object object, FileSystem fs, Path path) throws IOException {
+	FSDataOutputStream outStream = fs.create(path, true);// overwrite
+	fs.setPermission(path, ALL_PERMISSIONS);
+	ObjectOutputStream outOs = new ObjectOutputStream(outStream);
+	outOs.writeObject(object);
+	outOs.close();
     }
 
     /**
      * For static invocation from pig via define mph InvokeForInt(
-     * 'com.yahoo.glimmer.util.ComputeMph.pigInvoker', filename, signed); The hash
-     * function itself will be serialized to DFS as filename.<s>map
+     * 'com.yahoo.glimmer.util.ComputeMph.pigInvoker', filename, signed); The
+     * hash function itself will be serialized to DFS as filename.<s>map
      * 
      * TODO Test it.
      * 
@@ -146,8 +171,8 @@ public class ComputeMphTool extends Configured implements Tool {
      * @return size of generated hash
      * @throws IOException
      */
-    public static int pigInvoker(String filename, int signatureWidth, String charsetName) throws IOException {
-	return new ComputeMphTool().buildHash(FileSystem.get(null), filename, signatureWidth, Charset.forName(charsetName));
+    public static long pigInvoker(String filename, int signatureWidth, boolean keepUnsigned, String charsetName) throws IOException {
+	return new ComputeMphTool().buildHash(FileSystem.get(null), filename, signatureWidth, keepUnsigned, Charset.forName(charsetName));
     }
 
     public static void main(String[] args) throws Exception {
