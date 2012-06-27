@@ -41,11 +41,23 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
     private static final int OBJECT_IDX = 2;
     private static final int CONTEXT_IDX = 3;
 
+    public static final String INCLUDE_CONTEXTS_KEY = "includeContexts";
     public static final String PREDICATE_VALUE = "PREDICATE";
     public static final String OBJECT_VALUE = "OBJECT";
     public static final String CONTEXT_VALUE = "CONTEXT";
 
+    private boolean includeContexts = true;
     private StringBuilder relations = new StringBuilder();
+    
+    protected void setup(Mapper<LongWritable,Text,Text,Text>.Context context) throws java.io.IOException ,InterruptedException {
+	String includeContextsString = context.getConfiguration().get(INCLUDE_CONTEXTS_KEY);
+	assert includeContextsString != null;
+	setIncludeContexts(Boolean.parseBoolean(includeContextsString));
+    };
+
+    public void setIncludeContexts(boolean includeContexts) {
+	this.includeContexts = includeContexts;
+    }
 
     @Override
     protected void map(LongWritable key, Text value, Mapper<LongWritable, Text, Text, Text>.Context context) throws java.io.IOException, InterruptedException {
@@ -109,7 +121,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	relations.append(' ');
 	relations.append(nodeN3);
 
-	if (nodes.length > CONTEXT_IDX) {
+	if (includeContexts && nodes.length > CONTEXT_IDX) {
 	    node = nodes[CONTEXT_IDX];
 	    nodeN3 = node.toN3();
 	    assert node instanceof org.semanticweb.yars.nx.Resource;

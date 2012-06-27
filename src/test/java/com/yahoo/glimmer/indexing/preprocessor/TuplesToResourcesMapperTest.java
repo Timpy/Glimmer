@@ -45,12 +45,27 @@ public class TuplesToResourcesMapperTest {
 	context.checking(new Expectations(){{
 	    one(mrContext).write(with(new TextMatcher("http://purl.org/dc/elements/1.1/creator")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
 	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://www.example.org/index.html")), with(new TextMatcher("<http://www.example.org/index.html> <http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> .")));
+	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/index.html")), with(new TextMatcher("<http://www.example.org/index.html> <http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> <http://context/> .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
 	
 	mapper.map(new LongWritable(5l), new Text(
-		"<http://www.example.org/index.html> <http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> ."), mrContext);
+		"<http://www.example.org/index.html> <http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> <http://context/> ."), mrContext);
+    }
+    
+    @Test
+    public void noContextsObjectTest() throws IOException, InterruptedException {
+	context.checking(new Expectations(){{
+	    one(mrContext).write(with(new TextMatcher("http://purl.org/dc/elements/1.1/creator")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/index.html")), with(new TextMatcher("<http://www.example.org/index.html> <http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> .")));
+	}});
+	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
+	mapper.setIncludeContexts(false);
+	
+	mapper.map(new LongWritable(5l), new Text(
+		"<http://www.example.org/index.html> <http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> <http://context/> ."), mrContext);
     }
     
     /*

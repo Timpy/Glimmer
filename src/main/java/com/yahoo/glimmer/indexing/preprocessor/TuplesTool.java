@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -23,10 +24,12 @@ import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPResult;
 import com.martiansoftware.jsap.Parameter;
 import com.martiansoftware.jsap.SimpleJSAP;
+import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
 import com.yahoo.glimmer.util.MergeSortTool;
 
 public class TuplesTool extends Configured implements Tool {
+    public static final String CONTEXTS_ARG = "includeContexts";
     private static final String OUTPUT_ARG = "output";
     private static final String INPUT_ARG = "input";
 
@@ -39,6 +42,7 @@ public class TuplesTool extends Configured implements Tool {
     public int run(String[] args) throws Exception {
 
 	SimpleJSAP jsap = new SimpleJSAP(TuplesTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
+	    	new Switch(CONTEXTS_ARG, 'c', "with-contexts", "Included the nquads context in the generated output."),
 		new UnflaggedOption(INPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
 		new UnflaggedOption(OUTPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the out data."),
 
@@ -49,11 +53,11 @@ public class TuplesTool extends Configured implements Tool {
 	    System.err.print(jsap.getUsage());
 	    System.exit(1);
 	}
-
-	Path outputDir = new Path(jsapResult.getString(OUTPUT_ARG));
 	
-	Job job = new Job(getConf());
-
+	Configuration config = getConf();
+	config.set(TuplesToResourcesMapper.INCLUDE_CONTEXTS_KEY, Boolean.toString(jsapResult.getBoolean(CONTEXTS_ARG, false)));
+	
+	Job job = new Job(config);
 	job.setJarByClass(TuplesTool.class);
 
 	job.setJobName(TuplesTool.class.getName() + "-part1-" + System.currentTimeMillis());
@@ -73,6 +77,7 @@ public class TuplesTool extends Configured implements Tool {
 
 	FileInputFormat.setInputPaths(job, new Path(jsapResult.getString(INPUT_ARG)));
 
+	Path outputDir = new Path(jsapResult.getString(OUTPUT_ARG));
 	FileOutputFormat.setOutputPath(job, outputDir);
 
 	if (!job.waitForCompletion(true)) {
@@ -88,7 +93,7 @@ public class TuplesTool extends Configured implements Tool {
 	
 	// Maybe quicker to use a MR job with one reducer..  Currently decompression, merge and compression are all done in this thread..
 	
-	FileSystem fs = FileSystem.get(getConf());
+	FileSystem fs = FileSystem.get(config);
 	
 	Map<String, List<Path>> filenamesToPartPaths = new HashMap<String, List<Path>>();
 	
@@ -108,7 +113,7 @@ public class TuplesTool extends Configured implements Tool {
 	    }
 	}
 	
-	CompressionCodecFactory factory = new CompressionCodecFactory(getConf());
+	CompressionCodecFactory factory = new CompressionCodecFactory(config);
 	
 	for (String filename : filenamesToPartPaths.keySet()) {
 	    Path outputPath = new Path(outputDir, filename);
