@@ -297,11 +297,6 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 	}
 
 	public CharSequence title() {
-	    try {
-		ensureParsed();
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
 	    CharSequence title = (CharSequence) resolve(PropertyBasedDocumentFactory.MetadataKeys.TITLE, metadata);
 	    return title == null ? "" : title;
 	}

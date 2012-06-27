@@ -6,6 +6,7 @@ import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.mg4j.document.Document;
 import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
+import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 import it.unimi.dsi.util.Properties;
 
 import java.io.BufferedReader;
@@ -17,22 +18,23 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.openrdf.model.Literal;
 import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
-import org.openrdf.rio.RDFHandlerException;
-import org.openrdf.rio.RDFParseException;
 import org.semanticweb.yars.nx.namespace.RDF;
-import org.semanticweb.yars.nx.parser.ParseException;
 
 public class HorizontalDocumentFactory extends RDFDocumentFactory {
     private static final long serialVersionUID = 7360010820859436049L;
 
+    public static final String NO_CONTEXT = "NC";
+    public static enum MetadataKeys {
+	CONTEXT_MPH
+    }
+    
+    protected LcpMonotoneMinimalPerfectHashFunction<CharSequence> contextMph;
+    
     /**
      * Returns a copy of this document factory. A new parser is allocated for
      * the copy.
@@ -56,9 +58,19 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
     public HorizontalDocumentFactory() {
 	super();
     }
+    
+    @SuppressWarnings("unchecked")
+    @Override
+    protected void init() {
+        super.init();
+        contextMph = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) resolve(MetadataKeys.CONTEXT_MPH, defaultMetadata);
+	if (contextMph == null) {
+	    throw new IllegalStateException("No context MPH set in metadata map.");
+	}
+    }
 
     public int numberOfFields() {
-	return 5;
+	return 4;
     }
 
     public String fieldName(final int field) {
@@ -69,10 +81,8 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	case 1:
 	    return "property";
 	case 2:
-	    return "subject";
-	case 3:
 	    return "context";
-	case 4:
+	case 3:
 	    return "uri";
 	default:
 	    throw new IllegalArgumentException();
@@ -97,21 +107,17 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	    return FieldType.TEXT;
 	case 3:
 	    return FieldType.TEXT;
-	case 4:
-	    return FieldType.TEXT;
-
 	default:
 	    throw new IllegalArgumentException();
 	}
     }
-
 
     public Document getDocument(final InputStream rawContent, final Reference2ObjectMap<Enum<?>, Object> metadata) throws IOException {
 	RDFDocument result = new HorizontalDataRSSDocument(metadata);
 	result.setContent(rawContent);
 	return result;
     }
-    
+
     /**
      * A DataRSS document.
      * 
@@ -130,7 +136,6 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	/** Field content **/
 	private List<String> tokens = new ArrayList<String>();
 	private List<String> properties = new ArrayList<String>();
-	private List<String> subjects = new ArrayList<String>();
 	private List<String> contexts = new ArrayList<String>();
 	private List<String> uri = new ArrayList<String>();
 
@@ -150,7 +155,6 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	    }
 	    tokens.clear();
 	    properties.clear();
-	    subjects.clear();
 	    contexts.clear();
 	    uri.clear();
 
@@ -159,8 +163,10 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void ensureParsed() throws IOException {
-	    if (parsed)
+	    if (parsed) {
 		return;
+	    }
+	    parsed = true;
 
 	    if (rawContent == null) {
 		throw new IOException("Trying to parse null rawContent");
@@ -175,7 +181,6 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	    if (line == null || line.trim().equals("")) {
 		if (mapContext != null)
 		    mapContext.getCounter(TripleIndexGenerator.Counters.EMPTY_LINES).increment(1);
-		parsed = true;
 		return;
 	    }
 	    // First part is URL, second part is docfeed
@@ -183,15 +188,16 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	    String data = line.substring(line.indexOf('\t')).trim();
 
 	    if (data.trim().equals("")) {
-		if (mapContext != null)
+		if (mapContext != null) {
 		    mapContext.getCounter(TripleIndexGenerator.Counters.EMPTY_DOCUMENTS).increment(1);
-		parsed = true;
+		}
 		return;
 	    }
 
 	    // Index URI except the protocol, if exists
 	    FastBufferedReader fbr;
-	    MutableString word = new MutableString(""), nonWord = new MutableString("");
+	    MutableString word = new MutableString();
+	    MutableString nonWord = new MutableString();
 	    int firstColon = url.indexOf(':');
 	    if (firstColon < 0) {
 		fbr = new FastBufferedReader(new StringReader(url));
@@ -203,91 +209,84 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 		    if (TERMPROCESSOR.processTerm(word)) {
 			uri.add(word.toString().toLowerCase());
 		    }
-
 		}
 	    }
 	    fbr.close();
 
 	    // Docfeed parsing
+	    StatementCollectorHandler handler;
 	    try {
-
-		// TODO: sort by subject
-		StatementCollectorHandler handler = parseStatements(url, data);
-
-		for (Statement stmt : handler.getStatements()) {
-
-		    String predicate = stmt.getPredicate().toString();
-
-		    String fieldName = encodeFieldName(predicate);
-
-		    // Check if prefix is on blacklist
-		    if (onPredicateBlackList(fieldName)) {
-			if (mapContext != null)
-			    mapContext.getCounter(TripleIndexGenerator.Counters.BLACKLISTED_TRIPLES).increment(1);
-			continue;
-		    }
-		    if (stmt.getObject() instanceof Resource) {
-			if (predicate.equals(RDF.TYPE.toString())) {
-			    if (mapContext != null)
-				mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
-			    tokens.add(stmt.getObject().toString());
-			    properties.add(fieldName);
-			} else {
-			    tokens.add(subjectsMph.get(stmt.getObject().toString()).toString());
-			    properties.add(fieldName);
-			}
-		    } else {
-			String object = ((Literal) stmt.getObject()).getLabel();
-			// Iterate over the words of the value
-			fbr = new FastBufferedReader(new StringReader(object));
-			while (fbr.next(word, nonWord)) {
-			    if (word != null && !word.equals("")) {
-
-				if (TERMPROCESSOR.processTerm(word)) {
-				    // Lowercase terms
-				    tokens.add(word.toString());
-
-				    // Preserve casing for properties and
-				    // contexts
-				    properties.add(fieldName);
-
-				    // Index first position in the quad
-				    // (subject)
-				    // subjects.add(subject);
-				    // Index fourth position in the quad
-				    // (context)
-				    // contexts.add(context);
-				}
-
-			    }
-			}
-			fbr.close();
-		    }
-		    if (mapContext != null)
-			mapContext.getCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES).increment(1);
-		}
-	    } catch (TransformerConfigurationException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage());
-	    } catch (RDFParseException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage());
-	    } catch (RDFHandlerException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage());
-	    } catch (TransformerException e) {
+		handler = parseStatements(url, data);
+	    } catch (IOException e) {
+		throw e;
+	    } catch (Exception e) {
 		System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
-	    } catch (ParseException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
-	    } catch (IllegalArgumentException e) {
-		System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
+		return;
 	    }
-	    parsed = true;
+
+	    for (Statement stmt : handler.getStatements()) {
+		String predicate = stmt.getPredicate().toString();
+		String fieldName = encodeFieldName(predicate);
+		
+		// Check if prefix is on blacklist
+		if (onPredicateBlackList(fieldName)) {
+		    if (mapContext != null)
+			mapContext.getCounter(TripleIndexGenerator.Counters.BLACKLISTED_TRIPLES).increment(1);
+		    continue;
+		}
+		
+		String contextValue = NO_CONTEXT;
+		if (stmt.getContext() != null) {
+		    String s = stmt.getContext().toString();
+		    Long l = contextMph.get(s);
+		    if (l == null) {
+			throw new IllegalStateException("Context " + stmt.getContext().toString() + " not in context hash function!");
+		    }
+		    contextValue = l.toString(); 
+		}
+		
+		if (stmt.getObject() instanceof Resource) {
+		    if (predicate.equals(RDF.TYPE.toString())) {
+			if (mapContext != null)
+			    mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
+			tokens.add(stmt.getObject().toString());
+		    } else {
+			tokens.add(subjectsMph.get(stmt.getObject().toString()).toString());
+		    }
+		    properties.add(fieldName);
+		    if (contextValue != null) {
+			contexts.add(contextValue);
+		    }
+		} else {
+		    String object = ((Literal) stmt.getObject()).getLabel();
+		    // Iterate over the words of the value
+		    fbr = new FastBufferedReader(new StringReader(object));
+		    while (fbr.next(word, nonWord)) {
+			if (word != null && !word.equals("")) {
+			    if (TERMPROCESSOR.processTerm(word)) {
+				// Lowercase terms
+				tokens.add(word.toString());
+
+				// Preserve casing for properties and
+				// contexts
+				properties.add(fieldName);
+				
+				if (contextValue != null) {
+				    contexts.add(contextValue);
+				}
+			    }
+
+			}
+		    }
+		    fbr.close();
+		}
+		
+		if (mapContext != null)
+		    mapContext.getCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES).increment(1);
+	    }
 	}
 
 	public CharSequence title() {
-	    try {
-		ensureParsed();
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
 	    CharSequence title = (CharSequence) resolve(PropertyBasedDocumentFactory.MetadataKeys.TITLE, metadata);
 	    return title == null ? "" : title;
 	}
@@ -314,10 +313,8 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	    case 1:
 		return new WordArrayReader(properties);
 	    case 2:
-		return new WordArrayReader(subjects);
-	    case 3:
 		return new WordArrayReader(contexts);
-	    case 4:
+	    case 3:
 		return new WordArrayReader(uri);
 	    default:
 		throw new IllegalArgumentException();
@@ -330,5 +327,4 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	    return wordReader;
 	}
     }
-
 }
