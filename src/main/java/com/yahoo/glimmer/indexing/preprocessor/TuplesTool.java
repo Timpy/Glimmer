@@ -7,6 +7,7 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -29,6 +30,7 @@ import com.martiansoftware.jsap.UnflaggedOption;
 import com.yahoo.glimmer.util.MergeSortTool;
 
 public class TuplesTool extends Configured implements Tool {
+    private static final String COUNTS_FILENAME = "counts";
     public static final String CONTEXTS_ARG = "includeContexts";
     private static final String OUTPUT_ARG = "output";
     private static final String INPUT_ARG = "input";
@@ -115,13 +117,19 @@ public class TuplesTool extends Configured implements Tool {
 	
 	CompressionCodecFactory factory = new CompressionCodecFactory(config);
 	
+	Path countsPath = new Path(outputDir, COUNTS_FILENAME);
+	FSDataOutputStream countsOutputStream = fs.create(countsPath);
+	
 	for (String filename : filenamesToPartPaths.keySet()) {
 	    Path outputPath = new Path(outputDir, filename);
 	    List<Path> sourcePaths = filenamesToPartPaths.get(filename);
 	    int lineCount = MergeSortTool.mergeSort(fs, sourcePaths, outputPath, factory);
 	    System.out.println("Merged " + lineCount + " lines into " + filename);
+	    countsOutputStream.writeBytes(filename + '\t' + lineCount + '\n');
 	}
-
+	countsOutputStream.flush();
+	countsOutputStream.close();
+	
 	return 0;
     }
 }
