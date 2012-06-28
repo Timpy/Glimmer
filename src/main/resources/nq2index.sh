@@ -18,7 +18,6 @@ if [ ! -z ${3} ] ; then
 	SUBINDICES=${3}
 fi
 
-
 # To allow the use of commons-configuration version 1.8 over Hadoop's version 1.6 we export HADOOP_USER_CLASSPATH_FIRST=true
 # See https://issues.apache.org/jira/browse/MAPREDUCE-1938 and hadoop.apache.org/common/docs/r0.20.204.0/releasenotes.html
 export HADOOP_USER_CLASSPATH_FIRST=true
@@ -32,18 +31,10 @@ LOCAL_BUILD_DIR="${HOME}/tmp/nq2index.${BUILD_NAME}"
 PROJECT_JAR="../Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
 GENERATE_INDEX_FILES="blacklist.txt,fixDataRSS.xsl,RDFa2RDFXML.xsl,t_namespaces.html"
 
-COMPRESSION_EXTENSION=".bz2"
 COMPRESSION_CODEC="org.apache.hadoop.io.compress.BZip2Codec"
 COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,${COMPRESSION_CODEC}"
 
 HASH_EXTENSION=".smap"
-
-OUTPUT_NAMES[0]="bysubject"
-OUTPUT_NAMES[1]="subjects"
-OUTPUT_NAMES[2]="predicates"
-OUTPUT_NAMES[3]="objects"
-OUTPUT_NAMES[4]="contexts"
-OUTPUT_NAMES[5]="all"
 
 if [ ! -f ${PROJECT_JAR} ] ; then
 	echo "Projects jar file missing!! ${PROJECT_JAR}"
@@ -61,12 +52,6 @@ if [ -z ${BZCAT_CMD} ] ; then
 	echo "Can't find the bzcat command."
 	exit 1
 fi
-
-
-for i in ${!OUTPUT_NAMES[*]}; do
-	OUTPUT_NAME="${DFS_BUILD_DIR}/${OUTPUT_NAMES[$i]}"
-	OUTPUT_NAMES[$i]=${OUTPUT_NAME}
-done
 
 ${HADOOP_CMD} dfs -test -d ${DFS_BUILD_DIR}
 if [ $? -ne 0 ] ; then
@@ -138,10 +123,11 @@ else
 fi
 
 function groupBySubject () {
-	INPUT=${1}
-	echo Grouping tulpes by subject from file ${INPUT_FILENAME}...
+	local INPUT_FILE=${1}
+	local OUTPUT_DIR=${2}
+	echo Processing tuples from file ${INPUT_FILENAME}...
 	echo
-	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.TuplesTool \
+	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.TuplesTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapred.map.tasks.speculative.execution=true \
 		-Dmapred.child.java.opts=-Xmx800m \
@@ -149,70 +135,68 @@ function groupBySubject () {
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=true \
-		${INPUT} ${DFS_BUILD_DIR}/out"
+		${INPUT_FILE} ${OUTPUT_DIR}"
 	echo ${CMD}
 	${CMD}
 		
-	EXIT_CODE=$?
+	local EXIT_CODE=$?
 	if [ $EXIT_CODE -ne "0" ] ; then
 		echo "TuplesTool exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi	
+	
+	# The number of docs is the number of subjects.
+	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${OUTPUT_DIR}/counts | grep bysubject | cut -f 2`
+	if [ -z "${NUMBER_OF_DOCS}" -o $? -ne "0" ] ; then
+		echo "Failed to get the number of subjects. exiting.."
+		exit 1
+	fi
+	echo "There are ${NUMBER_OF_DOCS} docs(subjects)."
 }
 
 function computeHashes () {
+	FILES=$@
 	echo
 	echo Generating Hashes..
 	echo
 	# Generate Hashes for subjects, predicates and objects and all
-	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.util.ComputeMphTool \
+	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.util.ComputeHashTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
-		-s \
-		${OUTPUT_NAMES[1]}${COMPRESSION_EXTENSION} ${OUTPUT_NAMES[2]}${COMPRESSION_EXTENSION} ${OUTPUT_NAMES[3]}${COMPRESSION_EXTENSION} ${OUTPUT_NAMES[5]}${COMPRESSION_EXTENSION}"
+		-su ${FILES}"
 	echo ${CMD}; ${CMD}
 		
 	EXIT_CODE=$?
 	if [ $EXIT_CODE -ne "0" ] ; then
-		echo "MP hash generation exited with code $EXIT_CODE. exiting.."
+		echo "Hash generation exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi	
 }
 
-function getNumberOfDocs() {
-	# The number of docs is equal to the number of subjects.
-	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${OUTPUT_NAMES[1]}${HASH_EXTENSION}.info | grep size | cut -f 2`
-	if [ -z "${NUMBER_OF_DOCS}" -o $? -ne "0" ] ; then
-		echo "Failed to get the number of documents. exiting.."
-		exit 1
-	fi
-	echo "There are ${NUMBER_OF_DOCS} docs(subjects)."
-	return $NUMBER_OF_DOCS
-}
-
 function generateIndex () {
-	METHOD=${1}
-	NUMBER_OF_DOCS=${2}
-	SUBINDICES=${3}
-	DFS_SUB_INDEX_DIR="${DFS_BUILD_DIR}/${METHOD}"
+	BY_SUBJECT_DIR=${1}
+	METHOD=${2}
+	NUMBER_OF_DOCS=${3}
+	SUBINDICES=${4}
+	OUTPUT_DIR="${DFS_BUILD_DIR}/${METHOD}"
 	
 	echo
 	echo "RUNING HADOOP INDEX BUILD FOR METHOD:" ${METHOD}
 	echo
 	
-	${HADOOP_CMD} fs -test -e "${DFS_SUB_INDEX_DIR}"
+	${HADOOP_CMD} fs -test -e "${OUTPUT_DIR}"
 	if [ $? -eq 0 ] ; then
-		read -p "${DFS_SUB_INDEX_DIR} exists already! Delete and regenerate index, Continue using existing index or otherwise quit? (D/C)" -n 1 -r
+		read -p "${OUTPUT_DIR} exists already! Delete and regenerate index, Continue using existing index or otherwise quit? (D/C)" -n 1 -r
 		echo
 		if [[ $REPLY =~ ^[Cc]$ ]] ; then
-			echo Continuing with existing sub indexes in ${DFS_SUB_INDEX_DIR}
+			echo Continuing with existing sub indexes in ${OUTPUT_DIR}
 			return 0
 		elif [[ ! $REPLY =~ ^[Dd]$ ]] ; then
 			echo Exiting.
 			exit 1
 		fi
 	
-		echo "Deleting DFS index directory ${DFS_SUB_INDEX_DIR}.."
-		${HADOOP_CMD} fs -rmr -skipTrash ${DFS_SUB_INDEX_DIR}
+		echo "Deleting DFS index directory ${OUTPUT_DIR}.."
+		${HADOOP_CMD} fs -rmr -skipTrash ${OUTPUT_DIR}
 	fi
 	 
 	echo Generating index..
@@ -223,8 +207,8 @@ function generateIndex () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
-		-files ${GENERATE_INDEX_FILES},${OUTPUT_NAMES[2]}/part-r-00000 \
-		-m ${METHOD} -f ntuples -p part-r-00000 ${OUTPUT_NAMES[0]}${COMPRESSION_EXTENSION} $NUMBER_OF_DOCS ${DFS_SUB_INDEX_DIR} ${OUTPUT_NAMES[1]}${HASH_EXTENSION} ${OUTPUT_NAMES[2]}${HASH_EXTENSION}"
+		-files ${GENERATE_INDEX_FILES},${BY_SUBJECT_DIR}/predicate.bz2 \
+		-m ${METHOD} -p predicate.bz2 ${BY_SUBJECT_DIR}/bysubject.bz2 $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 		
@@ -235,7 +219,7 @@ function generateIndex () {
 	fi
 	
 	# Remove empty MR part-... files
-	${HADOOP_CMD} fs -rmr -skipTrash "${DFS_SUB_INDEX_DIR}/part-*"
+	${HADOOP_CMD} fs -rmr -skipTrash "${OUTPUT_DIR}/part-*"
 }
 
 function getSubIndexes () {
@@ -389,13 +373,11 @@ function buildCollection () {
 	${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/collection" "${LOCAL_BUILD_DIR}"
 }
 
-groupBySubject ${IN_FILE}
-exit 1
-computeHashes
-getNumberOfDocs
-NUMBER_OF_DOCS=$?
+#groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/bysubject
+#computeHashes ${DFS_BUILD_DIR}/bysubject/all${COMPRESSION_EXTENSION}
 
-generateIndex horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
+generateIndex ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
+exit 1
 getSubIndexes horizontal
 mergeSubIndexes horizontal
 

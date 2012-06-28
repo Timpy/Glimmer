@@ -50,6 +50,7 @@ import org.apache.hadoop.util.ToolRunner;
  * Generate an inverted index from an input of <url, term> pairs using MG4J
  */
 
+@Deprecated
 public class WordIndexGenerator extends Configured implements Tool {
 
     static enum Counters {
@@ -216,9 +217,6 @@ public class WordIndexGenerator extends Configured implements Tool {
 	System.out.println("Usage : WordIndexGenerator <input_dir> <output_dir>");
     }
 
-    /**
-   * 
-   */
     public int run(String[] args) throws Exception {
 
 	if (args.length < 2) {
@@ -240,8 +238,6 @@ public class WordIndexGenerator extends Configured implements Tool {
 
 	job.setMapOutputValueClass(IntWritable.class);
 
-	// Here we would need to pass in the number of documents, which we can
-	// get using mph.size()
 	job.setInt(NUMBER_OF_DOCUMENTS, LARGE_NUMBER);
 	job.set(OUTPUT_DIR, args[1]);
 

@@ -25,7 +25,7 @@ public class AbstractDocumentFactoryTest {
     		"<http://subject/> <http://predicate/3> \"object 3\"@en <http://context/1> .  ";
     
     protected Mockery context;
-    protected LcpMonotoneMinimalPerfectHashFunction<CharSequence> subjectsHash;
+    protected LcpMonotoneMinimalPerfectHashFunction<CharSequence> resourcesHash;
     protected Mapper<?, ?, ?, ?>.Context mapContext;
     protected Counters counters = new Counters();
     protected Reference2ObjectMap<Enum<?>, Object> metadata = new Reference2ObjectOpenHashMap<Enum<?>, Object>();
@@ -34,9 +34,9 @@ public class AbstractDocumentFactoryTest {
     
     protected Expectations defineExpectations() {
 	return new Expectations(){{
-	    allowing(subjectsHash).get("http://object/1");
+	    allowing(resourcesHash).get("http://object/1");
 	    will(returnValue(45l));
-	    allowing(subjectsHash).get("http://object/2");
+	    allowing(resourcesHash).get("http://object/2");
 	    will(returnValue(46l));
 	    allowing(mapContext).getCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES);
 	    will(returnValue(counters.findCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES)));
@@ -48,14 +48,14 @@ public class AbstractDocumentFactoryTest {
     public void before() {
 	context = new Mockery();
 	context.setImposteriser(ClassImposteriser.INSTANCE);
-	subjectsHash = context.mock(LcpMonotoneMinimalPerfectHashFunction.class, "subjectsHash");
+	resourcesHash = context.mock(LcpMonotoneMinimalPerfectHashFunction.class, "resourcesHash");
 	mapContext = context.mock(Mapper.Context.class);
 	
 	context.checking(defineExpectations());
 	
 	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.ENCODING, "UTF-8");
 	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.TITLE, "The Title");
-	metadata.put(MetadataKeys.SUBJECTS_MPH, subjectsHash);
+	metadata.put(MetadataKeys.RESOURCES_HASH, resourcesHash);
 	metadata.put(MetadataKeys.MAPPER_CONTEXT, mapContext);
 	
 	rawContentInputStream = new ByteArrayInputStream(RAW_CONTENT_STRING.getBytes(RAW_CHARSET));

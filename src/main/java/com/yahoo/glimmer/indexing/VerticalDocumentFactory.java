@@ -256,13 +256,13 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 
 		if (stmt.getObject() instanceof Resource) {
 		    // For all fields except type, encode the resource URI
-		    // or bnode ID using the MPH for subjects
+		    // or bnode ID using the resources hash
 		    if (predicate.equals(RDF.TYPE.toString())) {
 			if (mapContext != null)
 			    mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
 			fields.get(fieldIndex).add(stmt.getObject().toString());
 		    } else {
-			fields.get(fieldIndex).add(subjectsMph.get(stmt.getObject().stringValue()).toString());
+			fields.get(fieldIndex).add(resourcesHash.get(stmt.getObject().stringValue()).toString());
 		    }
 		} else {
 		    Value object = stmt.getObject();

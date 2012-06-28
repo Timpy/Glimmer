@@ -1,6 +1,7 @@
 package com.yahoo.glimmer.indexing;
 
 import it.unimi.dsi.fastutil.io.BinIO;
+import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
@@ -15,7 +16,6 @@ import it.unimi.dsi.mg4j.index.DiskBasedIndex;
 import it.unimi.dsi.mg4j.index.SkipBitStreamIndexWriter;
 import it.unimi.dsi.mg4j.index.CompressionFlags.Coding;
 import it.unimi.dsi.mg4j.index.CompressionFlags.Component;
-import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 import it.unimi.dsi.util.Properties;
 
 import java.io.BufferedWriter;
@@ -72,6 +72,7 @@ import com.martiansoftware.jsap.UnflaggedOption;
  */
 
 public class TripleIndexGenerator extends Configured implements Tool {
+    private static final String RESOURCES_HASH_ARG = "resourcesHash";
 
     static enum Counters {
 	FAILED_PARSING, NUMBER_OF_RECORDS, INDEXED_TRIPLES, INDEXED_OCCURRENCES, BLACKLISTED_TRIPLES, BLACKLISTED_OCCURRENCES, UNINDEXED_PREDICATE_TRIPLES, CANNOT_CREATE_FIELDNAME_TRIPLES, OBJECTPROPERTY_TRIPLES, EMPTY_DOCUMENTS, EMPTY_LINES, NEGATIVE_PREDICATE_ID, POSTINGLIST_SIZE_OVERFLOW, POSITIONLIST_SIZE_OVERFLOW, REDUCE_WRITTEN_OCCURRENCES, RDF_TYPE_TRIPLES
@@ -85,12 +86,6 @@ public class TripleIndexGenerator extends Configured implements Tool {
 
     public static final int MAX_POSITIONLIST_SIZE = 1000000;
     public static final int MAX_INVERTEDLIST_SIZE = 50000000; // 10m docs
-
-    public static final String RDFFORMAT_KEY = "RDFFORMAT";
-
-    public static final String DATARSS_FORMAT = "DATARSS";
-
-    public static final String NTUPLES_FORMAT = "NTUPLES";
 
     public static final String INDEXEDPROPERTIES_FILENAME_KEY = "INDEXEDPROPERTIES_FILENAME";
 
@@ -499,8 +494,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	}
     }
 
-    public static DocumentFactory initFactory(Class<?> documentFactoryClass, Configuration job, @SuppressWarnings("rawtypes") Mapper.Context context,
-	    boolean loadMPH) {
+    public static DocumentFactory initFactory(Class<?> documentFactoryClass, Configuration job, @SuppressWarnings("rawtypes") Mapper.Context context, boolean loadHash) {
 	DocumentFactory factory = null;
 
 	try {
@@ -510,13 +504,13 @@ public class TripleIndexGenerator extends Configured implements Tool {
 		defaultMetadata.put(RDFDocumentFactory.MetadataKeys.INDEXED_PROPERTIES_FILENAME, job.get(TripleIndexGenerator.INDEXEDPROPERTIES_FILENAME_KEY));
 
 	    }
-	    if (loadMPH) {
+	    if (loadHash) {
 		FileSystem fs = FileSystem.getLocal(job);
-		Path subjectsLocation = DistributedCache.getLocalCacheFiles(job)[0];
+		Path resourcesLocation = DistributedCache.getLocalCacheFiles(job)[0];
 		@SuppressWarnings("unchecked")
-		LcpMonotoneMinimalPerfectHashFunction<CharSequence> subjects = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) BinIO.loadObject(fs
-			.open(subjectsLocation));
-		defaultMetadata.put(RDFDocumentFactory.MetadataKeys.SUBJECTS_MPH, subjects);
+		AbstractObject2LongFunction<CharSequence> resourcesHash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(fs
+			.open(resourcesLocation));
+		defaultMetadata.put(RDFDocumentFactory.MetadataKeys.RESOURCES_HASH, resourcesHash);
 	    }
 
 	    if (context != null) {
@@ -546,7 +540,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 
     public static class MapClass extends Mapper<LongWritable, Document, TermOccurrencePair, Occurrence> {
 
-	private LcpMonotoneMinimalPerfectHashFunction<CharSequence> subjects, predicates;
+	private AbstractObject2LongFunction<CharSequence> resourcesHash;
 
 	private DocumentFactory factory;
 
@@ -556,7 +550,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 
 	    // Create an instance of the factory that was used...we only need
 	    // this to get the number of fields
-	    // Unfortunately, this means that we will read the objects mph
+	    // Unfortunately, this means that we will read the objects hash
 	    Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
 	    factory = initFactory(documentFactoryClass, job, context, false);
 
@@ -566,16 +560,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 		FileSystem fs = FileSystem.getLocal(job);
 		Path subjectsLocation = DistributedCache.getLocalCacheFiles(job)[0];
 		subjectsInput = fs.open(subjectsLocation);
-		subjects = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) BinIO.loadObject(subjectsInput);
-
-		if (DistributedCache.getLocalCacheFiles(job).length > 1) {
-		    Path predicatesLocation = DistributedCache.getLocalCacheFiles(job)[1];
-		    predicatesInput = fs.open(predicatesLocation);
-		    predicates = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) BinIO.loadObject(predicatesInput);
-		}
-
-		// Set the number of documents, will be used by the reducers
-		// job.setInt(NUMBER_OF_DOCUMENTS, mph.size());
+		resourcesHash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(subjectsInput);
 	    } catch (IOException e) {
 
 		e.printStackTrace();
@@ -608,9 +593,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 		return;
 	    }
 
-	    int docID = (int) subjects.getLong(doc.uri().toString());
-	    // System.out.println("Processing: " + doc.uri() + " DOCID: " +
-	    // docID);
+	    int docID = resourcesHash.get(doc.uri().toString()).intValue();
 
 	    if (docID < 0) {
 		throw new RuntimeException("Negative DocID for URI: " + doc.uri());
@@ -618,10 +601,6 @@ public class TripleIndexGenerator extends Configured implements Tool {
 
 	    // Collect the keys (term+index) of this document
 	    HashSet<TermOccurrencePair> keySet = new HashSet<TermOccurrencePair>();
-
-	    // First part is URL, second part is term
-	    // output.collect(new Text(parts[1]), new IntWritable((int)
-	    // mph.getLong(parts[0])));
 
 	    // Positionless occurrence to indicate the presence of a term in a
 	    // doc
@@ -660,7 +639,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 
 			if (factory instanceof VerticalDocumentFactory) {
 			    // Create an entry in the alignment index
-			    int predicateID = (int) predicates.getLong(fieldName);
+			    int predicateID = resourcesHash.get(fieldName).intValue();
 			    // System.out.println("Processing: " + doc.uri() +
 			    // " DOCID: " + docID);
 
@@ -903,15 +882,13 @@ public class TripleIndexGenerator extends Configured implements Tool {
 
 	SimpleJSAP jsap = new SimpleJSAP(TripleIndexGenerator.class.getName(), "Generates a keyword index from RDF data.", new Parameter[] {
 		new FlaggedOption("method", JSAP.STRING_PARSER, "horizontal", JSAP.REQUIRED, 'm', "method", "horizontal or vertical."),
-		new FlaggedOption("format", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'f', "format", "datarss or ntuples."),
 		new FlaggedOption("properties", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', "properties",
 			"Subset of the properties to be indexed."),
 
 		new UnflaggedOption("input", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
 		new UnflaggedOption("numdocs", JSAP.INTEGER_PARSER, JSAP.REQUIRED, "Number of documents to index"),
 		new UnflaggedOption("output", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the output."),
-		new UnflaggedOption("subjects", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the MPH for subjects."),
-		new UnflaggedOption("predicates", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the MPH for predicates."),
+		new UnflaggedOption(RESOURCES_HASH_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the resources hash file."),
 
 	});
 
@@ -949,25 +926,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.getConfiguration().set("mapreduce.user.classpath.first", "true");
 	job.setGroupingComparatorClass(FirstGroupingComparator.class);
 
-	DistributedCache.addCacheFile(new URI(args.getString("subjects")), job.getConfiguration());
-
-	DistributedCache.addCacheFile(new URI(args.getString("predicates")), job.getConfiguration());
-
-	// Load the MPH to get its size
-	// or otherwise we could provide it as a param
-	/*
-	 * FSDataInputStream input = null; try { FileSystem fs =
-	 * FileSystem.get(conf); // Get the cached archives/files input =
-	 * fs.open(new Path(mphLocation.toString()));
-	 * LcpMonotoneMinimalPerfectHashFunction<CharSequence> mph =
-	 * (LcpMonotoneMinimalPerfectHashFunction<CharSequence>)
-	 * BinIO.loadObject(input); conf.setInt(NUMBER_OF_DOCUMENTS,
-	 * mph.size()); System.out.println("Size of the MPH: " + mph.size()); }
-	 * catch (IOException e) { throw new RuntimeException(e); } catch
-	 * (ClassNotFoundException e) { throw new RuntimeException(e); } finally
-	 * { if (input != null) { try { input.close(); } catch (IOException e) {
-	 * throw new RuntimeException(e); } } }
-	 */
+	DistributedCache.addCacheFile(new URI(args.getString(RESOURCES_HASH_ARG)), job.getConfiguration());
 
 	job.getConfiguration().setInt(NUMBER_OF_DOCUMENTS, args.getInt("numdocs"));
 
@@ -983,12 +942,6 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, HorizontalDocumentFactory.class, PropertyBasedDocumentFactory.class);
 	} else {
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, VerticalDocumentFactory.class, PropertyBasedDocumentFactory.class);
-	}
-
-	if (args.getString("format").equalsIgnoreCase("datarss")) {
-	    job.getConfiguration().set(RDFFORMAT_KEY, DATARSS_FORMAT);
-	} else {
-	    job.getConfiguration().set(RDFFORMAT_KEY, NTUPLES_FORMAT);
 	}
 
 	if (args.getString("properties") != null) {

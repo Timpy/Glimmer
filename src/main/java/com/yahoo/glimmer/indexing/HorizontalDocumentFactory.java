@@ -6,7 +6,6 @@ import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.mg4j.document.Document;
 import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
-import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 import it.unimi.dsi.util.Properties;
 
 import java.io.BufferedReader;
@@ -27,13 +26,6 @@ import org.semanticweb.yars.nx.namespace.RDF;
 
 public class HorizontalDocumentFactory extends RDFDocumentFactory {
     private static final long serialVersionUID = 7360010820859436049L;
-
-    public static final String NO_CONTEXT = "NC";
-    public static enum MetadataKeys {
-	CONTEXT_MPH
-    }
-    
-    protected LcpMonotoneMinimalPerfectHashFunction<CharSequence> contextMph;
     
     /**
      * Returns a copy of this document factory. A new parser is allocated for
@@ -57,16 +49,6 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 
     public HorizontalDocumentFactory() {
 	super();
-    }
-    
-    @SuppressWarnings("unchecked")
-    @Override
-    protected void init() {
-        super.init();
-        contextMph = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) resolve(MetadataKeys.CONTEXT_MPH, defaultMetadata);
-	if (contextMph == null) {
-	    throw new IllegalStateException("No context MPH set in metadata map.");
-	}
     }
 
     public int numberOfFields() {
@@ -235,12 +217,12 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 		    continue;
 		}
 		
-		String contextValue = NO_CONTEXT;
-		if (stmt.getContext() != null) {
+		String contextValue = NULL_URL;
+		if (withContext && stmt.getContext() != null) {
 		    String s = stmt.getContext().toString();
-		    Long l = contextMph.get(s);
+		    Long l = resourcesHash.get(s);
 		    if (l == null) {
-			throw new IllegalStateException("Context " + stmt.getContext().toString() + " not in context hash function!");
+			throw new IllegalStateException("Context " + stmt.getContext().toString() + " not in resources hash function!");
 		    }
 		    contextValue = l.toString(); 
 		}
@@ -251,7 +233,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 			    mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
 			tokens.add(stmt.getObject().toString());
 		    } else {
-			tokens.add(subjectsMph.get(stmt.getObject().toString()).toString());
+			tokens.add(resourcesHash.get(stmt.getObject().toString()).toString());
 		    }
 		    properties.add(fieldName);
 		    if (contextValue != null) {

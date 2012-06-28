@@ -1,5 +1,6 @@
 package com.yahoo.glimmer.indexing;
 
+import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.WordReader;
@@ -7,7 +8,6 @@ import it.unimi.dsi.lang.ObjectParser;
 import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.mg4j.index.TermProcessor;
 import it.unimi.dsi.mg4j.util.MG4JClassParser;
-import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 import it.unimi.dsi.util.Properties;
 
 import java.io.IOException;
@@ -30,24 +30,20 @@ import com.yahoo.glimmer.util.Util;
  * 
  */
 public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
-    public static final String NULL_URL = "NULL_URL";
+    private static final long serialVersionUID = 3508901442129214511L;
 
-    private static final long serialVersionUID = 1L;
+    public static final String NULL_URL = "NULL_URL";
+    /** Determines if we use the namespaces table for abbreviating field names */
+    public static final boolean USE_NAMESPACES = false;
+    public static final String[] PREDICATE_BLACKLIST = { "stag", "tagspace", "ctag", "rel", "mm" };
+    public static final char NAMESPACE_SEPARATOR = '_';
+    protected static final TermProcessor TERMPROCESSOR = CombinedTermProcessor.getInstance();
 
     /** The word reader used for all documents. */
     protected transient WordReader wordReader;
-
     protected transient DataRSSToNTuples converter;
-
-    public final static String[] PREDICATE_BLACKLIST = { "stag", "tagspace", "ctag", "rel", "mm" };
-    public static final char NAMESPACE_SEPARATOR = '_';
-
-    /** Determines if we use the namespaces table for abbreviating field names */
-    public static final boolean USE_NAMESPACES = false;
-
-    protected LcpMonotoneMinimalPerfectHashFunction<CharSequence> subjectsMph;
-
-    protected static final TermProcessor TERMPROCESSOR = CombinedTermProcessor.getInstance();
+    protected AbstractObject2LongFunction<CharSequence> resourcesHash;
+    protected boolean withContext;
 
     /**
      * Used by the documents, not by the factory
@@ -56,7 +52,7 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
      * 
      */
     public static enum MetadataKeys {
-	MAPPER_CONTEXT, INDEXED_PROPERTIES, INDEXED_PROPERTIES_FILENAME, SUBJECTS_MPH
+	MAPPER_CONTEXT, INDEXED_PROPERTIES, INDEXED_PROPERTIES_FILENAME, RESOURCES_HASH, WITH_CONTEXTS
     };
 
     public RDFDocumentFactory(final Properties properties) throws ConfigurationException {
@@ -146,11 +142,12 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	} catch (TransformerConfigurationException e1) {
 	    throw new RuntimeException(e1);
 	}
-	// Retrieve MPH for objects encoding
-	subjectsMph = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) resolve(MetadataKeys.SUBJECTS_MPH, defaultMetadata);
-	if (subjectsMph == null) {
-	    throw new IllegalStateException("No subject MPH set in metadata map.");
-	}
+	// Retrieve hash for objects encoding
+	resourcesHash = (AbstractObject2LongFunction<CharSequence>) resolve(MetadataKeys.RESOURCES_HASH, defaultMetadata);
+//	if (resourcesHash == null) {
+//	    throw new IllegalStateException("No resources hash set in metadata map.");
+//	}
+	withContext = (Boolean)resolve(MetadataKeys.WITH_CONTEXTS, defaultMetadata, Boolean.FALSE);
     }
 
     private void readObject(final ObjectInputStream s) throws IOException, ClassNotFoundException {

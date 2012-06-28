@@ -18,7 +18,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 /**
  * Writes to different output files depending on the contents of the value.
  * @author tep
- *
+ * 
  */
 public class ResourceRecordWriter extends RecordWriter<Text, Text> {
     private static final char BY_SUBJECT_DELIMITER = '\t';
@@ -36,7 +36,7 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 	    throw new IOException("Task work path already exists:" + taskWorkPath.toString());
 	}
 	fs.mkdirs(taskWorkPath);
-	
+
 	for (String key : OUTPUTS) {
 	    OutputStream out;
 	    if (codecIfAny != null) {
@@ -49,9 +49,7 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 	    }
 	    outputStreamsMap.put(key, out);
 	}
-   }
-    
-    
+    }
 
     @Override
     public void write(Text key, Text value) throws IOException, InterruptedException {
@@ -74,7 +72,7 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 	    return;
 	}
 
-	// Bytes left in value after cutting CONTEXT/OBJECT/PREDICATE off the end..  Write subject and bySubject.
+	// Bytes left in value after cutting CONTEXT/OBJECT/PREDICATE off the end.. Write subject and bySubject.
 	out = outputStreamsMap.get(SUBJECT);
 	out.write(key.getBytes(), 0, key.getLength());
 	out.write('\n');
@@ -125,9 +123,9 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 		Class<? extends CompressionCodec> outputCompressorClass = getOutputCompressorClass(job, BZip2Codec.class);
 		outputCompressionCodec = ReflectionUtils.newInstance(outputCompressorClass, conf);
 	    }
-	    
+
 	    FileSystem fs = FileSystem.get(conf);
-	    
+
 	    return new ResourceRecordWriter(fs, taskWorkPath, outputCompressionCodec);
 	}
     }

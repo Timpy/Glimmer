@@ -1,6 +1,7 @@
 package com.yahoo.glimmer.indexing;
 
 import it.unimi.dsi.fastutil.io.BinIO;
+import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
@@ -8,7 +9,6 @@ import it.unimi.dsi.mg4j.document.Document;
 import it.unimi.dsi.mg4j.document.DocumentFactory;
 import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.mg4j.index.DiskBasedIndex;
-import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -51,7 +51,8 @@ import com.martiansoftware.jsap.UnflaggedOption;
  */
 
 public class DocSizesGenerator extends Configured implements Tool {
-
+    private static final String RESOURCES_HASH_ARG = "resourcesHash";
+    
     static enum Counters {
 	NUMBER_OF_RECORDS, INDEXED_OCCURRENCES, FAILED_PARSING
     }
@@ -149,7 +150,6 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    } else if (o1.document > o2.document) {
 		return +1;
 	    } else {
-		// o1.document == o2.document
 		if (o1.size < o2.size) {
 		    return -1;
 		} else if (o1.size > o2.size) {
@@ -203,9 +203,6 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	public int compareTo(IndexDocSizePair other) {
 	    if (index != other.index) {
-		// System.out.println("TermOccurrencePair.compareTo( " +
-		// this.toString() + "== " + top.toString() + ") = " +
-		// occ.compareTo(top.occ));
 		return ((Integer) index).compareTo(other.index);
 	    } else {
 		return ds.compareTo(other.ds);
@@ -261,9 +258,6 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	public int compare(IndexDocSizePair o1, IndexDocSizePair o2) {
 	    if (o1.index != o2.index) {
-		// System.out.println("FirstGroupingComparator.compareTo( " +
-		// this.toString() + "== " + top.toString() + ") = " +
-		// occ.compareTo(top.occ));
 		return ((Integer) o1.index).compareTo(o2.index);
 	    }
 	    return 0;
@@ -272,8 +266,8 @@ public class DocSizesGenerator extends Configured implements Tool {
 
     public static class MapClass extends Mapper<LongWritable, Document, IndexDocSizePair, DocSize> {
 
-	private Path mphLocation;
-	private LcpMonotoneMinimalPerfectHashFunction<CharSequence> mph;
+	private Path hashPath;
+	private AbstractObject2LongFunction<CharSequence> hash;
 
 	private DocumentFactory factory;
 
@@ -292,9 +286,9 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    FSDataInputStream input = null;
 	    try {
 		FileSystem fs = FileSystem.getLocal(job);
-		mphLocation = DistributedCache.getLocalCacheFiles(job)[0];
-		input = fs.open(mphLocation);
-		mph = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) BinIO.loadObject(input);
+		hashPath = DistributedCache.getLocalCacheFiles(job)[0];
+		input = fs.open(hashPath);
+		hash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(input);
 	    } catch (IOException e) {
 
 		e.printStackTrace();
@@ -322,17 +316,11 @@ public class DocSizesGenerator extends Configured implements Tool {
 		return;
 	    }
 
-	    int docID = (int) mph.getLong(doc.uri().toString());
-	    // System.out.println("Processing: " + doc.uri() + " DOCID: " +
-	    // docID);
+	    int docID = hash.get(doc.uri().toString()).intValue();
 
 	    if (docID < 0) {
 		throw new RuntimeException("Negative DocID for URI: " + doc.uri());
 	    }
-
-	    // First part is URL, second part is term
-	    // output.collect(new Text(parts[1]), new IntWritable((int)
-	    // mph.getLong(parts[0])));
 
 	    // Iterate over all indices
 	    for (int i = 0; i < factory.numberOfFields(); i++) {
@@ -473,14 +461,13 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	SimpleJSAP jsap = new SimpleJSAP(TripleIndexGenerator.class.getName(), "Generates a keyword index from RDF data.", new Parameter[] {
 		new FlaggedOption("method", JSAP.STRING_PARSER, "horizontal", JSAP.REQUIRED, 'm', "method", "horizontal or vertical."),
-		new FlaggedOption("format", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'f', "format", "datarss or ntuples."),
 		new FlaggedOption("properties", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', "properties",
 			"Subset of the properties to be indexed."),
 
 		new UnflaggedOption("input", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
 		new UnflaggedOption("numdocs", JSAP.INTEGER_PARSER, JSAP.REQUIRED, "Number of documents to index"),
 		new UnflaggedOption("output", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the output."),
-		new UnflaggedOption("subjects", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the MPH for subjects."),
+		new UnflaggedOption(RESOURCES_HASH_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the resources hash file."),
 
 	});
 
@@ -516,7 +503,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	job.setGroupingComparatorClass(FirstGroupingComparator.class);
 
-	DistributedCache.addCacheFile(new URI(args.getString("subjects")), job.getConfiguration());
+	DistributedCache.addCacheFile(new URI(args.getString(RESOURCES_HASH_ARG)), job.getConfiguration());
 
 	job.getConfiguration().setInt(NUMBER_OF_DOCUMENTS, args.getInt("numdocs"));
 
@@ -532,12 +519,6 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, HorizontalDocumentFactory.class, PropertyBasedDocumentFactory.class);
 	} else {
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, VerticalDocumentFactory.class, PropertyBasedDocumentFactory.class);
-	}
-
-	if (args.getString("format").equalsIgnoreCase("datarss")) {
-	    job.getConfiguration().set(TripleIndexGenerator.RDFFORMAT_KEY, TripleIndexGenerator.DATARSS_FORMAT);
-	} else {
-	    job.getConfiguration().set(TripleIndexGenerator.RDFFORMAT_KEY, TripleIndexGenerator.NTUPLES_FORMAT);
 	}
 
 	if (args.getString("properties") != null) {

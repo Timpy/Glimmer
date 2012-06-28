@@ -160,14 +160,8 @@ public class DistributedCollectionBuilder extends Configured implements Tool {
 	    conf.setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, VerticalDocumentFactory.class, PropertyBasedDocumentFactory.class);
 	}
 
-	if (args[3].equalsIgnoreCase("datarss")) {
-	    conf.set(TripleIndexGenerator.RDFFORMAT_KEY, TripleIndexGenerator.DATARSS_FORMAT);
-	} else {
-	    conf.set(TripleIndexGenerator.RDFFORMAT_KEY, TripleIndexGenerator.NTUPLES_FORMAT);
-	}
-
-	if (args.length > 4) {
-	    conf.set(TripleIndexGenerator.INDEXEDPROPERTIES_FILENAME_KEY, args[4]);
+	if (args.length > 3) {
+	    conf.set(TripleIndexGenerator.INDEXEDPROPERTIES_FILENAME_KEY, args[3]);
 	}
 
 	conf.setInt("mapred.linerecordreader.maxlength", 10000);
