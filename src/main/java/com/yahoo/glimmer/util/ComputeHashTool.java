@@ -47,6 +47,7 @@ public class ComputeHashTool extends Configured implements Tool {
     private static final String SRC_FILES_ARG = "srcFilenames";
     private static final String SIGNED_ARG = "signed";
     private static final String UNSIGNED_ARG = "unsigned";
+    private static final String WRITE_INFO_ARG = "info";
     private static final String SIGNATURE_WIDTH_ARG = "signatureWidth";
     private static final String FILE_ENCODING_ARG = "encoding";
     public static final FsPermission ALL_PERMISSIONS = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
@@ -58,7 +59,8 @@ public class ComputeHashTool extends Configured implements Tool {
     public int run(String[] args) throws Exception {
 	final SimpleJSAP jsap = new SimpleJSAP(ComputeHashTool.class.getName(), "Builds a hash function.", new Parameter[] {
 		new Switch(SIGNED_ARG, 's', SIGNED_ARG, "Generate signed hashes."),
-		new Switch(UNSIGNED_ARG, 'u', SIGNED_ARG, "Generate unsiged hashes."),
+		new Switch(UNSIGNED_ARG, 'u', UNSIGNED_ARG, "Generate unsiged hashes."),
+		new Switch(WRITE_INFO_ARG, 'i', WRITE_INFO_ARG, "Write a .info tab seperated text file with size/width info in."),
 		new FlaggedOption(SIGNATURE_WIDTH_ARG, IntegerStringParser.getParser(), "32", JSAP.NOT_REQUIRED, 'w', "width",
 			"Sign the hash with a hash width of w bits."),
 		new FlaggedOption(FILE_ENCODING_ARG, ForNameStringParser.getParser(Charset.class), "UTF-8", JSAP.NOT_REQUIRED, 'e', "encoding",
@@ -94,12 +96,13 @@ public class ComputeHashTool extends Configured implements Tool {
 	FileSystem fs = FileSystem.get(job);
 	for (String filename : srcFilenames) {
 	    LOGGER.info("Building hash of " + filename);
-	    buildHash(fs, filename, signatureWidth, keepUnsigned, srcFileCharset);
+	    buildHash(fs, filename, signatureWidth, keepUnsigned, srcFileCharset, jsapResult.getBoolean(WRITE_INFO_ARG, false));
 	}
 	return 0;
     }
 
-    public long buildHash(FileSystem fs, String srcFilename, int signatureWidth, boolean keepUnsigned, final Charset charset) throws IOException {
+    public long buildHash(FileSystem fs, String srcFilename, int signatureWidth, boolean keepUnsigned, final Charset charset, boolean writeInfoFile)
+	    throws IOException {
 	final MapReducePartInputStreamEnumeration inputStreamEnumeration;
 	try {
 	    inputStreamEnumeration = new MapReducePartInputStreamEnumeration(fs, new Path(srcFilename));
@@ -117,37 +120,39 @@ public class ComputeHashTool extends Configured implements Tool {
 
 	LcpMonotoneMinimalPerfectHashFunction<CharSequence> unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection,
 		TransformationStrategies.prefixFreeUtf16());
-	
+
 	String destFilename = inputStreamEnumeration.removeCompressionSuffixIfAny(srcFilename);
-	
+
 	if (signatureWidth <= 0 || keepUnsigned) {
 	    writeObjectToFile(unsignedHash, fs, new Path(destFilename + DOT_UNSIGNED));
 	}
-	
+
 	if (signatureWidth > 0) {
 	    ShiftAddXorSignedStringMap signedHash = new ShiftAddXorSignedStringMap(inCollection.iterator(), unsignedHash, signatureWidth);
 	    writeObjectToFile(signedHash, fs, new Path(destFilename + DOT_SIGNED));
 	}
 
-	Path infoPath = new Path(destFilename + DOT_MAPINFO);
-	FSDataOutputStream infoStream = fs.create(infoPath, true);// overwrite
-	fs.setPermission(infoPath, ALL_PERMISSIONS);
-	OutputStreamWriter infoWriter = new OutputStreamWriter(infoStream);
-	infoWriter.write("size\t");
-	infoWriter.write(Long.toString(unsignedHash.size64()));
-	infoWriter.write("\n");
-	if (keepUnsigned) {
-	    infoWriter.write("unsignedBits\t");
-	    infoWriter.write(Long.toString((unsignedHash).numBits()));
+	if (writeInfoFile) {
+	    Path infoPath = new Path(destFilename + DOT_MAPINFO);
+	    FSDataOutputStream infoStream = fs.create(infoPath, true);// overwrite
+	    fs.setPermission(infoPath, ALL_PERMISSIONS);
+	    OutputStreamWriter infoWriter = new OutputStreamWriter(infoStream);
+	    infoWriter.write("size\t");
+	    infoWriter.write(Long.toString(unsignedHash.size64()));
 	    infoWriter.write("\n");
+	    if (keepUnsigned) {
+		infoWriter.write("unsignedBits\t");
+		infoWriter.write(Long.toString((unsignedHash).numBits()));
+		infoWriter.write("\n");
+	    }
+	    if (signatureWidth > 0) {
+		infoWriter.write("signedWidth\t");
+		infoWriter.write(Integer.toString(signatureWidth));
+		infoWriter.write("\n");
+	    }
+	    infoWriter.close();
+	    infoStream.close();
 	}
-	if (signatureWidth > 0) {
-	    infoWriter.write("signedWidth\t");
-	    infoWriter.write(Integer.toString(signatureWidth));
-	    infoWriter.write("\n");
-	}
-	infoWriter.close();
-	infoStream.close();
 
 	return unsignedHash.size64();
     }
@@ -171,8 +176,8 @@ public class ComputeHashTool extends Configured implements Tool {
      * @return size of generated hash
      * @throws IOException
      */
-    public static long pigInvoker(String filename, int signatureWidth, boolean keepUnsigned, String charsetName) throws IOException {
-	return new ComputeHashTool().buildHash(FileSystem.get(null), filename, signatureWidth, keepUnsigned, Charset.forName(charsetName));
+    public static long pigInvoker(String filename, int signatureWidth, boolean keepUnsigned, String charsetName, boolean writeInfoFile) throws IOException {
+	return new ComputeHashTool().buildHash(FileSystem.get(null), filename, signatureWidth, keepUnsigned, Charset.forName(charsetName), writeInfoFile);
     }
 
     public static void main(String[] args) throws Exception {
