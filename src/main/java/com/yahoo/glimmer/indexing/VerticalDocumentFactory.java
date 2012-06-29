@@ -207,7 +207,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 
 	    if (line == null || line.trim().equals("")) {
 		if (mapContext != null)
-		    mapContext.getCounter(TripleIndexGenerator.Counters.EMPTY_LINES).increment(1);
+		    mapContext.getCounter(Counters.EMPTY_LINES).increment(1);
 		return;
 	    }
 	    // First part is URL, second part is docfeed
@@ -216,7 +216,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 
 	    if (data.trim().equals("")) {
 		if (mapContext != null) {
-		    mapContext.getCounter(TripleIndexGenerator.Counters.EMPTY_DOCUMENTS).increment(1);
+		    mapContext.getCounter(Counters.EMPTY_DOCUMENTS).increment(1);
 		}
 		return;
 	    }
@@ -241,7 +241,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		// Check if prefix is on blacklist
 		if (onPredicateBlackList(fieldName)) {
 		    if (mapContext != null)
-			mapContext.getCounter(TripleIndexGenerator.Counters.BLACKLISTED_TRIPLES).increment(1);
+			mapContext.getCounter(Counters.BLACKLISTED_TRIPLES).increment(1);
 		    continue;
 		}
 
@@ -250,7 +250,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		if (fieldIndex == -1) {
 		    System.err.println("Field not indexed: " + fieldName);
 		    if (mapContext != null)
-			mapContext.getCounter(TripleIndexGenerator.Counters.UNINDEXED_PREDICATE_TRIPLES).increment(1);
+			mapContext.getCounter(Counters.UNINDEXED_PREDICATE_TRIPLES).increment(1);
 		    continue;
 		}
 
@@ -259,7 +259,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		    // or bnode ID using the resources hash
 		    if (predicate.equals(RDF.TYPE.toString())) {
 			if (mapContext != null)
-			    mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
+			    mapContext.getCounter(Counters.RDF_TYPE_TRIPLES).increment(1);
 			fields.get(fieldIndex).add(stmt.getObject().toString());
 		    } else {
 			fields.get(fieldIndex).add(resourcesHash.get(stmt.getObject().stringValue()).toString());
@@ -281,7 +281,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 
 		    while (fbr.next(word, nonWord)) {
 			if (word != null && !word.equals("")) {
-			    if (TERMPROCESSOR.processTerm(word)) {
+			    if (CombinedTermProcessor.getInstance().processTerm(word)) {
 				fields.get(fieldIndex).add(word.toString());
 			    }
 			}
@@ -290,7 +290,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		}
 
 		if (mapContext != null) {
-		    Counter counter = mapContext.getCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES);
+		    Counter counter = mapContext.getCounter(Counters.INDEXED_TRIPLES);
 		    counter.increment(1);
 		}
 	    }

@@ -29,7 +29,10 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 public class DistributedCollectionBuilder extends Configured implements Tool {
-
+    private static enum Counters {
+	NUMBER_OF_RECORDS
+    }
+    
     public static class MapClass extends Mapper<LongWritable, Document, Text, Text> {
 
 	private SimpleCompressedDocumentCollectionBuilder builder;
@@ -57,7 +60,7 @@ public class DistributedCollectionBuilder extends Configured implements Tool {
 		// Create an instance of the factory that was used...we only
 		// need this to get the number of fields
 		Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-		factory = TripleIndexGenerator.initFactory(documentFactoryClass, job, null, false);
+		factory = RDFDocumentFactory.initFactory(documentFactoryClass, job, null, false);
 
 		// basename is actually the complete path
 		builder = new SimpleCompressedDocumentCollectionBuilder("datarss-", factory, false);
@@ -101,7 +104,7 @@ public class DistributedCollectionBuilder extends Configured implements Tool {
 		    builder.nonTextField(content);
 		}
 	    }
-	    context.getCounter(TripleIndexGenerator.Counters.NUMBER_OF_RECORDS).increment(1);
+	    context.getCounter(Counters.NUMBER_OF_RECORDS).increment(1);
 	    document.close();
 	    builder.endDocument();
 
@@ -161,7 +164,7 @@ public class DistributedCollectionBuilder extends Configured implements Tool {
 	}
 
 	if (args.length > 3) {
-	    conf.set(TripleIndexGenerator.INDEXEDPROPERTIES_FILENAME_KEY, args[3]);
+	    conf.set(RDFDocumentFactory.INDEXEDPROPERTIES_FILENAME_KEY, args[3]);
 	}
 
 	conf.setInt("mapred.linerecordreader.maxlength", 10000);

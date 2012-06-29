@@ -31,7 +31,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals(4, factory.numberOfFields());
 	HorizontalDataRSSDocument document = (HorizontalDataRSSDocument)factory.getDocument(rawContentInputStream, metadata);
 	
-	assertEquals("<http://subject/>", document.uri());
+	assertEquals("http://subject/", document.uri());
 	assertEquals("The Title", document.title());
 	
 	MutableString word = new MutableString();
@@ -94,7 +94,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(3l, counters.findCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES).getValue());
+	assertEquals(3l, counters.findCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES).getValue());
     }
     
     @Test
@@ -103,7 +103,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals(4, factory.numberOfFields());
 	HorizontalDataRSSDocument document = (HorizontalDataRSSDocument)factory.getDocument(rawContentInputStream, metadata);
 	
-	assertEquals("<http://subject/>", document.uri());
+	assertEquals("http://subject/", document.uri());
 	assertEquals("The Title", document.title());
 	
 	MutableString word = new MutableString();
@@ -166,6 +166,6 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(3l, counters.findCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES).getValue());
+	assertEquals(3l, counters.findCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES).getValue());
     }
 }

@@ -21,7 +21,7 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	VerticalDataRSSDocument document = (VerticalDataRSSDocument)factory.getDocument(rawContentInputStream, metadata);
 	
-	assertEquals("<http://subject/>", document.uri());
+	assertEquals("http://subject/", document.uri());
 	assertEquals("The Title", document.title());
 	
 	MutableString word = new MutableString();
@@ -50,6 +50,6 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(3l, counters.findCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES).getValue());
+	assertEquals(3l, counters.findCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES).getValue());
     }
 }

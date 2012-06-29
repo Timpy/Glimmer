@@ -19,7 +19,7 @@ import com.yahoo.glimmer.indexing.RDFDocumentFactory.MetadataKeys;
 
 public class AbstractDocumentFactoryTest {
     protected static final Charset RAW_CHARSET = Charset.forName("UTF-8");
-    protected static final String RAW_CONTENT_STRING = "<http://subject/>\t" +
+    protected static final String RAW_CONTENT_STRING = "http://subject/\t" +
     		"<http://subject/> <http://predicate/1> <http://object/1> \"literal context\" .  " +
     		"<http://subject/> <http://predicate/2> <http://object/2> .  " +
     		"<http://subject/> <http://predicate/3> \"object 3\"@en <http://context/1> .  ";
@@ -38,8 +38,8 @@ public class AbstractDocumentFactoryTest {
 	    will(returnValue(45l));
 	    allowing(resourcesHash).get("http://object/2");
 	    will(returnValue(46l));
-	    allowing(mapContext).getCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES);
-	    will(returnValue(counters.findCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES)));
+	    allowing(mapContext).getCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES);
+	    will(returnValue(counters.findCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES)));
 	}};
     }
     

@@ -29,7 +29,7 @@ public class RDFInputFormat extends FileInputFormat<LongWritable, Document> {
 
 	// Configure the document factory
 	Class<?> documentFactoryClass = context.getConfiguration().getClass(DOCUMENTFACTORY_CLASS, PropertyBasedDocumentFactory.class);
-	DocumentFactory factory = TripleIndexGenerator.initFactory(documentFactoryClass, context.getConfiguration(), null, true);
+	DocumentFactory factory = RDFDocumentFactory.initFactory(documentFactoryClass, context.getConfiguration(), null, true);
 
 	return new RDFRecordReader(factory);
     }

@@ -119,6 +119,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	private List<String> tokens = new ArrayList<String>();
 	private List<String> properties = new ArrayList<String>();
 	private List<String> contexts = new ArrayList<String>();
+	// uri is strings extracted from the url
 	private List<String> uri = new ArrayList<String>();
 
 	private String url = NULL_URL;
@@ -162,7 +163,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 
 	    if (line == null || line.trim().equals("")) {
 		if (mapContext != null)
-		    mapContext.getCounter(TripleIndexGenerator.Counters.EMPTY_LINES).increment(1);
+		    mapContext.getCounter(Counters.EMPTY_LINES).increment(1);
 		return;
 	    }
 	    // First part is URL, second part is docfeed
@@ -171,7 +172,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 
 	    if (data.trim().equals("")) {
 		if (mapContext != null) {
-		    mapContext.getCounter(TripleIndexGenerator.Counters.EMPTY_DOCUMENTS).increment(1);
+		    mapContext.getCounter(Counters.EMPTY_DOCUMENTS).increment(1);
 		}
 		return;
 	    }
@@ -188,7 +189,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 	    }
 	    while (fbr.next(word, nonWord)) {
 		if (word != null && !word.equals("")) {
-		    if (TERMPROCESSOR.processTerm(word)) {
+		    if (CombinedTermProcessor.getInstance().processTerm(word)) {
 			uri.add(word.toString().toLowerCase());
 		    }
 		}
@@ -213,7 +214,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 		// Check if prefix is on blacklist
 		if (onPredicateBlackList(fieldName)) {
 		    if (mapContext != null)
-			mapContext.getCounter(TripleIndexGenerator.Counters.BLACKLISTED_TRIPLES).increment(1);
+			mapContext.getCounter(Counters.BLACKLISTED_TRIPLES).increment(1);
 		    continue;
 		}
 		
@@ -230,7 +231,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 		if (stmt.getObject() instanceof Resource) {
 		    if (predicate.equals(RDF.TYPE.toString())) {
 			if (mapContext != null)
-			    mapContext.getCounter(TripleIndexGenerator.Counters.RDF_TYPE_TRIPLES).increment(1);
+			    mapContext.getCounter(Counters.RDF_TYPE_TRIPLES).increment(1);
 			tokens.add(stmt.getObject().toString());
 		    } else {
 			tokens.add(resourcesHash.get(stmt.getObject().toString()).toString());
@@ -245,7 +246,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 		    fbr = new FastBufferedReader(new StringReader(object));
 		    while (fbr.next(word, nonWord)) {
 			if (word != null && !word.equals("")) {
-			    if (TERMPROCESSOR.processTerm(word)) {
+			    if (CombinedTermProcessor.getInstance().processTerm(word)) {
 				// Lowercase terms
 				tokens.add(word.toString());
 
@@ -264,7 +265,7 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 		}
 		
 		if (mapContext != null)
-		    mapContext.getCounter(TripleIndexGenerator.Counters.INDEXED_TRIPLES).increment(1);
+		    mapContext.getCounter(Counters.INDEXED_TRIPLES).increment(1);
 	    }
 	}
 

@@ -200,7 +200,7 @@ function generateIndex () {
 	fi
 	 
 	echo Generating index..
-	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.TripleIndexGenerator \
+	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.generator.TripleIndexGenerator \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapred.map.tasks.speculative.execution=true \
 		-Dmapred.reduce.tasks=${SUBINDICES} \

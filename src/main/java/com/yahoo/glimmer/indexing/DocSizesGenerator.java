@@ -280,7 +280,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    // this to get the number of fields
 	    Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
 
-	    factory = TripleIndexGenerator.initFactory(documentFactoryClass, job, context, false);
+	    factory = RDFDocumentFactory.initFactory(documentFactoryClass, job, context, false);
 
 	    // Get the cached archives/files
 	    FSDataInputStream input = null;
@@ -380,7 +380,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 		// Create an instance of the factory that was used...we only
 		// need this to get the number of fields
 		Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-		factory = TripleIndexGenerator.initFactory(documentFactoryClass, job, null, false);
+		factory = RDFDocumentFactory.initFactory(documentFactoryClass, job, null, false);
 
 		// Creating the output dir if necessary
 		outputDir = job.get(OUTPUT_DIR);
@@ -458,8 +458,7 @@ public class DocSizesGenerator extends Configured implements Tool {
     }
 
     public int run(String[] arg) throws Exception {
-
-	SimpleJSAP jsap = new SimpleJSAP(TripleIndexGenerator.class.getName(), "Generates a keyword index from RDF data.", new Parameter[] {
+	SimpleJSAP jsap = new SimpleJSAP(DocSizesGenerator.class.getName(), "Generates a keyword index from RDF data.", new Parameter[] {
 		new FlaggedOption("method", JSAP.STRING_PARSER, "horizontal", JSAP.REQUIRED, 'm', "method", "horizontal or vertical."),
 		new FlaggedOption("properties", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', "properties",
 			"Subset of the properties to be indexed."),
@@ -522,7 +521,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	}
 
 	if (args.getString("properties") != null) {
-	    job.getConfiguration().set(TripleIndexGenerator.INDEXEDPROPERTIES_FILENAME_KEY, args.getString("properties"));
+	    job.getConfiguration().set(RDFDocumentFactory.INDEXEDPROPERTIES_FILENAME_KEY, args.getString("properties"));
 	}
 
 	job.getConfiguration().setInt("mapred.linerecordreader.maxlength", 10000);
