@@ -14,6 +14,7 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -21,14 +22,17 @@ import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.jmock.Expectations;
 import org.jmock.Mockery;
 import org.jmock.lib.legacy.ClassImposteriser;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 public class TermOccurrencePairReduceTest {
-    private static final String INDEX_TMP_DIR = "/tmp";
+    private static final String INDEX_TMP_DIR = "/tmp/TermOccurrencePairReduceTest";
     private Mockery context;
     private Reducer<TermOccurrencePair, Occurrence, Text, Text>.Context reducerContext;
     private Map<Integer, Index> indices;
+    private FileSystem fs = new RawLocalFileSystem();
+    
 
     @SuppressWarnings("unchecked")
     @Before
@@ -38,7 +42,6 @@ public class TermOccurrencePairReduceTest {
 
 	reducerContext = context.mock(Context.class, "reducerContext");
 
-	FileSystem fs = new RawLocalFileSystem();
 	fs.initialize(new URI("file:///"), new Configuration());
 	indices = new HashMap<Integer, Index>();
 	Index index = new Index(fs, INDEX_TMP_DIR, "index0", 7, true);
@@ -47,6 +50,15 @@ public class TermOccurrencePairReduceTest {
 	index = new Index(fs, INDEX_TMP_DIR, "index1", 7, true);
 	index.open();
 	indices.put(1, index);
+    }
+    
+    @After
+    public void after() throws IOException {
+	// fs.deleteOnExit(new Path(INDEX_TMP_DIR)); doesn't work..
+	if (!INDEX_TMP_DIR.startsWith("/tmp/")) {
+	    throw new AssertionError("Not removing test indexes as they are not in /tmp as expected.");
+	}
+	fs.delete(new Path(INDEX_TMP_DIR), true);
     }
 
     @Test

@@ -9,7 +9,6 @@ import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.util.Properties;
 
 import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -19,11 +18,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.filecache.DistributedCache;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.compress.CompressionCodec;
+import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.openrdf.model.Literal;
-import org.openrdf.model.Statement;
 import org.openrdf.model.Resource;
+import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.semanticweb.yars.nx.namespace.RDF;
 
@@ -39,62 +44,66 @@ import org.semanticweb.yars.nx.namespace.RDF;
  * 
  */
 public class VerticalDocumentFactory extends RDFDocumentFactory {
-
-    private static final long serialVersionUID = 1L;
-
+    private static final long serialVersionUID = -1996948102296996229L;
     private List<String> indexedProperties;
 
-    protected boolean parseProperty(final String key, final String[] values, final Reference2ObjectMap<Enum<?>, Object> metadata) throws ConfigurationException {
-	if (sameKey(MetadataKeys.INDEXED_PROPERTIES_FILENAME, key)) {
-	    metadata.put(MetadataKeys.INDEXED_PROPERTIES_FILENAME, ensureJustOne(key, values));
-	    return true;
-	}
-
-	return super.parseProperty(key, values, metadata);
-    }
-
-    @SuppressWarnings("unchecked")
     protected void init() {
 	super.init();
-	// Retrieve properties to index from metadata, or if fails from the
-	// filesystem or jar
-	this.indexedProperties = (List<String>) resolve(MetadataKeys.INDEXED_PROPERTIES, defaultMetadata);
-	if (this.indexedProperties == null) {
-	    indexedProperties = new ArrayList<String>();
-	    BufferedReader reader;
-	    try {
-		String fileName = (String) resolve(MetadataKeys.INDEXED_PROPERTIES_FILENAME, defaultMetadata);
-		try {
-		    reader = new BufferedReader(new FileReader(fileName));
-		} catch (Exception e) {
-		    System.err.println("INDEXED_PROPERTIES_FILENAME: " + fileName);
-		    reader = new BufferedReader(new InputStreamReader(getClass().getClassLoader().getResourceAsStream(fileName)));
-		}
-		String nextLine = "";
-		while ((nextLine = reader.readLine()) != null) {
-		    if (!nextLine.trim().equals("")) {
-			// Take the first column
-			String property = nextLine.split("\\s")[0].trim(); // if
-									   // no
-									   // match,
-									   // returns
-									   // the
-									   // whole
-									   // string
 
-			// Only include if it's in the namespaces table and not
-			// blacklisted
-			if (property != null && !onPredicateBlackList(property)) {
-			    System.out.println("Going to index predicate:" + property);
-			    indexedProperties.add(property);
-			}
+	// Should only be called once per
+	if (this.indexedProperties != null) {
+	    throw new IllegalStateException("init() has aready been called.");
+	}
+	indexedProperties = new ArrayList<String>();
+
+	// Load predicates(properties) from the DistributedCache
+	String predicatesFilename = (String) resolveNotNull(MetadataKeys.PREDICATES_FILENAME, defaultMetadata);
+	Configuration conf = (Configuration) resolveNotNull(MetadataKeys.HADOOP_CONF, defaultMetadata);
+	
+	CompressionCodecFactory factory = new CompressionCodecFactory(conf);
+	
+	try {
+	    FileSystem fs = FileSystem.getLocal(conf);
+	    Path predicatesPath = null;
+	    for (Path distributedPath : DistributedCache.getLocalCacheFiles(conf)) {
+		if (distributedPath.getName().equals(predicatesFilename)) {
+		    predicatesPath = distributedPath;
+		    break;
+		}
+	    }
+	    if (predicatesPath == null) {
+		throw new IllegalStateException("The predicates file " + predicatesFilename + " was not found in the distributed cache.");
+	    }
+	    InputStream predicatesInputStream = fs.open(predicatesPath);
+
+	    CompressionCodec codecIfAny = factory.getCodec(predicatesPath);
+	    if (codecIfAny != null) {
+		predicatesInputStream = codecIfAny.createInputStream(predicatesInputStream);
+	    }
+
+	    BufferedReader reader = new BufferedReader(new InputStreamReader(predicatesInputStream));
+	    String nextLine = "";
+
+	    while ((nextLine = reader.readLine()) != null) {
+		nextLine = nextLine.trim();
+		if (!nextLine.isEmpty()) {
+		    // Take the first column
+		    String property = nextLine.split("\\s+")[0];
+		    // if no match, returns the whole string
+
+		    // Only include if it's in the namespaces table and not
+		    // blacklisted
+		    if (property != null && !onPredicateBlackList(property)) {
+			System.out.println("Going to index predicate:" + property);
+			indexedProperties.add(property);
 		    }
 		}
-		reader.close();
-	    } catch (Exception e) {
-		throw new RuntimeException(e);
-
 	    }
+	    reader.close();
+	    
+	    System.out.println("Read " + indexedProperties.size() + " properties from predicates file " + predicatesPath.toString());
+	} catch (IOException e) {
+	    throw new RuntimeException(e);
 	}
     }
 
@@ -193,7 +202,6 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		return;
 	    }
 	    parsed = true;
-	    
 
 	    if (rawContent == null) {
 		throw new IOException("Trying to parse null rawContent");
@@ -231,7 +239,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
 		return;
 	    }
-	    
+
 	    for (Statement stmt : handler.getStatements()) {
 
 		String predicate = stmt.getPredicate().toString();
@@ -268,12 +276,13 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		    Value object = stmt.getObject();
 		    String objectAsString;
 		    if (object instanceof Literal) {
-			// If we treat a Literal as just a Value we index the @lang and ^^<type> too
-			objectAsString = ((Literal)object).stringValue();
+			// If we treat a Literal as just a Value we index the
+			// @lang and ^^<type> too
+			objectAsString = ((Literal) object).stringValue();
 		    } else {
 			objectAsString = object.stringValue();
 		    }
-		    
+
 		    // Iterate over the words of the value
 		    FastBufferedReader fbr = new FastBufferedReader(new StringReader(objectAsString));
 		    MutableString word = new MutableString();

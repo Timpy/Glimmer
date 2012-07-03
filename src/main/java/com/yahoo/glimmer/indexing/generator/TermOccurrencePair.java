@@ -5,10 +5,12 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.nio.charset.CharacterCodingException;
 
+import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 
 /**
  * 
@@ -16,9 +18,9 @@ import org.apache.hadoop.io.WritableUtils;
  * 
  */
 public class TermOccurrencePair implements WritableComparable<TermOccurrencePair> {
-    String term;
-    Occurrence occ = new Occurrence();
-    int index;
+    private int index;
+    private String term;
+    private Occurrence occ = new Occurrence();
 
     /*
      * Required for Hadoop
@@ -38,6 +40,10 @@ public class TermOccurrencePair implements WritableComparable<TermOccurrencePair
 
     public int getIndex() {
 	return index;
+    }
+    
+    public Occurrence getOccurrence() {
+	return occ;
     }
 
     public void readFields(DataInput in) throws IOException {
@@ -137,5 +143,39 @@ public class TermOccurrencePair implements WritableComparable<TermOccurrencePair
 	    }
 	    return 0;
 	}
+    }
+    
+    /**
+     * Compare only the term and index of the pair, so that reduce is called once for
+     * each value of the first part.
+     * 
+     * NOTE: first part (i.e. index and term) are serialized first
+     */
+    public static class FirstGroupingComparator implements RawComparator<TermOccurrencePair> {
+
+        public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
+    	// Skip the first two integers
+    	int intsize = Integer.SIZE / 8;
+    	return WritableComparator.compareBytes(b1, s1 + intsize * 2, l1 - intsize * 2, b2, s2 + intsize * 2, l2 - intsize * 2);
+        }
+
+        public int compare(TermOccurrencePair o1, TermOccurrencePair o2) {
+    	if (!o1.getTerm().equals(o2.getTerm())) {
+    	    return o1.getTerm().compareTo(o2.getTerm());
+    	} else if (o1.getIndex() != o2.getIndex()) {
+    	    return ((Integer) o1.getIndex()).compareTo(o2.getIndex());
+    	}
+    	return 0;
+        }
+    }
+    
+    /**
+     * Partition based only on the term. All occurrences of a term are processed by the same reducer instance. 
+     */
+    public static class FirstPartitioner extends HashPartitioner<TermOccurrencePair, Occurrence> {
+        @Override
+        public int getPartition(TermOccurrencePair key, Occurrence value, int numPartitions) {
+            return Math.abs(key.getTerm().hashCode() * 127) % numPartitions;
+        }
     }
 }

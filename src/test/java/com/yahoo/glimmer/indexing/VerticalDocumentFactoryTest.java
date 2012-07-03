@@ -15,7 +15,7 @@ import com.yahoo.glimmer.indexing.VerticalDocumentFactory.VerticalDataRSSDocumen
 public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
     @Test
     public void test1() throws IOException {
-	metadata.put(MetadataKeys.INDEXED_PROPERTIES_FILENAME, "VerticalDocumentFactoryTest.PropertiesToIndex");
+	metadata.put(MetadataKeys.PREDICATES_FILENAME, "VerticalDocumentFactoryTest.PropertiesToIndex");
 	VerticalDocumentFactory factory = new VerticalDocumentFactory(metadata);
 	assertEquals(3, factory.numberOfFields());
 	

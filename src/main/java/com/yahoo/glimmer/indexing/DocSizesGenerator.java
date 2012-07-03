@@ -46,23 +46,21 @@ import com.martiansoftware.jsap.Parameter;
 import com.martiansoftware.jsap.SimpleJSAP;
 import com.martiansoftware.jsap.UnflaggedOption;
 
-/**
- * Generate an inverted index from an input of <url, docfeed> pairs using MG4J
- */
-
 public class DocSizesGenerator extends Configured implements Tool {
+    private static final String METHOD_ARG = "method";
+    private static final String METHOD_ARG_VALUE_VERTICAL = "vertical";
+    private static final String METHOD_ARG_VALUE_HORIZONTAL = "horizontal";
+    // Job configuration attribute names
+    private static final String PROPERTIES_ARGS = "properties";
     private static final String RESOURCES_HASH_ARG = "resourcesHash";
+    private static final String OUTPUT_DIR_ARG = "OUTPUT_DIR";
+    private static final String NUMBER_OF_DOCUMENTS_ARG = "NUMBER_OF_DOCUMENTS";
     
-    static enum Counters {
+    private final static FsPermission ALL_PERMISSIONS = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
+    
+    private static enum Counters {
 	NUMBER_OF_RECORDS, INDEXED_OCCURRENCES, FAILED_PARSING
     }
-
-    public final static FsPermission allPermissions = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
-
-    // Job configuration attribute names
-    private static final String OUTPUT_DIR = "OUTPUT_DIR";
-
-    private static final String NUMBER_OF_DOCUMENTS = "NUMBER_OF_DOCUMENTS";
 
     public static class DocSize implements WritableComparable<DocSize>, Cloneable {
 	private int document, size;
@@ -70,7 +68,6 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	// Hadoop needs this
 	public DocSize() {
-
 	}
 
 	public DocSize(int document, int size) {
@@ -158,7 +155,6 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    }
 	    return 0;
 	}
-
     }
 
     /*
@@ -167,9 +163,7 @@ public class DocSizesGenerator extends Configured implements Tool {
      * @author pmika
      */
     public static class IndexDocSizePair implements WritableComparable<IndexDocSizePair> {
-
 	private int index;
-
 	private DocSize ds = new DocSize();
 
 	/*
@@ -227,19 +221,16 @@ public class DocSizesGenerator extends Configured implements Tool {
 	public String toString() {
 	    return "(" + index + "," + ds.toString() + ")";
 	}
-
     }
 
     /**
      * Partition based only on the term
      */
     public static class FirstPartitioner extends HashPartitioner<IndexDocSizePair, DocSize> {
-
 	@Override
 	public int getPartition(IndexDocSizePair key, DocSize value, int numPartitions) {
 	    return Math.abs(key.getIndex() * 127) % numPartitions;
 	}
-
     }
 
     /**
@@ -249,7 +240,6 @@ public class DocSizesGenerator extends Configured implements Tool {
      * NOTE: first part (i.e. index and term) are serialized first
      */
     public static class FirstGroupingComparator implements RawComparator<IndexDocSizePair> {
-
 	public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
 	    // Skip the first two integers
 	    int intsize = Integer.SIZE / 8;
@@ -265,7 +255,6 @@ public class DocSizesGenerator extends Configured implements Tool {
     }
 
     public static class MapClass extends Mapper<LongWritable, Document, IndexDocSizePair, DocSize> {
-
 	private Path hashPath;
 	private AbstractObject2LongFunction<CharSequence> hash;
 
@@ -303,7 +292,6 @@ public class DocSizesGenerator extends Configured implements Tool {
 		    }
 		}
 	    }
-
 	}
 
 	@Override
@@ -335,17 +323,12 @@ public class DocSizesGenerator extends Configured implements Tool {
 		int position = 0;
 
 		while (termReader.next(term, nonWord)) {
-
 		    // Read next property as well
 		    if (term != null) {
-
 			// Report progress
 			context.setStatus(factory.fieldName(i) + "=" + term.substring(0, Math.min(term.length(), 50)));
-
 			position++;
-
 			context.getCounter(Counters.INDEXED_OCCURRENCES).increment(1);
-
 		    } else {
 			System.out.println("Nextterm is null");
 		    }
@@ -363,10 +346,6 @@ public class DocSizesGenerator extends Configured implements Tool {
     }
 
     public static class ReduceClass extends Reducer<IndexDocSizePair, DocSize, Text, Text> {
-
-	// private Vector<DataOutputStream> sizes = new
-	// Vector<DataOutputStream>();
-
 	private String outputDir;
 	private FileSystem fs;
 	private DocumentFactory factory;
@@ -376,14 +355,13 @@ public class DocSizesGenerator extends Configured implements Tool {
 	public void setup(Context context) {
 	    Configuration job = context.getConfiguration();
 	    try {
-
 		// Create an instance of the factory that was used...we only
 		// need this to get the number of fields
 		Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
 		factory = RDFDocumentFactory.initFactory(documentFactoryClass, job, null, false);
 
 		// Creating the output dir if necessary
-		outputDir = job.get(OUTPUT_DIR);
+		outputDir = job.get(OUTPUT_DIR_ARG);
 		if (!outputDir.endsWith("/"))
 		    outputDir = outputDir + "/";
 
@@ -393,12 +371,11 @@ public class DocSizesGenerator extends Configured implements Tool {
 		Path path = new Path(outputDir);
 		if (!fs.exists(path)) {
 		    fs.mkdirs(path);
-		    fs.setPermission(path, allPermissions);
-
+		    fs.setPermission(path, ALL_PERMISSIONS);
 		}
 
 		// Number of documents
-		numdocs = job.getInt(NUMBER_OF_DOCUMENTS, 0);
+		numdocs = job.getInt(NUMBER_OF_DOCUMENTS_ARG, 0);
 	    } catch (IOException e) {
 
 		throw new RuntimeException(e);
@@ -407,23 +384,18 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	@Override
 	public void reduce(IndexDocSizePair key, Iterable<DocSize> values, Context context) throws IOException, InterruptedException {
-
-	    if (key == null || key.equals(""))
+	    if (key == null || key.equals("")) {
 		return;
-
-	    long occurrences = 0;
-
+	    }
+	    
 	    System.out.println("Processing index: " + factory.fieldName(key.index));
 
+	    // Decide which file we are going to write to
 	    Path sizesPath = new Path(outputDir + factory.fieldName(key.index) + DiskBasedIndex.SIZES_EXTENSION);
 	    OutputBitStream stream = new OutputBitStream(fs.create(sizesPath, true));// overwrite
-	    // BufferedWriter stream = new BufferedWriter(new
-	    // OutputStreamWriter(fs.create(sizesPath, true)));//overwrite
+	    fs.setPermission(sizesPath, ALL_PERMISSIONS);
 
-	    fs.setPermission(sizesPath, allPermissions);
-	    // Decide which file we are going to write to
-	    // DataOutputStream stream = sizes.get(key.get());
-
+	    long occurrences = 0;
 	    int prevDocID = -1;
 	    Iterator<DocSize> valueIt = values.iterator();
 	    while (valueIt.hasNext()) {
@@ -433,13 +405,9 @@ public class DocSizesGenerator extends Configured implements Tool {
 		}
 		for (int i = prevDocID + 1; i < value.document; i++) {
 		    stream.writeGamma(0);
-		    // stream.write("0\n");
 		}
-		// stream.writeInt(value.document);
 		stream.writeGamma(value.size);
 		occurrences += value.size;
-		// stream.write(value.size + "\n");
-		System.out.println(value.document + ":" + value.size);
 		prevDocID = value.document;
 	    }
 	    if ((prevDocID + 1) < numdocs) {
@@ -447,27 +415,24 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    }
 	    for (int i = prevDocID + 1; i < numdocs; i++) {
 		stream.writeGamma(0);
-		// stream.write("0\n");
 	    }
 
 	    stream.close();
 
 	    System.out.println("Total number of occurrences: " + occurrences);
 	}
-
     }
 
     public int run(String[] arg) throws Exception {
-	SimpleJSAP jsap = new SimpleJSAP(DocSizesGenerator.class.getName(), "Generates a keyword index from RDF data.", new Parameter[] {
-		new FlaggedOption("method", JSAP.STRING_PARSER, "horizontal", JSAP.REQUIRED, 'm', "method", "horizontal or vertical."),
-		new FlaggedOption("properties", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', "properties",
+	SimpleJSAP jsap = new SimpleJSAP(DocSizesGenerator.class.getName(), "Generates doc sizes from RDF data.", new Parameter[] {
+		new FlaggedOption(METHOD_ARG, JSAP.STRING_PARSER, METHOD_ARG_VALUE_HORIZONTAL, JSAP.REQUIRED, 'm', METHOD_ARG, "horizontal or vertical."),
+		new FlaggedOption(PROPERTIES_ARGS, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', PROPERTIES_ARGS,
 			"Subset of the properties to be indexed."),
 
 		new UnflaggedOption("input", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
 		new UnflaggedOption("numdocs", JSAP.INTEGER_PARSER, JSAP.REQUIRED, "Number of documents to index"),
 		new UnflaggedOption("output", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the output."),
 		new UnflaggedOption(RESOURCES_HASH_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the resources hash file."),
-
 	});
 
 	JSAPResult args = jsap.parse(arg);
@@ -504,9 +469,9 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	DistributedCache.addCacheFile(new URI(args.getString(RESOURCES_HASH_ARG)), job.getConfiguration());
 
-	job.getConfiguration().setInt(NUMBER_OF_DOCUMENTS, args.getInt("numdocs"));
+	job.getConfiguration().setInt(NUMBER_OF_DOCUMENTS_ARG, args.getInt("numdocs"));
 
-	job.getConfiguration().set(OUTPUT_DIR, args.getString("output"));
+	job.getConfiguration().set(OUTPUT_DIR_ARG, args.getString("output"));
 
 	FileInputFormat.setInputPaths(job, new Path(args.getString("input")));
 
@@ -514,14 +479,16 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	// Set the document factory class: HorizontalDocumentFactory or
 	// VerticalDocumentFactory
-	if (args.getString("method").equalsIgnoreCase("horizontal")) {
+	if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, HorizontalDocumentFactory.class, PropertyBasedDocumentFactory.class);
-	} else {
+	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)) {
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, VerticalDocumentFactory.class, PropertyBasedDocumentFactory.class);
-	}
-
-	if (args.getString("properties") != null) {
-	    job.getConfiguration().set(RDFDocumentFactory.INDEXEDPROPERTIES_FILENAME_KEY, args.getString("properties"));
+	    if (args.getString(PROPERTIES_ARGS) != null) {
+		DistributedCache.addCacheFile(new URI(args.getString(PROPERTIES_ARGS)), job.getConfiguration());
+		//job.getConfiguration().set(RDFDocumentFactory.INDEXEDPROPERTIES_FILENAME_KEY, args.getString("properties"));
+	    }
+	} else {
+	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}
 
 	job.getConfiguration().setInt("mapred.linerecordreader.maxlength", 10000);

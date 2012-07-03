@@ -10,10 +10,12 @@ import it.unimi.dsi.mg4j.document.DocumentFactory.FieldType;
 import it.unimi.dsi.mg4j.tool.Scan.VirtualDocumentFragment;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.UUID;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -164,7 +166,8 @@ public class DistributedCollectionBuilder extends Configured implements Tool {
 	}
 
 	if (args.length > 3) {
-	    conf.set(RDFDocumentFactory.INDEXEDPROPERTIES_FILENAME_KEY, args[3]);
+	    DistributedCache.addCacheFile(new URI(args[3]), job.getConfiguration());
+	    //conf.set(RDFDocumentFactory.INDEXEDPROPERTIES_FILENAME_KEY, args[3]);
 	}
 
 	conf.setInt("mapred.linerecordreader.maxlength", 10000);

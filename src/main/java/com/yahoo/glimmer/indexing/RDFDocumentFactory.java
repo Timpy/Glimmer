@@ -39,12 +39,12 @@ import com.yahoo.glimmer.util.Util;
  */
 public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
     private static final long serialVersionUID = 3508901442129214511L;
-    public static final String INDEXEDPROPERTIES_FILENAME_KEY = "INDEXEDPROPERTIES_FILENAME";
     public static final String NULL_URL = "NULL_URL";
     /** Determines if we use the namespaces table for abbreviating field names */
     public static final boolean USE_NAMESPACES = false;
     public static final String[] PREDICATE_BLACKLIST = { "stag", "tagspace", "ctag", "rel", "mm" };
     public static final char NAMESPACE_SEPARATOR = '_';
+    public static final String PREDICATES_FILENAME_KEY = "predicatesFilename";
 
     /** The word reader used for all documents. */
     protected transient WordReader wordReader;
@@ -53,7 +53,7 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
     protected boolean withContext;
 
     public static enum MetadataKeys {
-	MAPPER_CONTEXT, INDEXED_PROPERTIES, INDEXED_PROPERTIES_FILENAME, RESOURCES_HASH, WITH_CONTEXTS
+	MAPPER_CONTEXT, RESOURCES_HASH, WITH_CONTEXTS, HADOOP_CONF, PREDICATES_FILENAME //, INDEXED_PROPERTIES, INDEXED_PROPERTIES_FILENAME
     };
 
     public static enum Counters {
@@ -157,19 +157,20 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	init();
     }
     
-    public static DocumentFactory initFactory(Class<?> documentFactoryClass, Configuration job, Mapper<?,?,?,?>.Context context, boolean loadHash) {
+    public static DocumentFactory initFactory(Class<?> documentFactoryClass, Configuration conf, Mapper<?,?,?,?>.Context context, boolean loadHash) {
 	Reference2ObjectMap<Enum<?>, Object> defaultMetadata = new Reference2ObjectArrayMap<Enum<?>, Object>();
+	defaultMetadata.put(MetadataKeys.HADOOP_CONF, conf);
 	defaultMetadata.put(PropertyBasedDocumentFactory.MetadataKeys.ENCODING, "UTF-8");
-	if (job.get(INDEXEDPROPERTIES_FILENAME_KEY) != null) {
-	    defaultMetadata.put(MetadataKeys.INDEXED_PROPERTIES_FILENAME, job.get(INDEXEDPROPERTIES_FILENAME_KEY));
-
+	if (conf.get(PREDICATES_FILENAME_KEY) != null) {
+	    defaultMetadata.put(MetadataKeys.PREDICATES_FILENAME, conf.get(PREDICATES_FILENAME_KEY));
 	}
 	if (loadHash) {
 	    try {
-		FileSystem fs = FileSystem.getLocal(job);
-		Path resourcesLocation = DistributedCache.getLocalCacheFiles(job)[0];
+		FileSystem fs = FileSystem.getLocal(conf);
+		Path resourcesLocation = DistributedCache.getLocalCacheFiles(conf)[0];
 		@SuppressWarnings("unchecked")
 		AbstractObject2LongFunction<CharSequence> resourcesHash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(fs.open(resourcesLocation));
+		System.out.println("Loaded resource hash with " + resourcesHash.size() + " entires.");
 		defaultMetadata.put(MetadataKeys.RESOURCES_HASH, resourcesHash);
 	    } catch (Exception e) {
 		throw new RuntimeException(e);

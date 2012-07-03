@@ -28,7 +28,7 @@ DFS_USER_DIR="${DFS_ROOT_DIR}/user/${USER}"
 DFS_BUILD_DIR="${DFS_USER_DIR}/nq2index.${BUILD_NAME}"
 LOCAL_BUILD_DIR="${HOME}/tmp/nq2index.${BUILD_NAME}"
 
-PROJECT_JAR="../Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
+PROJECT_JAR="../target/Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
 GENERATE_INDEX_FILES="blacklist.txt,fixDataRSS.xsl,RDFa2RDFXML.xsl,t_namespaces.html"
 
 COMPRESSION_CODEC="org.apache.hadoop.io.compress.BZip2Codec"
@@ -144,14 +144,6 @@ function groupBySubject () {
 		echo "TuplesTool exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi	
-	
-	# The number of docs is the number of subjects.
-	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${OUTPUT_DIR}/counts | grep bysubject | cut -f 2`
-	if [ -z "${NUMBER_OF_DOCS}" -o $? -ne "0" ] ; then
-		echo "Failed to get the number of subjects. exiting.."
-		exit 1
-	fi
-	echo "There are ${NUMBER_OF_DOCS} docs(subjects)."
 }
 
 function computeHashes () {
@@ -170,6 +162,21 @@ function computeHashes () {
 		echo "Hash generation exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi	
+}
+
+function getDocCount () {
+    local BY_SUBJECT_DIR=${1}
+	# The number of docs is the number of 'all' resources..
+	# Note: It's really the number of subjects but as the MG4J docId is taken from the position in the all resources hash
+	# MG4J expects that the docId be smaller that the number of docs.  Using the all resource count is simpler that using
+	# the subject count and hash to get the docIds.  The effect is that the index contains empty docs and that the
+	# Doc count it's accurate. Which may effect scoring in some cases.. 
+	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${BY_SUBJECT_DIR}/counts | grep all | cut -f 2`
+	if [ -z "${NUMBER_OF_DOCS}" -o $? -ne "0" ] ; then
+		echo "Failed to get the number of subjects. exiting.."
+		exit 1
+	fi
+	echo "There are ${NUMBER_OF_DOCS} docs(subjects)."
 }
 
 function generateIndex () {
@@ -207,8 +214,8 @@ function generateIndex () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
-		-files ${GENERATE_INDEX_FILES},${BY_SUBJECT_DIR}/predicate.bz2 \
-		-m ${METHOD} -p predicate.bz2 ${BY_SUBJECT_DIR}/bysubject.bz2 $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
+		-files ${GENERATE_INDEX_FILES} \
+		-m ${METHOD} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 		
@@ -322,8 +329,9 @@ function mergeSubIndexes() {
 
 	
 function generateDocSizes () {
-	METHOD=${1}
-	NUMBER_OF_DOCS=${2}
+	BY_SUBJECT_DIR=${1}
+	METHOD=${2}
+	NUMBER_OF_DOCS=${3}
 	DFS_SIZES_DIR="${DFS_BUILD_DIR}/${METHOD}.sizes"
 	
 	echo
@@ -336,8 +344,8 @@ function generateDocSizes () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-D=mapred.job.reduce.memory.mb=2000 \
-		-files ${GENERATE_INDEX_FILES},${OUTPUT_NAMES[2]}/part-r-00000 \
-		-m ${METHOD} -f ntuples -p part-r-00000 ${OUTPUT_NAMES[0]}${COMPRESSION_EXTENSION} $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${OUTPUT_NAMES[1]}${HASH_EXTENSION}"
+		-files ${GENERATE_INDEX_FILES} \
+		-m ${METHOD} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
@@ -361,7 +369,7 @@ function buildCollection () {
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.job.queue.name=$QUEUE \
-		-Dmapred.min.split.size=8500000000 ${OUTPUT_NAMES[0]}${COMPRESSION_EXTENSION} ${DFS_BUILD_DIR}/collection/"
+		-Dmapred.min.split.size=8500000000 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 ${DFS_BUILD_DIR}/collection/"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
@@ -374,19 +382,23 @@ function buildCollection () {
 }
 
 #groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/bysubject
-#computeHashes ${DFS_BUILD_DIR}/bysubject/all${COMPRESSION_EXTENSION}
+#computeHashes ${DFS_BUILD_DIR}/bysubject/all.bz2
 
-generateIndex ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
-exit 1
-getSubIndexes horizontal
-mergeSubIndexes horizontal
+getDocCount ${DFS_BUILD_DIR}/bysubject
 
-generateIndex vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
-getSubIndexes vertical
-mergeSubIndexes vertical
+#generateIndex ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
+#getSubIndexes horizontal
+#mergeSubIndexes horizontal
+
+#generateIndex ${DFS_BUILD_DIR}/bysubject vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
+#getSubIndexes vertical
+#mergeSubIndexes vertical
+
 
 # These could be run in parallel with index generation.
-generateDocSizes horizontal $NUMBER_OF_DOCS
+generateDocSizes ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS}
+
+exit 1
 buildCollection
 
 ${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/subjects.bz2/*.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/subjects.txt"

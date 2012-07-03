@@ -160,7 +160,7 @@ public class DocumentMapper extends Mapper<LongWritable, Document, TermOccurrenc
 	context.getCounter(Counters.NUMBER_OF_RECORDS).increment(1);
 
 	for (TermOccurrencePair term : keySet) {
-	    context.write(term, term.occ);
+	    context.write(term, term.getOccurrence());
 	}
 	// Close document
 	doc.close();

@@ -82,8 +82,7 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 		    // are created.
 		    long heapFreeSize = Runtime.getRuntime().freeMemory();
 
-		    System.out
-			    .println("Opening index for field:" + name + " Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
+		    System.out.println("Opening index for field:" + name + " Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
 
 		    Index index = new Index(fs, outputDir + uuid, name, job.getInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, -1), true);
 		    index.open();
@@ -103,34 +102,31 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 	    return;
 	}
 
-	context.setStatus(key.index + ":" + key.term);
+	context.setStatus(key.getIndex() + ":" + key.getTerm());
 
 	// Decide which index we are going to write to
-	Index currentIndex = indices.get(key.index);
+	Index currentIndex = indices.get(key.getIndex());
 
-	// For every term, the first instances are fake instances introduced
-	// for document counting
-	boolean firstDoc = false;
+	// For every term, the first values are fake Occurrences introduced
+	// for document counting. 
 	int numDocs = 0;
-	Occurrence occ = null, prevOcc = null;
-	Iterator<Occurrence> valueIt = values.iterator();
-	while (valueIt.hasNext() && !firstDoc) {
-	    occ = valueIt.next();
-
+	Occurrence occ = null;
+	Occurrence prevOcc = null;
+	Iterator<Occurrence> valuesIt = values.iterator();
+	while (valuesIt.hasNext()) {
+	    occ = valuesIt.next();
 	    //if (occ.getDocument() == -1) {
-	    if (!occ.isDocSet()) {
-		if (!occ.equals(prevOcc)) {
-		    numDocs++;
-		}
-		prevOcc = (Occurrence) occ.clone();
-	    } else {
-		firstDoc = true;
+	    if (occ.isDocSet()) {
+		break;
 	    }
-
+	    if (!occ.equals(prevOcc)) {
+		numDocs++;
+	    }
+	    prevOcc = (Occurrence) occ.clone();
 	}
 
 	// Cut off the index type prefix from the key
-	currentIndex.getTermsWriter().println(key.term);
+	currentIndex.getTermsWriter().println(key.getTerm());
 	currentIndex.getIndexWriter().newInvertedList();
 	currentIndex.getIndexWriter().writeFrequency(Math.min(numDocs, TripleIndexGenerator.MAX_INVERTEDLIST_SIZE));
 
@@ -152,23 +148,19 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 		writtenOccurrences += posIndex;
 		if (writtenDocs == TripleIndexGenerator.MAX_INVERTEDLIST_SIZE) {
 		    context.getCounter(Counters.POSTINGLIST_SIZE_OVERFLOW).increment(1);
-		    System.err.println("More than " + TripleIndexGenerator.MAX_INVERTEDLIST_SIZE + " documents for term " + key.term);
+		    System.err.println("More than " + TripleIndexGenerator.MAX_INVERTEDLIST_SIZE + " documents for term " + key.getTerm());
 		    break;
 		}
 		posIndex = 0;
 		if (occ.isPositionSet()) {
 		    buf[posIndex++] = occ.getPosition();
-		} else {
-		    // TODO What? tep
 		}
 	    } else {
 		if (posIndex > TripleIndexGenerator.MAX_POSITIONLIST_SIZE - 1) {
 		    context.getCounter(Counters.POSITIONLIST_SIZE_OVERFLOW).increment(1);
-		    System.err.println("More than " + TripleIndexGenerator.MAX_POSITIONLIST_SIZE + " positions for term " + key.term);
+		    System.err.println("More than " + TripleIndexGenerator.MAX_POSITIONLIST_SIZE + " positions for term " + key.getTerm());
 		} else if (occ.isPositionSet()){
 		    buf[posIndex++] = occ.getPosition();
-		} else {
-		    // TODO What? tep
 		}
 	    }
 
@@ -176,13 +168,13 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 	    prevOcc = (Occurrence) occ.clone();
 
 	    boolean last = false;
-	    if (valueIt.hasNext()) {
-		occ = valueIt.next();
+	    if (valuesIt.hasNext()) {
+		occ = valuesIt.next();
 		// Skip equivalent occurrences
-		while (occ.equals(prevOcc) && valueIt.hasNext()) {
-		    occ = valueIt.next();
+		while (occ.equals(prevOcc) && valuesIt.hasNext()) {
+		    occ = valuesIt.next();
 		}
-		if (occ.equals(prevOcc) && !valueIt.hasNext()) {
+		if (occ.equals(prevOcc) && !valuesIt.hasNext()) {
 		    last = true;
 		}
 	    } else {
@@ -200,9 +192,7 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 		writtenOccurrences += posIndex;
 		occ = null;
 	    }
-
 	}
-
     }
 
     @Override

@@ -30,6 +30,10 @@ import com.yahoo.glimmer.indexing.VerticalDocumentFactory;
  * Generate an inverted index from an input of <url, docfeed> pairs using MG4J
  */
 public class TripleIndexGenerator extends Configured implements Tool {
+    private static final String METHOD_ARG = "method";
+    private static final String METHOD_ARG_VALUE_VERTICAL = "vertical";
+    private static final String METHOD_ARG_VALUE_HORIZONTAL = "horizontal";
+    private static final String PREDICATES_ARG = "properties";
     // Job configuration attribute names
     static final String OUTPUT_DIR = "OUTPUT_DIR";
     static final String NUMBER_OF_DOCUMENTS = "NUMBER_OF_DOCUMENTS";
@@ -45,8 +49,8 @@ public class TripleIndexGenerator extends Configured implements Tool {
     
     public int run(String[] arg) throws Exception {
 	SimpleJSAP jsap = new SimpleJSAP(TripleIndexGenerator.class.getName(), "Generates a keyword index from RDF data.", new Parameter[] {
-		new FlaggedOption("method", JSAP.STRING_PARSER, "horizontal", JSAP.REQUIRED, 'm', "method", "horizontal or vertical."),
-		new FlaggedOption("properties", JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', "properties",
+		new FlaggedOption(METHOD_ARG, JSAP.STRING_PARSER, "horizontal", JSAP.REQUIRED, 'm', METHOD_ARG, "horizontal or vertical."),
+		new FlaggedOption(PREDICATES_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', PREDICATES_ARG,
 			"Subset of the properties to be indexed."),
 
 		new UnflaggedOption("input", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
@@ -85,10 +89,10 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.setMapOutputKeyClass(TermOccurrencePair.class);
 	job.setMapOutputValueClass(Occurrence.class);
 
-	job.setPartitionerClass(FirstPartitioner.class);
+	job.setPartitionerClass(TermOccurrencePair.FirstPartitioner.class);
 	job.getConfiguration().setClass("mapred.output.key.comparator.class", TermOccurrencePair.Comparator.class, WritableComparator.class);
 	job.getConfiguration().set("mapreduce.user.classpath.first", "true");
-	job.setGroupingComparatorClass(FirstGroupingComparator.class);
+	job.setGroupingComparatorClass(TermOccurrencePair.FirstGroupingComparator.class);
 
 	DistributedCache.addCacheFile(new URI(args.getString(RESOURCES_HASH_ARG)), job.getConfiguration());
 
@@ -99,14 +103,22 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.getConfiguration().set(OUTPUT_DIR, args.getString("output"));
 	FileOutputFormat.setOutputPath(job, new Path(args.getString("output")));
 
-	if (args.getString("method").equalsIgnoreCase("horizontal")) {
+	if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, HorizontalDocumentFactory.class, PropertyBasedDocumentFactory.class);
-	} else {
+	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)){
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, VerticalDocumentFactory.class, PropertyBasedDocumentFactory.class);
-	}
+	    if (args.getString(PREDICATES_ARG) != null) {
+		String predicatedFilename = args.getString(PREDICATES_ARG);
+		DistributedCache.addCacheFile(new URI(predicatedFilename), job.getConfiguration());
+		int lastIndexOfSlash = predicatedFilename.lastIndexOf('/');
+		if (lastIndexOfSlash >= 0) {
+		    predicatedFilename = predicatedFilename.substring(lastIndexOfSlash + 1);
+		}
+		job.getConfiguration().set(RDFDocumentFactory.PREDICATES_FILENAME_KEY, predicatedFilename);
+	    }
+	} else {
+	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 
-	if (args.getString("properties") != null) {
-	    job.getConfiguration().set(RDFDocumentFactory.INDEXEDPROPERTIES_FILENAME_KEY, args.getString("properties"));
 	}
 
 	job.getConfiguration().setInt("mapred.linerecordreader.maxlength", 10000);
