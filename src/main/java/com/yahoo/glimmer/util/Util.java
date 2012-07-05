@@ -6,13 +6,10 @@ package com.yahoo.glimmer.util;
  * @author Peter Mika (pmika@yahoo-inc.com)
  */
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
@@ -23,10 +20,6 @@ import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.xml.transform.Source;
@@ -73,44 +66,6 @@ public class Util {
     private final static int BUFFER_SIZE = 2048;
 
     protected static Logger _logger = Logger.getLogger(Util.class);
-
-    public final static String NAMESPACES_TABLE = "t_namespaces.html";
-    public final static Pattern NAMESPACES_PATTERN = Pattern.compile("<tr><td>(.*?)</td><td>(.*?)</td><td>.*?</td><td>(.*?)</td></tr>");
-
-    public static final HashMap<String, String> SM_NAMESPACES = new HashMap<String, String>();
-
-    static {
-	SM_NAMESPACES.put("atom", "http://www.w3.org/2005/Atom");
-	SM_NAMESPACES.put("cc", "http://creativecommons.org/licenses/");
-	SM_NAMESPACES.put("dc", "http://purl.org/dc/elements/1.1/");
-	SM_NAMESPACES.put("foaf", "http://xmlns.com/foaf/0.1/");
-	SM_NAMESPACES.put("geo", "http://www.georss.org/georss");
-	SM_NAMESPACES.put("media", "http://search.yahoo.com/mrss/");
-	SM_NAMESPACES.put("rdf", "http://www.w3.org/1999/02/22-rdf-syntax-ns#");
-	SM_NAMESPACES.put("rdfs", "http://www.w3.org/2000/01/rdf-schema#");
-	SM_NAMESPACES.put("review", "http://www.purl.org/stuff/rev#");
-	SM_NAMESPACES.put("vcal", "http://www.w3.org/2002/12/cal#");
-	SM_NAMESPACES.put("vcard", "http://www.w3.org/2006/vcard/ns#");
-	SM_NAMESPACES.put("rel", "http://search.yahoo.com/searchmonkey-relation/");
-	SM_NAMESPACES.put("assert", "http://search.yahoo.com/searchmonkey/assert/");
-	SM_NAMESPACES.put("commerce", "http://search.yahoo.com/searchmonkey/commerce/");
-	SM_NAMESPACES.put("context", "http://search.yahoo.com/searchmonkey/context/");
-	SM_NAMESPACES.put("finance", "http://search.yahoo.com/searchmonkey/finance/");
-	SM_NAMESPACES.put("job", "http://search.yahoo.com/searchmonkey/job/");
-	SM_NAMESPACES.put("news", "http://search.yahoo.com/searchmonkey/news/");
-	SM_NAMESPACES.put("page", "http://search.yahoo.com/searchmonkey/page/");
-	SM_NAMESPACES.put("product", "http://search.yahoo.com/searchmonkey/product/");
-	SM_NAMESPACES.put("reference", "http://search.yahoo.com/searchmonkey/reference/");
-	SM_NAMESPACES.put("resume", "http://search.yahoo.com/searchmonkey/resume/");
-	SM_NAMESPACES.put("social", "http://search.yahoo.com/searchmonkey/social/");
-	SM_NAMESPACES.put("tagspace", "http://search.yahoo.com/searchmonkey/tagspace/");
-	SM_NAMESPACES.put("country", "http://search.yahoo.com/searchmonkey-datatype/country/");
-	SM_NAMESPACES.put("currency", "http://search.yahoo.com/searchmonkey-datatype/currency/");
-	SM_NAMESPACES.put("use", "http://search.yahoo.com/searchmonkey-datatype/use/");
-	SM_NAMESPACES.put("xfn", "http://gmpg.org/xfn/11#");
-	SM_NAMESPACES.put("xsd", "http://www.w3.org/2001/XMLSchema#");
-
-    }
 
     private static HttpClient _httpClient;
 
@@ -425,85 +380,6 @@ public class Util {
 	return convertToHex(md5hash);
     }
 
-    public static Map<String, String> loadPrefix2NamespaceMap(InputStream in) {
-	Map<String, String> result = new HashMap<String, String>();
-	// Load namespaces table
-	BufferedReader reader;
-	try {
-	    // System.out.println("Loading namespaces table");
-	    reader = new BufferedReader(new InputStreamReader(in));
-	    String nextLine = "";
-	    while ((nextLine = reader.readLine()) != null) {
-		if (nextLine.indexOf("<!--") >= 0) {
-
-		    // Skip until end of comment
-		    boolean found = nextLine.indexOf("-->") >= 0;
-		    while ((nextLine = reader.readLine()) != null && !found) {
-			if (nextLine.indexOf("-->") >= 0)
-			    found = true;
-		    }
-		}
-
-		if (nextLine != null) {
-		    Matcher m = NAMESPACES_PATTERN.matcher(nextLine);
-		    if (m.find()) {
-			result.put(m.group(1), m.group(3));
-			// System.out.println("Adding prefix: '" + m.group(1) +
-			// "' for '" + m.group(3) + "'");
-		    }
-		}
-	    }
-	    reader.close();
-	} catch (FileNotFoundException e) {
-	    e.printStackTrace();
-	} catch (IOException e) {
-	    e.printStackTrace();
-	}
-	return result;
-    }
-
-    public static Map<String, String> loadNamespaceToPrefixMap(InputStream in) {
-	Map<String, String> result = new HashMap<String, String>();
-	// Load namespaces table
-	BufferedReader reader;
-	try {
-	    System.out.println("Loading namespaces table");
-	    reader = new BufferedReader(new InputStreamReader(in));
-	    String nextLine = "";
-	    while ((nextLine = reader.readLine()) != null) {
-		if (nextLine.indexOf("<!--") >= 0) {
-
-		    // Skip until end of comment
-		    boolean found = nextLine.indexOf("-->") >= 0;
-		    while ((nextLine = reader.readLine()) != null && !found) {
-			if (nextLine.indexOf("-->") >= 0)
-			    found = true;
-		    }
-		}
-
-		Matcher m = NAMESPACES_PATTERN.matcher(nextLine);
-		if (m.find()) {
-		    result.put(m.group(3), m.group(1));
-		    System.out.println("Adding prefix: '" + m.group(1) + "' for '" + m.group(3) + "'");
-		}
-	    }
-	    reader.close();
-	} catch (FileNotFoundException e) {
-	    e.printStackTrace();
-	} catch (IOException e) {
-	    e.printStackTrace();
-	}
-	return result;
-    }
-
-    public static Map<String, String> loadPrefixToNamespaceMap() {
-	return loadPrefix2NamespaceMap(Util.class.getClassLoader().getResourceAsStream(NAMESPACES_TABLE));
-    }
-
-    public static Map<String, String> loadNamespaceToPrefixMap() {
-	return loadNamespaceToPrefixMap(Util.class.getClassLoader().getResourceAsStream(NAMESPACES_TABLE));
-    }
-
     /**
      * Parse an NQuad string and convert it to Sesame's Statement object
      * 
@@ -570,4 +446,7 @@ public class Util {
 	}
     }
 
+    public static String encodeFieldName(String name) {
+        return name.replaceAll("[^a-zA-Z0-9]+", "_");
+    }
 }

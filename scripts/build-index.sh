@@ -29,7 +29,7 @@ DFS_BUILD_DIR="${DFS_USER_DIR}/index-${BUILD_NAME}"
 LOCAL_BUILD_DIR="${HOME}/tmp/index-${BUILD_NAME}"
 
 PROJECT_JAR="../target/Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
-GENERATE_INDEX_FILES="../target/classes/blacklist.txt,../target/classes/RDFa2RDFXML.xsl,../target/classes/t_namespaces.html"
+HADOOP_CACHE_FILES="../target/classes/blacklist.txt"
 
 COMPRESSION_CODEC="org.apache.hadoop.io.compress.BZip2Codec"
 COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,${COMPRESSION_CODEC}"
@@ -214,7 +214,7 @@ function generateIndex () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
-		-files ${GENERATE_INDEX_FILES} \
+		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
@@ -344,7 +344,7 @@ function generateDocSizes () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-D=mapred.job.reduce.memory.mb=2000 \
-		-files ${GENERATE_INDEX_FILES} \
+		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
 	${CMD}

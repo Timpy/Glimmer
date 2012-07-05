@@ -5,23 +5,11 @@ String.prototype.startsWith = function(str) {
 var stats = {};
 var fields = [ "any" ];
 var store = {};
-var onto = "woo.ttl";
-// var pubby = "http://woo.barcelona.corp.yahoo.com/pubby-woo/page/";
 var ns = "http://woo.corp.yahoo.com/1.7.1/ns/".replace(/[^a-zA-Z0-9]+/g, "_");
-// var webapp = "http://woo.barcelona.corp.yahoo.com/swa-query/";
-// var webapp = "http://dn002.sg.woo.gq1.yahoo.com:4080/woosearch/";
 var webapp = "";
 var RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
-var ROOT_CLASS = "http://woo.corp.yahoo.com/ns/Entity";
-
-var pname = [];
-pname["http://woo.corp.yahoo.com/rdfcontext/-1397670415"] = "AMACAI";
-pname["http://woo.corp.yahoo.com/rdfcontext/515338244"] = "RR";
-pname["http://woo.corp.yahoo.com/rdfcontext/-1133668696"] = "GS_FF";
-pname["http://woo.corp.yahoo.com/rdfcontext/181541560"] = "INFOUSA";
-pname["http://woo.corp.yahoo.com/rdfcontext/462958760"] = "IUSA_CLOSED";
-pname["http://woo.corp.yahoo.com/rdfcontext/250342773"] = "SDE";
-pname["http://woo.corp.yahoo.com/rdfcontext/-1045275665"] = "YTRAVEL_CRAWL";
+var ONTOLOGY_ROOT = "http://www.w3.org/2002/07/owl#Thing";
+var contextsToColour = []; // TODO populate from server.
 
 var argString = window.location.href.split('?')[1];
 var args = []; // URL arguments
@@ -30,10 +18,10 @@ if (argString != undefined) {
 }
 
 function getProviderName(sstring) {
-	if (pname[sstring] === undefined)
+	if (contextsToColour[sstring] === undefined)
 		return getLocalName(sstring);
 	else
-		return pname[sstring];
+		return contextsToColour[sstring];
 }
 
 function getLocalName(uri) {
@@ -534,7 +522,7 @@ YUI({
 													.one('#statistics-tree')
 													.setContent(
 															'<ul id="statisticsTreeList"></ul>');
-											tree.push(addClass(ROOT_CLASS));
+											tree.push(addClass(ONTOLOGY_ROOT));
 											var treeview = new Y.TreeView(
 													{
 														srcNode : '#statisticsTreeList',

@@ -15,7 +15,7 @@
 	</bean>
 	<bean id="querier" class="com.yahoo.glimmer.web.Querier" />
 
-	<bean id="docObjectView" class="com.yahoo.glimmer.web.TextObjectView" />
+	<bean id="docObjectView" class="com.yahoo.glimmer.web.DocObjectView" />
 	<bean id="jsObjectView" class="com.yahoo.glimmer.web.JsObjectView" />
 	<bean id="txtObjectView" class="com.yahoo.glimmer.web.DocObjectView">
 		<property name="includeUri" value="true"/>

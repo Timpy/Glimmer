@@ -18,6 +18,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.indexing.RDFInputFormat;
 import com.yahoo.glimmer.indexing.VerticalDocumentFactory;
+import com.yahoo.glimmer.util.Util;
 
 public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurrence, Text, Text> {
     private Map<Integer, Index> indices = new HashMap<Integer, Index>();
@@ -67,7 +68,7 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 
 	    // Open one index per field
 	    for (int i = 0; i < factory.numberOfFields(); i++) {
-		String name = RDFDocumentFactory.encodeFieldName(factory.fieldName(i));
+		String name = Util.encodeFieldName(factory.fieldName(i));
 		if (!name.startsWith("NOINDEX")) {
 
 		    // Get current size of heap in bytes

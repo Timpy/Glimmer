@@ -55,9 +55,9 @@ import org.semanticweb.owlapi.model.OWLOntologyCreationException;
 import org.semanticweb.owlapi.model.OWLOntologyManager;
 
 import com.yahoo.glimmer.indexing.ConcatenatedDocumentCollection;
-import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.indexing.SimpleCompressedDocumentCollection;
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
+import com.yahoo.glimmer.util.Util;
 
 public class RDFIndex {
     private final static Logger LOGGER = Logger.getLogger(RDFIndex.class);
@@ -254,7 +254,7 @@ public class RDFIndex {
 	    fields = new ArrayList<String>();
 	    LOGGER.info("Loading field list from " + context.getFieldList());
 	    for (MutableString line : new FileLinesCollection(context.getFieldList(), "UTF-8")) {
-		fields.add(RDFDocumentFactory.encodeFieldName(line.toString()));
+		fields.add(Util.encodeFieldName(line.toString()));
 	    }
 	}
 

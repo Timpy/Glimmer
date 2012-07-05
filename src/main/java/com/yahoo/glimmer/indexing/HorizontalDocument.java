@@ -18,6 +18,8 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.semanticweb.yars.nx.namespace.RDF;
 
+import com.yahoo.glimmer.util.Util;
+
 /**
  * A RDF document.
  * 
@@ -106,7 +108,7 @@ class HorizontalDocument extends RDFDocument {
 
 	for (Statement stmt : handler.getStatements()) {
 	    String predicate = stmt.getPredicate().toString();
-	    String fieldName = HorizontalDocumentFactory.encodeFieldName(predicate);
+	    String fieldName = Util.encodeFieldName(predicate);
 
 	    // Check if prefix is on blacklist
 	    if (factory.onPredicateBlackList(fieldName)) {

@@ -48,12 +48,16 @@ Querying
 
 Once you have the indexes build you can use the MG4J query command line class it.unimi.dsi.mg4j.query.Query to query them.  You may find the query-index.sh script helpful here.
 
-You can also build and deploy the Java web application as follows:
+You can also setup, build and deploy the Java web application as follows:
 
-1. Use the maven-war-plugin to build the war file.  From the projects root directory run the command
+1. Configure where your indexes are in src/main/webapp/WEB-INF/classes/config-generic.properties.  The directories found in the directory given by 'multiindex.path' property and that have names starting with the 'multiindex.dirprefix' property are treated as MG4J indexes.  The names will appear in the Dataset dropdown in the webapp.
+ 
+2. Use the maven-war-plugin to build the war file.  From the projects root directory run the command
 
-	mvn war:war
+	mvn compile (or mvn test)
+	mvn war:war (mvn war:exploded maybe of interest to some people too)
 
 This will build the war file Glimmer-?.?.?-SNAPSHOT.war in the target directory.
 
+2. Copy the war into do the deployment directory of your installed Java Servlet container.
 

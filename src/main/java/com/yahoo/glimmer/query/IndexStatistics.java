@@ -15,7 +15,6 @@ import org.semanticweb.owlapi.model.OWLDataProperty;
 import org.semanticweb.owlapi.model.OWLOntology;
 import org.semanticweb.owlapi.model.OWLProperty;
 
-import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.vocabulary.OwlUtils;
 
 public class IndexStatistics {
@@ -126,9 +125,9 @@ public class IndexStatistics {
 		for (OWLProperty<?, ?> prop : OwlUtils.getPropertiesInDomain(clazz, onto)) {
 		    if (prop instanceof OWLDataProperty) {
 			stat.properties.add(prop.getIRI().toString());
-			if (predDist.containsKey(RDFDocumentFactory.encodeFieldName(removeVersion(prop.getIRI().toString())))) {
+			if (predDist.containsKey(com.yahoo.glimmer.util.Util.encodeFieldName(removeVersion(prop.getIRI().toString())))) {
 			    properties.put(prop.getIRI().toString(),
-				    new PropertyStat(predDist.get(RDFDocumentFactory.encodeFieldName(removeVersion(prop.getIRI().toString())))));
+				    new PropertyStat(predDist.get(com.yahoo.glimmer.util.Util.encodeFieldName(removeVersion(prop.getIRI().toString())))));
 			}
 		    }
 		}

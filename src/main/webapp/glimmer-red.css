@@ -1,31 +1,24 @@
 /* -- local specific -- */
-.source-AMACAI {
-	color: #228822;
-}
 
-.source-RR {
+.context-red {
 	color: #FF0000;
 }
-
-.source-GS_FF {
-	color: #FFFF00;
-}
-
-.source-INFOUSA {
-	color: #0000FF;
-}
-
-.source-IUSA_CLOSED {
+.context-green {
 	color: #00FF00;
 }
-
-.source-SDE {
+.context-blue {
+	color: #0000FF;
+}
+.context-yellow {
+	color: #FFFF00;
+}
+.context-cyan {
+	color: #00FFFF;
+}
+.context-purple {
 	color: #FF00FF;
 }
 
-.source-YTRAVEL_CRAWL {
-	color: #882222;
-}
 
 /* -- search specific -- */
 #searchBoxes {

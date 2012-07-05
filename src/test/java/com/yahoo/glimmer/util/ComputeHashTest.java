@@ -32,7 +32,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class ComputeHashTest {
-    private static final String SOME_LINES = "a\nb\ncc\nd\n\u2200";
+    private static final String SOME_LINES = "a\nb\ncc\nd\n";
 
     private Mockery context;
     private Expectations expectations;
@@ -99,11 +99,11 @@ public class ComputeHashTest {
 	
 	long hashSize = computeMph.buildHash(fs, "filename", 0, true, Charset.forName("UTF-8"), false);
 
-	assertEquals(5, hashSize);
+	assertEquals(4, hashSize);
 	context.assertIsSatisfied();
 
 	assertEquals("", infoStream.toString());
-
+	
 	// unmarshal the hash and check the values..
 	ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(unsignedStream.toByteArray()));
 	Object readObject = ois.readObject();
@@ -115,7 +115,6 @@ public class ComputeHashTest {
 	assertEquals(1, mph.getLong("b"));
 	assertEquals(2, mph.getLong("cc"));
 	assertEquals(3, mph.getLong("d"));
-	assertEquals(4, mph.getLong("\u2200"));
     }
 
     @Test
@@ -126,10 +125,10 @@ public class ComputeHashTest {
 	context.checking(expectations);
 	long hashSize = computeMph.buildHash(fs, "filename", 32, false, Charset.forName("UTF-8"), true);
 
-	assertEquals(5, hashSize);
+	assertEquals(4, hashSize);
 	context.assertIsSatisfied();
 
-	assertEquals("size\t5\nsignedWidth\t32\n", infoStream.toString());
+	assertEquals("size\t4\nsignedWidth\t32\n", infoStream.toString());
 
 	// unmarshal the hash and check the values..
 	ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(signedStream.toByteArray()));
@@ -146,9 +145,6 @@ public class ComputeHashTest {
 	assertEquals(-1, map.getLong("ca"));
 	assertEquals(3, map.getLong("d"));
 	assertEquals(-1, map.getLong("dx"));
-	assertEquals(-1, map.getLong("\u2199"));
-	assertEquals(4, map.getLong("\u2200"));
-	assertEquals(-1, map.getLong("\u2201"));
     }
     
     @Test
@@ -162,10 +158,10 @@ public class ComputeHashTest {
 	context.checking(expectations);
 	long hashSize = computeMph.buildHash(fs, "filename", 16, true, Charset.forName("UTF-8"), true);
 
-	assertEquals(5, hashSize);
+	assertEquals(4, hashSize);
 	context.assertIsSatisfied();
 
-	assertTrue(infoStream.toString().matches("^size\t5\nunsignedBits\t3\\d\\d\nsignedWidth\t16\n$"));
+	assertTrue(infoStream.toString().matches("^size\t4\nunsignedBits\t3\\d\\d\nsignedWidth\t16\n$"));
     }
     
     private class PathMatcher extends BaseMatcher<Path> {

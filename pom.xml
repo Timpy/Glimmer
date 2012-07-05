@@ -11,6 +11,8 @@
 	<properties>
 		<endorsed.dir>${project.build.directory}/endorsed</endorsed.dir>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<hadoop.version>0.20.205.0</hadoop.version>
 	</properties>
 
@@ -23,6 +25,9 @@
 				<configuration>
 					<source>1.6</source>
 					<target>1.6</target>
+					<systemPropertyVariables>
+						<propertyName></propertyName>
+					</systemPropertyVariables>
 				</configuration>
 			</plugin>
 			<plugin>

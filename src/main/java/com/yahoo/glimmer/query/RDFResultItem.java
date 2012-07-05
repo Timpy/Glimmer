@@ -21,7 +21,6 @@ import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.Triple;
 import org.semanticweb.yars.nx.parser.NxParser;
 
-import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 
 public class RDFResultItem extends ResultItem {
 
@@ -170,7 +169,7 @@ public class RDFResultItem extends ResultItem {
 	for (Triple key : quadsByTriple.keySet()) {
 	    // indexField will be null for triples with predicates that are not
 	    // indexed.
-	    String field = RDFDocumentFactory.encodeFieldName(((Resource) key.getPredicate()).toString());
+	    String field = com.yahoo.glimmer.util.Util.encodeFieldName(((Resource) key.getPredicate()).toString());
 	    boolean isIndexed = false;
 	    for (String fn : fieldNames) {
 		if (field.equalsIgnoreCase(fn)) {

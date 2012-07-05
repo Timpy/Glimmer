@@ -96,10 +96,6 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	return super.parseProperty(key, values, metadata);
     }
 
-    public static String encodeFieldName(String name) {
-	return name.replaceAll("[^a-zA-Z0-9]+", "_");
-    }
-
     protected boolean onPredicateBlackList(String name) {
 	// Filter out namespaces on blacklist
 	for (String black : PREDICATE_BLACKLIST) {
