@@ -25,11 +25,11 @@ export HADOOP_USER_CLASSPATH_FIRST=true
 HADOOP_NAME_NODE="localhost:9000"
 DFS_ROOT_DIR="hdfs://${HADOOP_NAME_NODE}"
 DFS_USER_DIR="${DFS_ROOT_DIR}/user/${USER}"
-DFS_BUILD_DIR="${DFS_USER_DIR}/nq2index.${BUILD_NAME}"
-LOCAL_BUILD_DIR="${HOME}/tmp/nq2index.${BUILD_NAME}"
+DFS_BUILD_DIR="${DFS_USER_DIR}/index-${BUILD_NAME}"
+LOCAL_BUILD_DIR="${HOME}/tmp/index-${BUILD_NAME}"
 
 PROJECT_JAR="../target/Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
-GENERATE_INDEX_FILES="blacklist.txt,fixDataRSS.xsl,RDFa2RDFXML.xsl,t_namespaces.html"
+GENERATE_INDEX_FILES="../target/classes/blacklist.txt,../target/classes/RDFa2RDFXML.xsl,../target/classes/t_namespaces.html"
 
 COMPRESSION_CODEC="org.apache.hadoop.io.compress.BZip2Codec"
 COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,${COMPRESSION_CODEC}"
@@ -381,29 +381,27 @@ function buildCollection () {
 	${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/collection" "${LOCAL_BUILD_DIR}"
 }
 
-#groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/bysubject
-#computeHashes ${DFS_BUILD_DIR}/bysubject/all.bz2
+groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/bysubject
+computeHashes ${DFS_BUILD_DIR}/bysubject/all.bz2
 
 getDocCount ${DFS_BUILD_DIR}/bysubject
 
-#generateIndex ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
-#getSubIndexes horizontal
-#mergeSubIndexes horizontal
+generateIndex ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
+getSubIndexes horizontal
+mergeSubIndexes horizontal
 
-#generateIndex ${DFS_BUILD_DIR}/bysubject vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
-#getSubIndexes vertical
-#mergeSubIndexes vertical
-
+generateIndex ${DFS_BUILD_DIR}/bysubject vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
+getSubIndexes vertical
+mergeSubIndexes vertical
 
 # These could be run in parallel with index generation.
 generateDocSizes ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS}
 
-exit 1
 buildCollection
 
-${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/subjects.bz2/*.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/subjects.txt"
-${HADOOP_CMD} fs -copyToLocal "${OUTPUT_NAMES[2]}/part-r-00000" "${LOCAL_BUILD_DIR}/predicates.txt"
-${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/subjects.mph" "${LOCAL_BUILD_DIR}"
+${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/bysubject/all.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/all.txt"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/bysubject/all.smap" "${LOCAL_BUILD_DIR}"
+${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/bysubject/predicate.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/predicates.txt"
 
 echo Done. Index files are here ${LOCAL_BUILD_DIR}
 

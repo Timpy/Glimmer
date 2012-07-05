@@ -1,7 +1,5 @@
 package com.yahoo.glimmer.indexing;
 
-import it.unimi.dsi.fastutil.io.BinIO;
-import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
@@ -20,7 +18,6 @@ import java.util.Iterator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.filecache.DistributedCache;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -255,56 +252,29 @@ public class DocSizesGenerator extends Configured implements Tool {
     }
 
     public static class MapClass extends Mapper<LongWritable, Document, IndexDocSizePair, DocSize> {
-	private Path hashPath;
-	private AbstractObject2LongFunction<CharSequence> hash;
+	private RDFDocumentFactory factory;
 
-	private DocumentFactory factory;
-
-	@SuppressWarnings("unchecked")
 	@Override
 	public void setup(Context context) {
 	    Configuration job = context.getConfiguration();
-
+	    
 	    // Create an instance of the factory that was used...we only need
 	    // this to get the number of fields
 	    Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-
-	    factory = RDFDocumentFactory.initFactory(documentFactoryClass, job, context, false);
-
-	    // Get the cached archives/files
-	    FSDataInputStream input = null;
-	    try {
-		FileSystem fs = FileSystem.getLocal(job);
-		hashPath = DistributedCache.getLocalCacheFiles(job)[0];
-		input = fs.open(hashPath);
-		hash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(input);
-	    } catch (IOException e) {
-
-		e.printStackTrace();
-	    } catch (ClassNotFoundException e) {
-		e.printStackTrace();
-	    } finally {
-		if (input != null) {
-		    try {
-			input.close();
-		    } catch (IOException e) {
-			throw new RuntimeException(e);
-		    }
-		}
-	    }
+	    factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
 	}
 
 	@Override
 	public void map(LongWritable key, Document doc, Context context) throws IOException, InterruptedException {
 
-	    if (doc == null || doc.uri().equals(RDFDocumentFactory.NULL_URL)) {
+	    if (doc == null || doc.uri().equals(RDFDocument.NULL_URL)) {
 		// Failed parsing
 		context.getCounter(Counters.FAILED_PARSING).increment(1);
 		System.out.println("Document failed parsing");
 		return;
 	    }
 
-	    int docID = hash.get(doc.uri().toString()).intValue();
+	    int docID = factory.resourcesHashLookup(doc.uri().toString()).intValue();
 
 	    if (docID < 0) {
 		throw new RuntimeException("Negative DocID for URI: " + doc.uri());
@@ -358,7 +328,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 		// Create an instance of the factory that was used...we only
 		// need this to get the number of fields
 		Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-		factory = RDFDocumentFactory.initFactory(documentFactoryClass, job, null, false);
+		factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
 
 		// Creating the output dir if necessary
 		outputDir = job.get(OUTPUT_DIR_ARG);
@@ -467,7 +437,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	job.setGroupingComparatorClass(FirstGroupingComparator.class);
 
-	DistributedCache.addCacheFile(new URI(args.getString(RESOURCES_HASH_ARG)), job.getConfiguration());
+	job.getConfiguration().set(RDFDocumentFactory.RESOURCES_FILENAME_KEY, args.getString(RESOURCES_HASH_ARG));
 
 	job.getConfiguration().setInt(NUMBER_OF_DOCUMENTS_ARG, args.getInt("numdocs"));
 

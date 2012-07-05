@@ -39,7 +39,7 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 	    // Create an instance of the factory that was used...we only
 	    // need this to get the number of fields
 	    Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-	    DocumentFactory factory = RDFDocumentFactory.initFactory(documentFactoryClass, job, null, false);
+	    DocumentFactory factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
 
 	    // Creating the output dir
 	    String outputDir = job.get(TripleIndexGenerator.OUTPUT_DIR);

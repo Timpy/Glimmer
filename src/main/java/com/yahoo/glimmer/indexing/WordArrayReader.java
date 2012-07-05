@@ -43,5 +43,4 @@ public class WordArrayReader implements WordReader {
     public WordReader setReader(Reader reader) {
 	throw new RuntimeException("Not supported: setReader()");
     }
-
 }

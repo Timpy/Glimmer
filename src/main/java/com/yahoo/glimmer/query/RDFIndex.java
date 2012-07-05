@@ -11,6 +11,7 @@ import it.unimi.dsi.fastutil.objects.Reference2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
+import it.unimi.dsi.io.FileLinesCollection;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.mg4j.document.Document;
@@ -252,9 +253,9 @@ public class RDFIndex {
 	if (context != null && context.getFieldList() != null) {
 	    fields = new ArrayList<String>();
 	    LOGGER.info("Loading field list from " + context.getFieldList());
-	    for (java.util.Iterator<it.unimi.dsi.lang.MutableString> iterator = new it.unimi.dsi.io.FileLinesCollection(context.getFieldList(), "UTF-8").iterator(); iterator
-		    .hasNext();)
-		fields.add(RDFDocumentFactory.encodeFieldName(iterator.next().toString()));
+	    for (MutableString line : new FileLinesCollection(context.getFieldList(), "UTF-8")) {
+		fields.add(RDFDocumentFactory.encodeFieldName(line.toString()));
+	    }
 	}
 
 	// Load the alignment index

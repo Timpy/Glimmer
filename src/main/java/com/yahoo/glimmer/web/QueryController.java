@@ -41,6 +41,9 @@ public class QueryController {
     @ModelAttribute(INDEX_KEY)
     public RDFIndex getIndex(@RequestParam(INDEX_KEY) String indexName) {
         RDFIndex index = indexMap.get(indexName);
+        if (index == null) {
+            throw new RuntimeException("No index found with name:" + indexName);
+        }
         return index;
     }
 

@@ -1,7 +1,5 @@
 package com.yahoo.glimmer.indexing;
 
-import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.mg4j.document.Document;
 import it.unimi.dsi.mg4j.document.DocumentFactory;
 
@@ -35,15 +33,12 @@ public class RDFRecordReader extends RecordReader<LongWritable, Document> {
     private LineReader in;
     private int maxLineLength;
     private DocumentFactory factory = null;
-    private Reference2ObjectMap<Enum<?>, Object> metadata;
 
     private LongWritable key = null;
     private Document value = null;
 
     public RDFRecordReader(DocumentFactory factory) {
 	this.factory = factory;
-	metadata = new Reference2ObjectArrayMap<Enum<?>, Object>();
-	// initialize(split, context);
     }
 
     @Override
@@ -115,7 +110,7 @@ public class RDFRecordReader extends RecordReader<LongWritable, Document> {
 
 	// Always create a new document...
 	// TODO: find out if we can reuse the same document
-	value = factory.getDocument(null, metadata);
+	value = factory.getDocument(null, null);
 
 	int newSize = 0;
 	while (pos < end) {

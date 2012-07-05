@@ -3,11 +3,8 @@ package com.yahoo.glimmer.indexing.generator;
 import static org.junit.Assert.assertEquals;
 import it.unimi.dsi.fastutil.chars.CharArraySet;
 import it.unimi.dsi.fastutil.chars.CharSet;
-import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import it.unimi.dsi.io.DelimitedWordReader;
 import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.document.DocumentFactory;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -24,12 +21,13 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.yahoo.glimmer.indexing.RDFDocumentFactory;
+
 public class DocumentMapperTest {
     private static final CharSet DELIMITER = new CharArraySet(Collections.singleton(' '));
     private Mockery context;
-    private DocumentFactory factory;
+    private RDFDocumentFactory factory;
     private Mapper<LongWritable, Document, TermOccurrencePair, Occurrence>.Context mapperContext;
-    private AbstractObject2LongFunction<CharSequence> resourcesHash;
     private Document doc;
     private Counters counters;
 
@@ -39,10 +37,9 @@ public class DocumentMapperTest {
 	context = new Mockery();
 	context.setImposteriser(ClassImposteriser.INSTANCE);
 	
-	factory = context.mock(DocumentFactory.class);
+	factory = context.mock(RDFDocumentFactory.class);
 	mapperContext = context.mock(Context.class, "mapperContext");
 	doc = context.mock(Document.class, "doc");
-	resourcesHash = new Object2LongOpenHashMap<CharSequence>();
 	counters = new Counters();
     }
     
@@ -51,8 +48,13 @@ public class DocumentMapperTest {
 	context.checking(new Expectations(){{
 	    allowing(doc).uri();
 	    will(returnValue("0"));
+	    
+	    one(factory).resourcesHashLookup("0");
+	    will(returnValue(0l));
+	    
 	    one(mapperContext).getCounter(DocumentMapper.Counters.NUMBER_OF_RECORDS);
 	    will(returnValue(counters.findCounter(DocumentMapper.Counters.NUMBER_OF_RECORDS)));
+	    
 	    one(doc).close();
 	    
 	    allowing(factory).numberOfFields();
@@ -62,11 +64,9 @@ public class DocumentMapperTest {
 	    allowing(doc).content(0);
 	    will(returnValue(new DelimitedWordReader("".toCharArray(), DELIMITER)));
 	}});
-	resourcesHash.put("0", 0);
 	
 	DocumentMapper mapper = new DocumentMapper();
 	mapper.setFactory(factory);
-	mapper.setResourcesHash(resourcesHash);
 	
 	mapper.map(null, doc, mapperContext);
 	
@@ -82,6 +82,13 @@ public class DocumentMapperTest {
 	    allowing(mapperContext).getCounter(DocumentMapper.Counters.INDEXED_OCCURRENCES);
 	    will(returnValue(counters.findCounter(DocumentMapper.Counters.INDEXED_OCCURRENCES)));
 	    one(doc).close();
+	    
+	    allowing(factory).resourcesHashLookup("4536");
+	    will(returnValue(10l));
+	    allowing(factory).resourcesHashLookup("fieldOne");
+	    will(returnValue(11l));
+	    allowing(factory).resourcesHashLookup("fieldZero");
+	    will(returnValue(12l));
 	    
 	    allowing(doc).uri();
 	    will(returnValue("4536"));
@@ -123,14 +130,10 @@ public class DocumentMapperTest {
 	    one(mapperContext).write(with(new PairMatcher(DocumentMapper.ALIGNMENT_INDEX, "4", null, 11)), with(new OccurrenceMatcher(null, 11)));
 	    one(mapperContext).write(with(new PairMatcher(DocumentMapper.ALIGNMENT_INDEX, "5", null, 11)), with(new OccurrenceMatcher(null, 11)));
 	}});
-	resourcesHash.put("4536", 10);
-	resourcesHash.put("fieldOne", 11);
-	resourcesHash.put("fieldZero", 12);
 	
 	DocumentMapper mapper = new DocumentMapper();
 	mapper.setFactory(factory);
 	mapper.setVerticalNotHorizontal(true);
-	mapper.setResourcesHash(resourcesHash);
 	
 	mapper.map(null, doc, mapperContext);
 	

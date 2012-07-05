@@ -6,20 +6,38 @@ import static org.junit.Assert.assertTrue;
 import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 
+import org.jmock.Expectations;
 import org.junit.Test;
 
-import com.yahoo.glimmer.indexing.RDFDocumentFactory.MetadataKeys;
-import com.yahoo.glimmer.indexing.VerticalDocumentFactory.VerticalDataRSSDocument;
-
 public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
+    @Override
+    protected Expectations defineExpectations() throws Exception {
+        Expectations e = super.defineExpectations();
+        
+        // Returning null here means the factory won't try and load the predicates 
+        e.allowing(conf).get(VerticalDocumentFactory.PREDICATES_FILENAME_KEY);
+        e.will(Expectations.returnValue(null));
+        
+        return e; 
+    }
+    
     @Test
     public void test1() throws IOException {
-	metadata.put(MetadataKeys.PREDICATES_FILENAME, "VerticalDocumentFactoryTest.PropertiesToIndex");
 	VerticalDocumentFactory factory = new VerticalDocumentFactory(metadata);
+	factory.setTaskAttemptContext(taskContext);
+	factory.init();
+	factory.setResourcesHash(resourcesHash);
+	List<String> indexedProperties = Arrays.asList(new String[]{
+		"http://predicate/1",
+		"http://predicate/2", 
+		"http://predicate/3"});
+	factory.setIndexedProperties(indexedProperties);
 	assertEquals(3, factory.numberOfFields());
 	
-	VerticalDataRSSDocument document = (VerticalDataRSSDocument)factory.getDocument(rawContentInputStream, metadata);
+	VerticalDocument document = (VerticalDocument)factory.getDocument(rawContentInputStream, metadata);
 	
 	assertEquals("http://subject/", document.uri());
 	assertEquals("The Title", document.title());

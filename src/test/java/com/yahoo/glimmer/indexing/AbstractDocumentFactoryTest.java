@@ -8,14 +8,13 @@ import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Counters;
-import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.TaskInputOutputContext;
 import org.jmock.Expectations;
 import org.jmock.Mockery;
 import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
-
-import com.yahoo.glimmer.indexing.RDFDocumentFactory.MetadataKeys;
 
 public class AbstractDocumentFactoryTest {
     protected static final Charset RAW_CHARSET = Charset.forName("UTF-8");
@@ -26,37 +25,50 @@ public class AbstractDocumentFactoryTest {
     
     protected Mockery context;
     protected LcpMonotoneMinimalPerfectHashFunction<CharSequence> resourcesHash;
-    protected Mapper<?, ?, ?, ?>.Context mapContext;
+    protected TaskInputOutputContext<?, ?, ?, ?> taskContext;
+    protected Configuration conf;
     protected Counters counters = new Counters();
     protected Reference2ObjectMap<Enum<?>, Object> metadata = new Reference2ObjectOpenHashMap<Enum<?>, Object>();
     protected ByteArrayInputStream rawContentInputStream;
     
     
-    protected Expectations defineExpectations() {
+    protected void defineMocks(Mockery context) {
+    }
+    
+    protected Expectations defineExpectations() throws Exception {
 	return new Expectations(){{
 	    allowing(resourcesHash).get("http://object/1");
 	    will(returnValue(45l));
 	    allowing(resourcesHash).get("http://object/2");
 	    will(returnValue(46l));
-	    allowing(mapContext).getCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES);
+	    
+	    allowing(taskContext).getConfiguration();
+	    will(returnValue(conf));
+	    
+	    // Returning null here means the factory won't try and load the file from the FileSystem.
+	    allowing(conf).get(RDFDocumentFactory.RESOURCES_FILENAME_KEY);
+	    will(returnValue(null));
+	        
+	    allowing(taskContext).getCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES);
 	    will(returnValue(counters.findCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES)));
 	}};
     }
     
     @SuppressWarnings("unchecked")
     @Before
-    public void before() {
+    public void before() throws Exception {
 	context = new Mockery();
 	context.setImposteriser(ClassImposteriser.INSTANCE);
 	resourcesHash = context.mock(LcpMonotoneMinimalPerfectHashFunction.class, "resourcesHash");
-	mapContext = context.mock(Mapper.Context.class);
+	taskContext = context.mock(TaskInputOutputContext.class, "taskContext");
+	conf = context.mock(Configuration.class, "conf");
+	
+	defineMocks(context);
 	
 	context.checking(defineExpectations());
 	
 	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.ENCODING, "UTF-8");
 	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.TITLE, "The Title");
-	metadata.put(MetadataKeys.RESOURCES_HASH, resourcesHash);
-	metadata.put(MetadataKeys.MAPPER_CONTEXT, mapContext);
 	
 	rawContentInputStream = new ByteArrayInputStream(RAW_CONTENT_STRING.getBytes(RAW_CHARSET));
     }

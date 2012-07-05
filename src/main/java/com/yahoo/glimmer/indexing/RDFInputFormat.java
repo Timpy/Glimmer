@@ -26,11 +26,10 @@ public class RDFInputFormat extends FileInputFormat<LongWritable, Document> {
 
     @Override
     public RecordReader<LongWritable, Document> createRecordReader(InputSplit split, TaskAttemptContext context) {
-
 	// Configure the document factory
 	Class<?> documentFactoryClass = context.getConfiguration().getClass(DOCUMENTFACTORY_CLASS, PropertyBasedDocumentFactory.class);
-	DocumentFactory factory = RDFDocumentFactory.initFactory(documentFactoryClass, context.getConfiguration(), null, true);
-
+	DocumentFactory factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
+	
 	return new RDFRecordReader(factory);
     }
 }

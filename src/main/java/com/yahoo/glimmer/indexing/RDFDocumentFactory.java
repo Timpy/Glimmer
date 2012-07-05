@@ -7,7 +7,6 @@ import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.ObjectParser;
-import it.unimi.dsi.mg4j.document.DocumentFactory;
 import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.mg4j.util.MG4JClassParser;
 import it.unimi.dsi.util.Properties;
@@ -23,15 +22,14 @@ import javax.xml.transform.TransformerException;
 
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.TaskInputOutputContext;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
 import org.semanticweb.yars.nx.parser.ParseException;
 
-import com.yahoo.glimmer.util.DataRSSToNTuples;
 import com.yahoo.glimmer.util.Util;
 
 /* Common superclass to HorizontalDocumentFactory and VerticalDocumentFactory.
@@ -39,45 +37,41 @@ import com.yahoo.glimmer.util.Util;
  */
 public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
     private static final long serialVersionUID = 3508901442129214511L;
-    public static final String NULL_URL = "NULL_URL";
     /** Determines if we use the namespaces table for abbreviating field names */
     public static final boolean USE_NAMESPACES = false;
     public static final String[] PREDICATE_BLACKLIST = { "stag", "tagspace", "ctag", "rel", "mm" };
     public static final char NAMESPACE_SEPARATOR = '_';
-    public static final String PREDICATES_FILENAME_KEY = "predicatesFilename";
+    public static final String RESOURCES_FILENAME_KEY = "ResourcesFilename";
 
+    private TaskAttemptContext taskAttemptContext;
     /** The word reader used for all documents. */
     protected transient WordReader wordReader;
-    protected transient DataRSSToNTuples converter;
-    protected AbstractObject2LongFunction<CharSequence> resourcesHash;
-    protected boolean withContext;
+    private AbstractObject2LongFunction<CharSequence> resourcesHash;
+
+    // Include NQuad contexts in processing.
+    private Boolean withContexts;
 
     public static enum MetadataKeys {
-	MAPPER_CONTEXT, RESOURCES_HASH, WITH_CONTEXTS, HADOOP_CONF, PREDICATES_FILENAME //, INDEXED_PROPERTIES, INDEXED_PROPERTIES_FILENAME
+	RESOURCES_HASH, WITH_CONTEXTS, HADOOP_FILE_SYSTEM, PREDICATES_CACHE_FILENAME // ,
+										     // INDEXED_PROPERTIES,
+										     // INDEXED_PROPERTIES_FILENAME
+										     // TASK_IO_CONTEXT,
     };
-
-    public static enum Counters {
-	EMPTY_LINES, EMPTY_DOCUMENTS, BLACKLISTED_TRIPLES, UNINDEXED_PREDICATE_TRIPLES, RDF_TYPE_TRIPLES, INDEXED_TRIPLES
-    }
 
     public RDFDocumentFactory(final Properties properties) throws ConfigurationException {
 	super(properties);
-	init();
     }
 
     public RDFDocumentFactory(final Reference2ObjectMap<Enum<?>, Object> defaultMetadata) {
 	super(defaultMetadata);
-	init();
     }
 
     public RDFDocumentFactory(final String[] property) throws ConfigurationException {
 	super(property);
-	init();
     }
 
     public RDFDocumentFactory() {
 	super();
-	init();
     }
 
     protected boolean parseProperty(final String key, final String[] values, final Reference2ObjectMap<Enum<?>, Object> metadata) throws ConfigurationException {
@@ -97,9 +91,6 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	    catch (Exception e) {
 		throw new ConfigurationException(e);
 	    }
-	    return true;
-	} else if (sameKey(MetadataKeys.MAPPER_CONTEXT, key)) {
-	    metadata.put(MetadataKeys.MAPPER_CONTEXT, ensureJustOne(key, values));
 	    return true;
 	}
 	return super.parseProperty(key, values, metadata);
@@ -130,61 +121,107 @@ public abstract class RDFDocumentFactory extends PropertyBasedDocumentFactory {
 	return handler;
     }
 
-    @SuppressWarnings("unchecked")
     protected void init() {
-
-	Object o;
 	try {
-	    o = defaultMetadata.get(PropertyBasedDocumentFactory.MetadataKeys.WORDREADER);
+	    Object o = defaultMetadata.get(PropertyBasedDocumentFactory.MetadataKeys.WORDREADER);
 	    wordReader = o == null ? new FastBufferedReader() : ObjectParser.fromSpec(o.toString(), WordReader.class, MG4JClassParser.PACKAGE);
 	} catch (Exception e) {
 	    throw new RuntimeException(e);
 	}
 
-	// Configure converter
-	try {
-	    converter = new DataRSSToNTuples();
-	} catch (TransformerConfigurationException e1) {
-	    throw new RuntimeException(e1);
+	Configuration conf = getTaskAttemptContext().getConfiguration();
+	String resourcesCacheFilename = conf.get(RESOURCES_FILENAME_KEY);
+	if (resourcesCacheFilename != null) {
+	    try {
+		Path resourcesCachePath = new Path(resourcesCacheFilename);
+		FileSystem fs = FileSystem.get(conf);
+		@SuppressWarnings("unchecked")
+		AbstractObject2LongFunction<CharSequence> resourcesHash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(fs
+			.open(resourcesCachePath));
+		System.out.println("Loaded resource hash from " + resourcesCacheFilename + " with " + resourcesHash.size() + " entires.");
+		defaultMetadata.put(MetadataKeys.RESOURCES_HASH, resourcesHash);
+	    } catch (Exception e) {
+		throw new RuntimeException(e);
+	    }
 	}
-	// Retrieve hash for objects encoding if any was set in initFactory.
-	resourcesHash = (AbstractObject2LongFunction<CharSequence>) resolve(MetadataKeys.RESOURCES_HASH, defaultMetadata);
-	withContext = (Boolean) resolve(MetadataKeys.WITH_CONTEXTS, defaultMetadata, Boolean.FALSE);
+    }
+
+    public TaskAttemptContext getTaskAttemptContext() {
+	return taskAttemptContext;
+    }
+
+    public void setTaskAttemptContext(TaskAttemptContext taskAttemptContext) {
+	this.taskAttemptContext = taskAttemptContext;
+    }
+
+    public void setResourcesHash(AbstractObject2LongFunction<CharSequence> resourcesHash) {
+	this.resourcesHash = resourcesHash;
+    }
+
+    @SuppressWarnings("unchecked")
+    public Long resourcesHashLookup(String key) {
+	if (resourcesHash == null) {
+	    resourcesHash = (AbstractObject2LongFunction<CharSequence>) super.resolve(MetadataKeys.RESOURCES_HASH, defaultMetadata);
+	    if (resourcesHash == null) {
+		throw new IllegalStateException("resourcesHashLookup() called when no resources hash filename was given to buildFactory()");
+	    }
+	}
+	return resourcesHash.get(key);
+    }
+
+    public boolean isWithContexts() {
+	if (withContexts == null) {
+	    withContexts = (Boolean) resolve(MetadataKeys.WITH_CONTEXTS, defaultMetadata, Boolean.FALSE);
+	}
+	return withContexts;
     }
 
     private void readObject(final ObjectInputStream s) throws IOException, ClassNotFoundException {
 	s.defaultReadObject();
 	init();
     }
-    
-    public static DocumentFactory initFactory(Class<?> documentFactoryClass, Configuration conf, Mapper<?,?,?,?>.Context context, boolean loadHash) {
-	Reference2ObjectMap<Enum<?>, Object> defaultMetadata = new Reference2ObjectArrayMap<Enum<?>, Object>();
-	defaultMetadata.put(MetadataKeys.HADOOP_CONF, conf);
-	defaultMetadata.put(PropertyBasedDocumentFactory.MetadataKeys.ENCODING, "UTF-8");
-	if (conf.get(PREDICATES_FILENAME_KEY) != null) {
-	    defaultMetadata.put(MetadataKeys.PREDICATES_FILENAME, conf.get(PREDICATES_FILENAME_KEY));
-	}
-	if (loadHash) {
-	    try {
-		FileSystem fs = FileSystem.getLocal(conf);
-		Path resourcesLocation = DistributedCache.getLocalCacheFiles(conf)[0];
-		@SuppressWarnings("unchecked")
-		AbstractObject2LongFunction<CharSequence> resourcesHash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(fs.open(resourcesLocation));
-		System.out.println("Loaded resource hash with " + resourcesHash.size() + " entires.");
-		defaultMetadata.put(MetadataKeys.RESOURCES_HASH, resourcesHash);
-	    } catch (Exception e) {
-		throw new RuntimeException(e);
-	    }
-	}
 
-	if (context != null) {
-	    defaultMetadata.put(MetadataKeys.MAPPER_CONTEXT, context);
-	}
+    public static RDFDocumentFactory buildFactory(Class<?> documentFactoryClass, TaskAttemptContext taskContext) {
+	Reference2ObjectMap<Enum<?>, Object> defaultMetadata = new Reference2ObjectArrayMap<Enum<?>, Object>();
+	defaultMetadata.put(PropertyBasedDocumentFactory.MetadataKeys.ENCODING, "UTF-8");
+
 	try {
 	    Constructor<?> constr = documentFactoryClass.getConstructor(Reference2ObjectMap.class);
-	    return ((DocumentFactory) constr.newInstance(defaultMetadata));
+	    RDFDocumentFactory factory = ((RDFDocumentFactory) constr.newInstance(defaultMetadata));
+	    factory.setTaskAttemptContext(taskContext);
+	    factory.init();
+	    return factory;
 	} catch (Exception e) {
 	    throw new RuntimeException(e);
+	}
+    }
+
+    @Override
+    protected void ensureFieldIndex(final int index) {
+	super.ensureFieldIndex(index);
+    }
+
+    @Override
+    protected Object resolveNotNull(final Enum<?> key, final Reference2ObjectMap<Enum<?>, Object> docMetadata) {
+	return super.resolveNotNull(key, docMetadata);
+    }
+
+    @Override
+    protected Object resolve(final Enum<?> key, final Reference2ObjectMap<Enum<?>, Object> docMetadata) {
+	return super.resolve(key, docMetadata);
+    }
+
+    public static enum Counters {
+	EMPTY_LINES, EMPTY_DOCUMENTS, BLACKLISTED_TRIPLES, UNINDEXED_PREDICATE_TRIPLES, RDF_TYPE_TRIPLES, INDEXED_TRIPLES
+    }
+
+    public void incrementCounter(RDFDocumentFactory.Counters counter, int by) {
+	// This will never actually count anything as the factory used for
+	// loading the docs is the one created in RDFInputFormat and not the one
+	// created in the Mapper.
+	// In RDFInputFormat we only have access to a TaskAttemptContext.
+	if (taskAttemptContext instanceof TaskInputOutputContext<?, ?, ?, ?>) {
+	    ((TaskInputOutputContext<?, ?, ?, ?>) taskAttemptContext).getCounter(counter).increment(by);
 	}
     }
 }

@@ -56,13 +56,12 @@ public class DistributedCollectionBuilder extends Configured implements Tool {
 		    fs.mkdirs(path);
 		    FsPermission allPermissions = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
 		    fs.setPermission(path, allPermissions);
-
 		}
 
 		// Create an instance of the factory that was used...we only
 		// need this to get the number of fields
 		Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-		factory = RDFDocumentFactory.initFactory(documentFactoryClass, job, null, false);
+		factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
 
 		// basename is actually the complete path
 		builder = new SimpleCompressedDocumentCollectionBuilder("datarss-", factory, false);

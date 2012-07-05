@@ -2,10 +2,7 @@ package com.yahoo.glimmer.indexing.generator;
 
 import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
 
-import java.net.URI;
-
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparator;
@@ -94,7 +91,8 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.getConfiguration().set("mapreduce.user.classpath.first", "true");
 	job.setGroupingComparatorClass(TermOccurrencePair.FirstGroupingComparator.class);
 
-	DistributedCache.addCacheFile(new URI(args.getString(RESOURCES_HASH_ARG)), job.getConfiguration());
+	//DistributedCache.addCacheFile(new URI(args.getString(RESOURCES_HASH_ARG)), job.getConfiguration());
+	job.getConfiguration().set(RDFDocumentFactory.RESOURCES_FILENAME_KEY, args.getString(RESOURCES_HASH_ARG));
 
 	job.getConfiguration().setInt(NUMBER_OF_DOCUMENTS, args.getInt("numdocs"));
 
@@ -107,15 +105,10 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, HorizontalDocumentFactory.class, PropertyBasedDocumentFactory.class);
 	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)){
 	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, VerticalDocumentFactory.class, PropertyBasedDocumentFactory.class);
-	    if (args.getString(PREDICATES_ARG) != null) {
-		String predicatedFilename = args.getString(PREDICATES_ARG);
-		DistributedCache.addCacheFile(new URI(predicatedFilename), job.getConfiguration());
-		int lastIndexOfSlash = predicatedFilename.lastIndexOf('/');
-		if (lastIndexOfSlash >= 0) {
-		    predicatedFilename = predicatedFilename.substring(lastIndexOfSlash + 1);
-		}
-		job.getConfiguration().set(RDFDocumentFactory.PREDICATES_FILENAME_KEY, predicatedFilename);
+	    if (!args.contains(PREDICATES_ARG)) {
+		throw new IllegalArgumentException("When '" + METHOD_ARG + "' is '" + METHOD_ARG_VALUE_VERTICAL + "' you have to give a predicates file too.");
 	    }
+	    job.getConfiguration().set(VerticalDocumentFactory.PREDICATES_FILENAME_KEY, args.getString(PREDICATES_ARG));
 	} else {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 
