@@ -1,63 +1,118 @@
 Welcome to Glimmer
 
- Glimmer is a Hadoop based distributed indexing system for building MG4J indexes from RDF tuples in NQuads format.  It also includes a simple web application for querying the resulting indexes <TODO +something about this+scorer..).  Both the indexing and web application are written in Java.  There are also a few shell scripts to execute the steps need to build the indexes for a given NQuads file and query the resulting index from the command line.  Glimmer is an academic project and is the implementation of distributed indexing detailed in the paper 'Distributed Indexing for Semantic Search' by Peter Mika(Yahoo Research).
+Glimmer uses several 3rd party open source libraries and tools.
+This file summarizes the tools used, their purpose, and the licenses under which they're released.
+This file also gives a basic introduction to building and using Glimmer.
 
-Prerequisites
--------------
-- Java JDK 6. Other versions may work. The code was written against version 1.6.0_31
-- A Maven installation.  We used version 3.0.3 during development.
-- A Hadoop cluster. Probably version 0.20.205.0. The version of Hadoop we developed the code with is defined in the pom.xml file.
-- If you want try out the web app an install of a Java servlet container such as Tomcat, Jetty etc..
-- If you want a more usable interface to the MG4J query command-line you can install rlwrap to get command-line history/editing.
+Except as specifically stated below, the 3rd party software packages are not distributed as part of
+this project, but instead are separately downloaded from the respective provider.
 
-All other dependencies are jars that are automatically downloaded by Maven.
-
-Index Building
---------------
-
-1. Build an uber jar with mvn for building indexes with.
-
-In the root directory of Glimmer run:
-
-	mvn compile (or mvn test)
-	mvn assembly:single
-
-This will produce a jar Glimmer-?.?.?-SNAPSHOT-jar-with-dependencies.jar in the ./target directory. This jar contains the Glimmer classes + all dependencies zipped into one file.
-
-2. The process of building an index with Glimmer consists of the following steps.  (The build-index.sh shell script is provided to automate the process.)
-
-* Preprocess the NQuads tuple file to get:
-  - A sorted unique list by subject with the subjects associated predicates, object, context. 
-  - A sorted unique list of subjects resources.
-  - A sorted unique list of predicates resources.
-  - A sorted unique list of all resources(Subject, Predicate, Object & Context).
-
-* Build minimal perfect hash functions over the unique sorted lists of resources. This function is a mapping of a given resource to its position in the unique sorted list.
-
-* Build the 'horizontal' and 'vertical'(See the paper..) MG4J indexes.
-
-* Compute the Document sizes.
-
-* Build the MG4J document collection.
-
-* Copy all the generated files to the desired location.
-
-
-Querying
---------
-
-Once you have the indexes build you can use the MG4J query command line class it.unimi.dsi.mg4j.query.Query to query them.  You may find the query-index.sh script helpful here.
-
-You can also setup, build and deploy the Java web application as follows:
-
-1. Configure where your indexes are in src/main/webapp/WEB-INF/classes/config-generic.properties.  The directories found in the directory given by 'multiindex.path' property and that have names starting with the 'multiindex.dirprefix' property are treated as MG4J indexes.  The names will appear in the Dataset dropdown in the webapp.
+* Hadoop version 0.20.205.0 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  Libs for executing code on a Hadoop map reduce cluster.
+  http://hadoop.apache.org/
  
-2. Use the maven-war-plugin to build the war file.  From the projects root directory run the command
+* NxParser version 1.2.2 (BSD - http://www.opensource.org/licenses/bsd-license.php)
+  http://code.google.com/p/nxparser/
+  
+* MG4j version 4.0.3 (GNU Lesser General Public License - http://www.gnu.org/licenses/lgpl.html)
+  http://mg4j.dsi.unimi.it/
 
-	mvn compile (or mvn test)
-	mvn war:war (mvn war:exploded maybe of interest to some people too)
+* Java servlet-api version 2.5 (Oracle Binary Code License - http://www.oracle.com/technetwork/java/javase/terms/license/index.html)
+  http://jcp.org/aboutJava/communityprocess/mrel/jsr154/index.html
+			
+* Fastutil version 6.4.4 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  Extends the Java™ Collections Framework by providing type-specific maps, sets, lists and queues with a small memory footprint and fast access and insertion
+  http://fastutil.di.unimi.it/
+			
+* DSI Utils version 2.0.6 (GNU Lesser General Public License - http://www.gnu.org/licenses/lgpl.html)
+  The DSI utilities are a mish mash of classes accumulated during the last ten years in projects developed at the DSI 
+  http://dsiutils.dsi.unimi.it/
+			
+* Sux4j version 3.0.4 (GNU Lesser General Public License - http://www.gnu.org/licenses/lgpl.html)
+  Implementation of basic succinct data strucures		
+  http://sux.di.unimi.it/
+  
+* WebGraph version 3.0.7 (GNU General Public License - http://www.gnu.org/copyleft/gpl.html)
+  WebGraph is a framework for graph compression aimed at studying web graphs
+  http://webgraph.di.unimi.it/
+  	
+* Colt version 1.2.0 (Colt License - http://acs.lbl.gov/software/colt/license.html)
+  Colt provides a set of Open Source Libraries for High Performance Scientific and Technical Computing in Java
+  http://acs.lbl.gov/software/colt/
+  
+* JSAP version 2.1 (JSAP License - http://www.martiansoftware.com/jsap/license.html)
+  Java command line argument processor.
+  http://www.martiansoftware.com/jsap/
+			
+* Apache Log4j version 1.2.16 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  Logging framework
+  http://logging.apache.org/log4j/
+			
+* Apache Commons IO version 2.2 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  Commons IO is a library of utilities to assist with developing IO functionality.
+  http://commons.apache.org/io/
+			
+* Apache Commons Lang version 2.6 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  Lang provides a host of helper utilities for the java.lang API
+  http://commons.apache.org/lang/
+			
+* Apache Commons Collections version 3.2.1 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  Commons-Collections seek to build upon the JDK classes by providing new interfaces, implementations and utilities
+  http://commons.apache.org/collections/
+			
+* Apache Commons Configuration version 1.8 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  The Commons Configuration software library provides a generic configuration interface which enables a Java application to read configuration data from a variety of sources.
+  http://commons.apache.org/configuration/
+  
+* Apache Commons Digester version 2.1 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  XML -> Java object mapping
+  http://commons.apache.org/digester/
+  
+* Apache Commons httpclient version 3.1 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  A java HTTP client.
+  http://hc.apache.org/httpclient-3.x/
+  
+* Tika version 1.1 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  The Apache Tika™ toolkit detects and extracts metadata and structured text content from various documents...
+  http://tika.apache.org/	
+			
+* Java Mail version 1.4.5 (Oracle Binary Code License - http://www.oracle.com/technetwork/java/javase/terms/license/index.html)
+  Java mail implementation. 
+  http://www.oracle.com/technetwork/java/javamail/index.html
+			
+* Sesame version 2.3.2 (a BSD-style license - http://www.openrdf.org/download.jsp)
+  Sesame is a de-facto standard framework for processing RDF data.
+  http://www.openrdf.org/
+			
+* Guava version 11.0.2 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  Collection of several of Google's core libraries.
+  http://code.google.com/p/guava-libraries/
+			
+* Gson version 2.1 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  Java library that can be used to convert Java Objects into their JSON representation
+  http://code.google.com/p/google-gson/
+			
+* OWL API version 3.3 (GNU Lesser General Public License - http://www.gnu.org/licenses/lgpl.html)
+  The OWL API is a Java API and reference implmentation for creating, manipulating and serialising OWL Ontologies.
+  http://owlapi.sourceforge.net/
+			
+* jMock version 2.5.1 (jMock Project License - http://www.jmock.org/license.html)
+  Mocks java objects for testing.
+  http://www.jmock.org/
+			
+* Spring Framework version 3.1.1.RELEASE (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  A comprehensive programming and configuration model for modern Java-based enterprise applications
+  http://www.springsource.org/spring-framework#documentation
 
-This will build the war file Glimmer-?.?.?-SNAPSHOT.war in the target directory.
+* Validation-api version 1.0.0.GA (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+  Jboss's implementation of Java validation JSR-303.
+  http://www.hibernate.org/subprojects/validator.html
+			
+* XStream version 1.4.2 (a BSD license - http://xstream.codehaus.org/license.html)
+  A simple library to serialize objects to XML and back again.
+  http://xstream.codehaus.org/
 
-2. Copy the war into do the deployment directory of your installed Java Servlet container.
+The following 3rd Party code is included as part of this Project:
 
+* The classes com.yahoo.glimmer.indexing.SimpleCompressedDocumentCollectionBuilder & com.yahoo.glimmer.indexing.SimpleCompressedDocumentCollection are
+  modified version of the MG4J classes of the same name. See the above for MG4J's licensing policy.
