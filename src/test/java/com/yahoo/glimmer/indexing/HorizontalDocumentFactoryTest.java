@@ -18,34 +18,25 @@ import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
 
-import org.jmock.Expectations;
 import org.junit.Test;
 
-import com.yahoo.glimmer.indexing.RDFDocumentFactory.MetadataKeys;
-
 public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
-    @Override
-    protected Expectations defineExpectations() throws Exception {
-        Expectations e = super.defineExpectations();
-        
-        e.allowing(resourcesHash).get("http://context/1");
-        e.will(Expectations.returnValue(55l));
-        
-        return e; 
-    }
     
     @Test
     public void withContextTest() throws IOException {
-	metadata.put(MetadataKeys.WITH_CONTEXTS, true);
-	HorizontalDocumentFactory factory = new HorizontalDocumentFactory(metadata);
-	factory.setTaskAttemptContext(taskContext);
-	factory.init();
-	factory.setResourcesHash(resourcesHash);
+	HorizontalDocumentFactory.setupConf(conf, true);
+	
+	resourcesMap.put("http://context/1", 55l);
+	resourcesMap.put("http://object/1", 45l);
+	resourcesMap.put("http://object/2", 46l);
+	ResourcesHashLoader.setHash(resourcesMap);
+	
+	HorizontalDocumentFactory factory = (HorizontalDocumentFactory)RDFDocumentFactory.buildFactory(conf);
 	assertEquals(4, factory.numberOfFields());
-	HorizontalDocument document = (HorizontalDocument)factory.getDocument(rawContentInputStream, metadata);
+	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
+	document.setContent(rawContentInputStream);
 	
 	assertEquals("http://subject/", document.uri());
-	assertEquals("The Title", document.title());
 	
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
@@ -107,19 +98,23 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(3l, counters.findCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES).getValue());
+	assertEquals(3l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
     
     @Test
     public void withoutContextTest() throws IOException {
-	HorizontalDocumentFactory factory = new HorizontalDocumentFactory(metadata);
-	factory.setTaskAttemptContext(taskContext);
-	factory.init();
-	factory.setResourcesHash(resourcesHash);
+	HorizontalDocumentFactory.setupConf(conf, false);
+	
+	resourcesMap.put("http://context/1", 55l);
+	resourcesMap.put("http://object/1", 45l);
+	resourcesMap.put("http://object/2", 46l);
+	ResourcesHashLoader.setHash(resourcesMap);
+	
+	HorizontalDocumentFactory factory = (HorizontalDocumentFactory) RDFDocumentFactory.buildFactory(conf);
 	assertEquals(4, factory.numberOfFields());
-	HorizontalDocument document = (HorizontalDocument)factory.getDocument(rawContentInputStream, metadata);
+	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
+	document.setContent(rawContentInputStream);
 	assertEquals("http://subject/", document.uri());
-	assertEquals("The Title", document.title());
 	
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
@@ -181,6 +176,6 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(3l, counters.findCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES).getValue());
+	assertEquals(3l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
 }

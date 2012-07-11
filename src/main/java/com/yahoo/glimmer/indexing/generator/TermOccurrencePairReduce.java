@@ -11,119 +11,38 @@ package com.yahoo.glimmer.indexing.generator;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.io.OutputBitStream;
-import it.unimi.dsi.mg4j.document.DocumentFactory;
-
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
-import java.util.UUID;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 
-import com.yahoo.glimmer.indexing.RDFDocumentFactory;
-import com.yahoo.glimmer.indexing.RDFInputFormat;
-import com.yahoo.glimmer.indexing.VerticalDocumentFactory;
-import com.yahoo.glimmer.util.Util;
-
-public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurrence, Text, Text> {
-    private Map<Integer, Index> indices = new HashMap<Integer, Index>();
-    private long writtenOccurrences;
+public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurrence, TermOccurrencePair, TermOccurrences> {
+    private static final int MAX_INVERTEDLIST_SIZE = 50000000;
+    private static final int MAX_POSITIONLIST_SIZE = 1000000;
+    
+    private TermOccurrences termOccurrences;
 
     private enum Counters {
-	POSTINGLIST_SIZE_OVERFLOW, POSITIONLIST_SIZE_OVERFLOW
-    }
-
-    public void setIndices(Map<Integer, Index> indices) {
-	this.indices = indices;
+	POSTINGLIST_SIZE_OVERFLOW, POSITIONLIST_SIZE_OVERFLOW, POSITIONLIST_SIZE_OVERFLOW_TIMES
     }
     
     @Override
-    public void setup(Context context) {
-	Configuration job = context.getConfiguration();
-	try {
-
-	    // Create an instance of the factory that was used...we only
-	    // need this to get the number of fields
-	    Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-	    DocumentFactory factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
-
-	    // Creating the output dir
-	    String outputDir = job.get(TripleIndexGenerator.OUTPUT_DIR);
-	    if (!outputDir.endsWith("/")) {
-		outputDir = outputDir + "/";
-	    }
-	    outputDir += "index/";
-	    FileSystem fs = FileSystem.get(job);
-	    // Adding a UUID to the name of the outputdir to make sure
-	    // different mappers write to different directories
-	    // TODO use hadoop working dir not UUID
-	    String uuid = UUID.randomUUID().toString();
-	    Path path = new Path(outputDir + uuid);
-	    if (!fs.exists(path)) {
-		fs.mkdirs(path);
-	    }
-
-	    if (factory instanceof VerticalDocumentFactory) {
-		// Open the alignment index
-		Index index = new Index(fs, outputDir + uuid, TripleIndexGenerator.ALIGNMENT_INDEX_NAME, job.getInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS,
-			-1), false);
-		index.open();
-		indices.put(DocumentMapper.ALIGNMENT_INDEX, index);
-	    }
-
-	    // Open one index per field
-	    for (int i = 0; i < factory.numberOfFields(); i++) {
-		String name = Util.encodeFieldName(factory.fieldName(i));
-		if (!name.startsWith("NOINDEX")) {
-
-		    // Get current size of heap in bytes
-		    long heapSize = Runtime.getRuntime().totalMemory();
-		    // Get maximum size of heap in bytes. The heap cannot
-		    // grow beyond this size.
-		    // Any attempt will result in an OutOfMemoryException.
-		    long heapMaxSize = Runtime.getRuntime().maxMemory();
-		    // Get amount of free memory within the heap in bytes.
-		    // This size will increase
-		    // after garbage collection and decrease as new objects
-		    // are created.
-		    long heapFreeSize = Runtime.getRuntime().freeMemory();
-
-		    System.out.println("Opening index for field:" + name + " Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
-
-		    Index index = new Index(fs, outputDir + uuid, name, job.getInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, -1), true);
-		    index.open();
-
-		    indices.put(i, index);
-		}
-	    }
-
-	} catch (IOException e) {
-	    throw new RuntimeException(e);
-	}
-    }
-
+    protected void setup(org.apache.hadoop.mapreduce.Reducer<TermOccurrencePair,Occurrence,TermOccurrencePair,TermOccurrences>.Context context) throws IOException ,InterruptedException {
+	// termOccurrences and the buffer are reused for every call to context.write()
+	termOccurrences = new TermOccurrences(MAX_POSITIONLIST_SIZE);
+    };
+    
     @Override
-    public void reduce(TermOccurrencePair key, Iterable<Occurrence> values, Context context) throws IOException {
+    public void reduce(TermOccurrencePair key, Iterable<Occurrence> values, Context context) throws IOException, InterruptedException {
 	if (key == null || key.equals("")) {
 	    return;
 	}
 
 	context.setStatus(key.getIndex() + ":" + key.getTerm());
 
-	// Decide which index we are going to write to
-	Index currentIndex = indices.get(key.getIndex());
-
-	// For every term, the first values are fake Occurrences introduced
-	// for document counting. 
 	int numDocs = 0;
 	Occurrence occ = null;
-	Occurrence prevOcc = null;
+	Occurrence prevOcc = new Occurrence();
 	Iterator<Occurrence> valuesIt = values.iterator();
 	while (valuesIt.hasNext()) {
 	    occ = valuesIt.next();
@@ -134,50 +53,41 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 	    if (!occ.equals(prevOcc)) {
 		numDocs++;
 	    }
-	    prevOcc = (Occurrence) occ.clone();
+	    prevOcc.set(occ);
 	}
-
-	// Cut off the index type prefix from the key
-	currentIndex.getTermsWriter().println(key.getTerm());
-	currentIndex.getIndexWriter().newInvertedList();
-	currentIndex.getIndexWriter().writeFrequency(Math.min(numDocs, TripleIndexGenerator.MAX_INVERTEDLIST_SIZE));
-
-	int[] buf = new int[TripleIndexGenerator.MAX_POSITIONLIST_SIZE];
-	int posIndex = 0;
+	
+	// write the document frequency for this term.
+	termOccurrences.setTermFrequency(Math.min(numDocs, MAX_INVERTEDLIST_SIZE));
+	context.write(key, termOccurrences);
+	termOccurrences.setTermFrequency(0);
+	
 	int writtenDocs = 0;
-	int prevDocID = occ.getDocument();
+	prevOcc.set(occ);
 	while (occ != null) {
 	    int docID = occ.getDocument();
-	    if (docID != prevDocID) {
+	    if (docID != prevOcc.getDocument()) {
 		// New document, write out previous postings
-		OutputBitStream out = currentIndex.getIndexWriter().newDocumentRecord();
-		currentIndex.getIndexWriter().writeDocumentPointer(out, prevDocID);
-		if (posIndex > 0 && currentIndex.hasPositions()) {
-		    currentIndex.getIndexWriter().writePositionCount(out, posIndex);
-		    currentIndex.getIndexWriter().writeDocumentPositions(out, buf, 0, posIndex, -1);
-		}
+		termOccurrences.setDocument(prevOcc.getDocument());
+		context.write(key, termOccurrences);
+		termOccurrences.clearOccerrences();
 		writtenDocs++;
-		writtenOccurrences += posIndex;
-		if (writtenDocs == TripleIndexGenerator.MAX_INVERTEDLIST_SIZE) {
+		
+		if (writtenDocs >= MAX_INVERTEDLIST_SIZE) {
 		    context.getCounter(Counters.POSTINGLIST_SIZE_OVERFLOW).increment(1);
-		    System.err.println("More than " + TripleIndexGenerator.MAX_INVERTEDLIST_SIZE + " documents for term " + key.getTerm());
+		    System.err.println("More than " + MAX_INVERTEDLIST_SIZE + " documents for term " + key.getTerm());
 		    break;
 		}
-		posIndex = 0;
 		if (occ.isPositionSet()) {
-		    buf[posIndex++] = occ.getPosition();
+		    termOccurrences.addOccurrence(occ.getPosition());
 		}
-	    } else {
-		if (posIndex > TripleIndexGenerator.MAX_POSITIONLIST_SIZE - 1) {
+	    } else if (occ.isPositionSet()) {
+		if (!termOccurrences.addOccurrence(occ.getPosition())) {
 		    context.getCounter(Counters.POSITIONLIST_SIZE_OVERFLOW).increment(1);
-		    System.err.println("More than " + TripleIndexGenerator.MAX_POSITIONLIST_SIZE + " positions for term " + key.getTerm());
-		} else if (occ.isPositionSet()){
-		    buf[posIndex++] = occ.getPosition();
+		    System.err.println("More than " + MAX_POSITIONLIST_SIZE + " positions for term " + key.getTerm());
 		}
 	    }
 
-	    prevDocID = docID;
-	    prevOcc = (Occurrence) occ.clone();
+	    prevOcc.set(occ);
 
 	    boolean last = false;
 	    if (valuesIt.hasNext()) {
@@ -195,27 +105,12 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 	    if (last) {
 		// This is the last occurrence: write out the remaining
 		// positions
-		OutputBitStream out = currentIndex.getIndexWriter().newDocumentRecord();
-		currentIndex.getIndexWriter().writeDocumentPointer(out, prevDocID);
-		if (currentIndex.hasPositions()) {
-		    currentIndex.getIndexWriter().writePositionCount(out, posIndex);
-		    currentIndex.getIndexWriter().writeDocumentPositions(out, buf, 0, posIndex, -1);
-		}
-		writtenOccurrences += posIndex;
+		termOccurrences.setDocument(prevOcc.getDocument());
+		context.write(key, termOccurrences);
+		
+		termOccurrences.clearOccerrences();
 		occ = null;
 	    }
-	}
-    }
-
-    @Override
-    public void cleanup(Context context) throws IOException, InterruptedException {
-	try {
-	    for (Index index : indices.values()) {
-		index.close(writtenOccurrences);
-	    }
-	    super.cleanup(context);
-	} catch (Throwable throwable) {
-	    throwable.printStackTrace();
 	}
     }
 }

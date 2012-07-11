@@ -89,14 +89,14 @@ public class TermOccurrencePair implements WritableComparable<TermOccurrencePair
     public boolean equals(Object right) {
 	if (right instanceof TermOccurrencePair) {
 	    TermOccurrencePair r = (TermOccurrencePair) right;
-	    return term.equals(r.term) && index == r.index && occ.equals(r.occ);
+	    return term.equals(r.term) && index == r.index && (occ == null ? r.occ == null : occ.equals(r.occ));
 	} else {
 	    return false;
 	}
     }
 
     public String toString() {
-	return Integer.toString(index) + ":" + term + ":" + occ.toString();
+	return Integer.toString(index) + ":" + term + ":" + (occ == null ? "null" : occ.toString());
     }
 
     /** A Comparator that compares serialized TermOccurrencePair. */

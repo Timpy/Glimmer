@@ -18,13 +18,15 @@ import java.io.IOException;
 import org.apache.hadoop.io.WritableComparable;
 
 public class Occurrence implements WritableComparable<Occurrence>, Cloneable {
-    private static final int NO_POSITION = -13;
     private static final int NO_DOC = -14;
+    private static final int NO_POSITION = -13;
     private int document;
     private int position;
 
     // Hadoop needs this
     public Occurrence() {
+	document = NO_DOC;
+	position = NO_POSITION;
     }
 
     public Occurrence(Integer document, Integer position) {
@@ -70,6 +72,11 @@ public class Occurrence implements WritableComparable<Occurrence>, Cloneable {
 	throw new IllegalStateException("getPosition() called on occurrence without a position.");
     }
 
+    public void set(Occurrence occ) {
+	document = occ.document;
+	position = occ.position;
+    }
+    
     public void readFields(DataInput in) throws IOException {
 	document = in.readInt();
 	position = in.readInt();
@@ -116,12 +123,5 @@ public class Occurrence implements WritableComparable<Occurrence>, Cloneable {
 	    }
 	}
 	return 0;
-    }
-
-    public Object clone() {
-	Occurrence that = new Occurrence();
-	that.document = document;
-	that.position = position;
-	return that;
     }
 }

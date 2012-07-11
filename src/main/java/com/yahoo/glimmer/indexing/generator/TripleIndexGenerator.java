@@ -11,11 +11,9 @@ package com.yahoo.glimmer.indexing.generator;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
-
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -28,10 +26,11 @@ import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPResult;
 import com.martiansoftware.jsap.Parameter;
 import com.martiansoftware.jsap.SimpleJSAP;
+import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
 import com.yahoo.glimmer.indexing.HorizontalDocumentFactory;
-import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.indexing.RDFInputFormat;
+import com.yahoo.glimmer.indexing.ResourcesHashLoader;
 import com.yahoo.glimmer.indexing.VerticalDocumentFactory;
 
 /**
@@ -42,21 +41,23 @@ public class TripleIndexGenerator extends Configured implements Tool {
     private static final String METHOD_ARG_VALUE_VERTICAL = "vertical";
     private static final String METHOD_ARG_VALUE_HORIZONTAL = "horizontal";
     private static final String PREDICATES_ARG = "properties";
+    private static final String NO_CONTEXTS_ARG = "noContexts";
+
     // Job configuration attribute names
     static final String OUTPUT_DIR = "OUTPUT_DIR";
     static final String NUMBER_OF_DOCUMENTS = "NUMBER_OF_DOCUMENTS";
-    static final int MAX_POSITIONLIST_SIZE = 1000000;
-    static final int MAX_INVERTEDLIST_SIZE = 50000000;
     static final String ALIGNMENT_INDEX_NAME = "alignment";
-    
+    static final String METHOD = "method";
+
     private static final String RESOURCES_HASH_ARG = "RESOURCES_HASH";
-    
+
     static { // register comparator
 	WritableComparator.define(TermOccurrencePair.class, new TermOccurrencePair.Comparator());
     }
-    
+
     public int run(String[] arg) throws Exception {
 	SimpleJSAP jsap = new SimpleJSAP(TripleIndexGenerator.class.getName(), "Generates a keyword index from RDF data.", new Parameter[] {
+	    	new Switch(NO_CONTEXTS_ARG, 'C', "withoutContexts", "Don't process the contexts for each tuple."),
 		new FlaggedOption(METHOD_ARG, JSAP.STRING_PARSER, "horizontal", JSAP.REQUIRED, 'm', METHOD_ARG, "horizontal or vertical."),
 		new FlaggedOption(PREDICATES_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', PREDICATES_ARG,
 			"Subset of the properties to be indexed."),
@@ -81,51 +82,51 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	}
 
 	Job job = new Job(getConf());
-
 	job.setJarByClass(TripleIndexGenerator.class);
-
 	job.setJobName("TripleIndexGenerator" + System.currentTimeMillis());
 
+	FileInputFormat.setInputPaths(job, new Path(args.getString("input")));
 	job.setInputFormatClass(RDFInputFormat.class);
 
-	job.setOutputKeyClass(Text.class);
-	job.setOutputValueClass(Text.class);
-
 	job.setMapperClass(DocumentMapper.class);
-	job.setReducerClass(TermOccurrencePairReduce.class);
-
 	job.setMapOutputKeyClass(TermOccurrencePair.class);
 	job.setMapOutputValueClass(Occurrence.class);
 
 	job.setPartitionerClass(TermOccurrencePair.FirstPartitioner.class);
-	job.getConfiguration().setClass("mapred.output.key.comparator.class", TermOccurrencePair.Comparator.class, WritableComparator.class);
-	job.getConfiguration().set("mapreduce.user.classpath.first", "true");
 	job.setGroupingComparatorClass(TermOccurrencePair.FirstGroupingComparator.class);
 
-	//DistributedCache.addCacheFile(new URI(args.getString(RESOURCES_HASH_ARG)), job.getConfiguration());
-	job.getConfiguration().set(RDFDocumentFactory.RESOURCES_FILENAME_KEY, args.getString(RESOURCES_HASH_ARG));
-
-	job.getConfiguration().setInt(NUMBER_OF_DOCUMENTS, args.getInt("numdocs"));
-
-	FileInputFormat.setInputPaths(job, new Path(args.getString("input")));
-	
-	job.getConfiguration().set(OUTPUT_DIR, args.getString("output"));
+	job.setReducerClass(TermOccurrencePairReduce.class);
+	job.setOutputKeyClass(TermOccurrencePair.class);
+	job.setOutputValueClass(TermOccurrences.class);
+	job.setOutputFormatClass(IndexRecordWriter.OutputFormat.class);
 	FileOutputFormat.setOutputPath(job, new Path(args.getString("output")));
 
+	Configuration conf = job.getConfiguration();
+
+	conf.setClass("mapred.output.key.comparator.class", TermOccurrencePair.Comparator.class, WritableComparator.class);
+	conf.set("mapreduce.user.classpath.first", "true");
+
+	ResourcesHashLoader.setCacheFilenameInConf(conf, args.getString(RESOURCES_HASH_ARG));
+
+	conf.setInt(NUMBER_OF_DOCUMENTS, args.getInt("numdocs"));
+
+	conf.set(OUTPUT_DIR, args.getString("output"));
+
+	boolean withContexts = !args.getBoolean(NO_CONTEXTS_ARG, false);
+	
 	if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
-	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, HorizontalDocumentFactory.class, PropertyBasedDocumentFactory.class);
-	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)){
-	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, VerticalDocumentFactory.class, PropertyBasedDocumentFactory.class);
+	    HorizontalDocumentFactory.setupConf(conf, withContexts);
+	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)) {
 	    if (!args.contains(PREDICATES_ARG)) {
 		throw new IllegalArgumentException("When '" + METHOD_ARG + "' is '" + METHOD_ARG_VALUE_VERTICAL + "' you have to give a predicates file too.");
 	    }
-	    job.getConfiguration().set(VerticalDocumentFactory.PREDICATES_FILENAME_KEY, args.getString(PREDICATES_ARG));
+	    Path predicatesPath = new Path(args.getString(PREDICATES_ARG));
+	    VerticalDocumentFactory.setupConf(conf, withContexts, predicatesPath);
 	} else {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
-
 	}
 
-	job.getConfiguration().setInt("mapred.linerecordreader.maxlength", 10000);
+	conf.setInt("mapred.linerecordreader.maxlength", 10000);
 
 	boolean success = job.waitForCompletion(true);
 

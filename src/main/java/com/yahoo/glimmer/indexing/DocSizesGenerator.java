@@ -14,21 +14,16 @@ package com.yahoo.glimmer.indexing;
 import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.document.DocumentFactory;
-import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.mg4j.index.DiskBasedIndex;
 
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.net.URI;
 import java.util.Comparator;
 import java.util.Iterator;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -58,6 +53,8 @@ public class DocSizesGenerator extends Configured implements Tool {
     private static final String METHOD_ARG = "method";
     private static final String METHOD_ARG_VALUE_VERTICAL = "vertical";
     private static final String METHOD_ARG_VALUE_HORIZONTAL = "horizontal";
+    private static final String PREDICATES_ARG = "properties";
+    
     // Job configuration attribute names
     private static final String PROPERTIES_ARGS = "properties";
     private static final String RESOURCES_HASH_ARG = "resourcesHash";
@@ -262,21 +259,16 @@ public class DocSizesGenerator extends Configured implements Tool {
 	}
     }
 
-    public static class MapClass extends Mapper<LongWritable, Document, IndexDocSizePair, DocSize> {
-	private RDFDocumentFactory factory;
-
+    public static class MapClass extends Mapper<LongWritable, RDFDocument, IndexDocSizePair, DocSize> {
+	private String[] fields;
+	
 	@Override
 	public void setup(Context context) {
-	    Configuration job = context.getConfiguration();
-	    
-	    // Create an instance of the factory that was used...we only need
-	    // this to get the number of fields
-	    Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-	    factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
+	    fields = RDFDocumentFactory.getFieldsFromConf(context.getConfiguration());
 	}
 
 	@Override
-	public void map(LongWritable key, Document doc, Context context) throws IOException, InterruptedException {
+	public void map(LongWritable key, RDFDocument doc, Context context) throws IOException, InterruptedException {
 
 	    if (doc == null || doc.uri().equals(RDFDocument.NULL_URL)) {
 		// Failed parsing
@@ -285,15 +277,15 @@ public class DocSizesGenerator extends Configured implements Tool {
 		return;
 	    }
 
-	    int docID = factory.resourcesHashLookup(doc.uri().toString()).intValue();
+	    int docID = ResourcesHashLoader.lookup(doc.uri().toString()).intValue();
 
 	    if (docID < 0) {
 		throw new RuntimeException("Negative DocID for URI: " + doc.uri());
 	    }
 
 	    // Iterate over all indices
-	    for (int i = 0; i < factory.numberOfFields(); i++) {
-		if (factory.fieldName(i).startsWith("NOINDEX")) {
+	    for (int i = 0; i < fields.length; i++) {
+		if (fields[i].startsWith("NOINDEX")) {
 		    continue;
 		}
 
@@ -307,7 +299,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 		    // Read next property as well
 		    if (term != null) {
 			// Report progress
-			context.setStatus(factory.fieldName(i) + "=" + term.substring(0, Math.min(term.length(), 50)));
+			context.setStatus(fields[i] + "=" + term.substring(0, Math.min(term.length(), 50)));
 			position++;
 			context.getCounter(Counters.INDEXED_OCCURRENCES).increment(1);
 		    } else {
@@ -329,24 +321,21 @@ public class DocSizesGenerator extends Configured implements Tool {
     public static class ReduceClass extends Reducer<IndexDocSizePair, DocSize, Text, Text> {
 	private String outputDir;
 	private FileSystem fs;
-	private DocumentFactory factory;
 	private int numdocs;
+	private String[] fields;
 
 	@Override
 	public void setup(Context context) {
-	    Configuration job = context.getConfiguration();
+	    Configuration conf = context.getConfiguration();
 	    try {
-		// Create an instance of the factory that was used...we only
-		// need this to get the number of fields
-		Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-		factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
+		fields = RDFDocumentFactory.getFieldsFromConf(conf);
 
 		// Creating the output dir if necessary
-		outputDir = job.get(OUTPUT_DIR_ARG);
+		outputDir = conf.get(OUTPUT_DIR_ARG);
 		if (!outputDir.endsWith("/"))
 		    outputDir = outputDir + "/";
 
-		fs = FileSystem.get(job);
+		fs = FileSystem.get(conf);
 
 		// Path path = new Path(outputDir + uuid);
 		Path path = new Path(outputDir);
@@ -356,7 +345,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 		}
 
 		// Number of documents
-		numdocs = job.getInt(NUMBER_OF_DOCUMENTS_ARG, 0);
+		numdocs = conf.getInt(NUMBER_OF_DOCUMENTS_ARG, 0);
 	    } catch (IOException e) {
 
 		throw new RuntimeException(e);
@@ -369,10 +358,10 @@ public class DocSizesGenerator extends Configured implements Tool {
 		return;
 	    }
 	    
-	    System.out.println("Processing index: " + factory.fieldName(key.index));
+	    System.out.println("Processing index: " + fields[key.index]);
 
 	    // Decide which file we are going to write to
-	    Path sizesPath = new Path(outputDir + factory.fieldName(key.index) + DiskBasedIndex.SIZES_EXTENSION);
+	    Path sizesPath = new Path(outputDir + fields[key.index] + DiskBasedIndex.SIZES_EXTENSION);
 	    OutputBitStream stream = new OutputBitStream(fs.create(sizesPath, true));// overwrite
 	    fs.setPermission(sizesPath, ALL_PERMISSIONS);
 
@@ -448,11 +437,13 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	job.setGroupingComparatorClass(FirstGroupingComparator.class);
 
-	job.getConfiguration().set(RDFDocumentFactory.RESOURCES_FILENAME_KEY, args.getString(RESOURCES_HASH_ARG));
+	Configuration conf = job.getConfiguration();
+	ResourcesHashLoader.setCacheFilenameInConf(conf, args.getString(RESOURCES_HASH_ARG));
 
-	job.getConfiguration().setInt(NUMBER_OF_DOCUMENTS_ARG, args.getInt("numdocs"));
 
-	job.getConfiguration().set(OUTPUT_DIR_ARG, args.getString("output"));
+	conf.setInt(NUMBER_OF_DOCUMENTS_ARG, args.getInt("numdocs"));
+
+	conf.set(OUTPUT_DIR_ARG, args.getString("output"));
 
 	FileInputFormat.setInputPaths(job, new Path(args.getString("input")));
 
@@ -461,18 +452,18 @@ public class DocSizesGenerator extends Configured implements Tool {
 	// Set the document factory class: HorizontalDocumentFactory or
 	// VerticalDocumentFactory
 	if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
-	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, HorizontalDocumentFactory.class, PropertyBasedDocumentFactory.class);
+	    HorizontalDocumentFactory.setupConf(conf, false);
 	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)) {
-	    job.getConfiguration().setClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, VerticalDocumentFactory.class, PropertyBasedDocumentFactory.class);
-	    if (args.getString(PROPERTIES_ARGS) != null) {
-		DistributedCache.addCacheFile(new URI(args.getString(PROPERTIES_ARGS)), job.getConfiguration());
-		//job.getConfiguration().set(RDFDocumentFactory.INDEXEDPROPERTIES_FILENAME_KEY, args.getString("properties"));
+	    if (!args.contains(PREDICATES_ARG)) {
+		throw new IllegalArgumentException("When '" + METHOD_ARG + "' is '" + METHOD_ARG_VALUE_VERTICAL + "' you have to give a predicates file too.");
 	    }
+	    Path predicatesPath = new Path(args.getString(PREDICATES_ARG));
+	    VerticalDocumentFactory.setupConf(conf, false, predicatesPath);
 	} else {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}
 
-	job.getConfiguration().setInt("mapred.linerecordreader.maxlength", 10000);
+	conf.setInt("mapred.linerecordreader.maxlength", 10000);
 
 	boolean success = job.waitForCompletion(true);
 

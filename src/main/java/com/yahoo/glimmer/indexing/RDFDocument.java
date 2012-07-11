@@ -11,47 +11,37 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.io.WordReader;
-import it.unimi.dsi.mg4j.document.AbstractDocument;
 
 import java.io.IOException;
 import java.io.InputStream;
 
-public abstract class RDFDocument extends AbstractDocument {
-    public static final String NULL_URL = "NULL_URL";
+import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 
+public abstract class RDFDocument {
+    // TODO RDFDocumnet should implement Hadoop's Writable but as we have a ref to an InputStream for lazy parsing this isn't possible.
+    
+    public static final String NULL_URL = "NULL_URL";
+    
     protected final RDFDocumentFactory factory;
-    private Reference2ObjectMap<Enum<?>, Object> docMetadata;
     /** Whether we already parsed the document. */
     protected boolean parsed;
     /** The cached raw content. */
     protected InputStream rawContent;
     protected String url = NULL_URL;
 
+    public abstract WordReader content(final int field) throws IOException;
+    public abstract IndexType getIndexType();
     protected abstract void ensureParsed() throws IOException;
+	
 
-    public RDFDocument(RDFDocumentFactory factory, Reference2ObjectMap<Enum<?>, Object> docMetadata) {
+    public RDFDocument(RDFDocumentFactory factory) {
 	this.factory = factory;
-	if (docMetadata == null) {
-	    this.docMetadata = new Reference2ObjectArrayMap<Enum<?>, Object>();
-	} else {
-	    this.docMetadata = docMetadata;
-	}
     }
 
     public void setContent(InputStream rawContent) {
 	this.rawContent = rawContent;
 	parsed = false;
-    }
-
-    public Object resolveNotNull(Enum<?> key) {
-	return factory.resolveNotNull(key, docMetadata);
-    }
-
-    public Object resolve(Enum<?> key) {
-	return factory.resolve(key, docMetadata);
     }
 
     public CharSequence uri() {
@@ -61,12 +51,5 @@ public abstract class RDFDocument extends AbstractDocument {
 	    throw new RuntimeException(e);
 	}
 	return url;
-    }
-
-    // All fields use the same reader
-    @Override
-    public WordReader wordReader(final int field) {
-	factory.ensureFieldIndex(field);
-	return factory.wordReader;
     }
 }

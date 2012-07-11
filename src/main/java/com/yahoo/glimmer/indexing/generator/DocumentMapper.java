@@ -13,7 +13,6 @@ package com.yahoo.glimmer.indexing.generator;
 
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.document.Document;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -24,39 +23,25 @@ import org.apache.hadoop.mapreduce.Mapper;
 
 import com.yahoo.glimmer.indexing.RDFDocument;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory;
-import com.yahoo.glimmer.indexing.RDFInputFormat;
-import com.yahoo.glimmer.indexing.VerticalDocumentFactory;
+import com.yahoo.glimmer.indexing.ResourcesHashLoader;
 
-public class DocumentMapper extends Mapper<LongWritable, Document, TermOccurrencePair, Occurrence> {
+public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurrencePair, Occurrence> {
     static final int ALIGNMENT_INDEX = -1; // special index for alignments
     
-    private RDFDocumentFactory factory;
-    private boolean verticalNotHorizontal;
-
     enum Counters {
 	FAILED_PARSING, INDEXED_OCCURRENCES, NEGATIVE_PREDICATE_ID, NUMBER_OF_RECORDS
     }
     
-    public void setFactory(RDFDocumentFactory factory) {
-	this.factory = factory;
-    }
-    public void setVerticalNotHorizontal(boolean verticalNotHorizontal) {
-	this.verticalNotHorizontal = verticalNotHorizontal;
-    }
-
-    public void setup(Context context) throws IOException {
-	Configuration job = context.getConfiguration();
-
-	// Create an instance of the factory that was used...we only need
-	// this to get the number of fields
-	Class<?> documentFactoryClass = job.getClass(RDFInputFormat.DOCUMENTFACTORY_CLASS, RDFDocumentFactory.class);
-	factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
-	
-	verticalNotHorizontal = documentFactoryClass.equals(VerticalDocumentFactory.class);
-    }
+    private String[] fields;
+    
+    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable,RDFDocument,TermOccurrencePair,Occurrence>.Context context) throws IOException ,InterruptedException {
+	Configuration conf = context.getConfiguration();
+	fields = RDFDocumentFactory.getFieldsFromConf(conf);
+	ResourcesHashLoader.load(conf);
+    };
 
     @Override
-    public void map(LongWritable key, Document doc, Context context) throws IOException, InterruptedException {
+    public void map(LongWritable key, RDFDocument doc, Context context) throws IOException, InterruptedException {
 	if (doc == null || doc.uri().equals(RDFDocument.NULL_URL)) {
 	    // Failed parsing
 	    context.getCounter(Counters.FAILED_PARSING).increment(1);
@@ -64,7 +49,7 @@ public class DocumentMapper extends Mapper<LongWritable, Document, TermOccurrenc
 	    return;
 	}
 
-	int docID = factory.resourcesHashLookup(doc.uri().toString()).intValue();
+	int docID = ResourcesHashLoader.lookup(doc.uri().toString()).intValue();
 
 	if (docID < 0) {
 	    throw new RuntimeException("Negative DocID for URI: " + doc.uri());
@@ -77,9 +62,9 @@ public class DocumentMapper extends Mapper<LongWritable, Document, TermOccurrenc
 	Occurrence fakeDocOccurrrence = new Occurrence(null, docID);
 
 	// Iterate over all indices
-	for (int i = 0; i < factory.numberOfFields(); i++) {
+	for (int i = 0; i < fields.length; i++) {
 
-	    String fieldName = factory.fieldName(i);
+	    String fieldName = fields[i];
 	    if (fieldName.startsWith("NOINDEX")) {
 		continue;
 	    }
@@ -87,7 +72,7 @@ public class DocumentMapper extends Mapper<LongWritable, Document, TermOccurrenc
 	    // Iterate in parallel over the words of the indices
 	    MutableString term = new MutableString("");
 	    MutableString nonWord = new MutableString("");
-	    WordReader termReader = (WordReader) doc.content(i);
+	    WordReader termReader = doc.content(i);
 	    int position = 0;
 
 	    while (termReader.next(term, nonWord)) {
@@ -95,7 +80,7 @@ public class DocumentMapper extends Mapper<LongWritable, Document, TermOccurrenc
 		if (term != null) {
 
 		    // Report progress
-		    context.setStatus(factory.fieldName(i) + "=" + term.substring(0, Math.min(term.length(), 50)));
+		    context.setStatus(fields[i] + "=" + term.substring(0, Math.min(term.length(), 50)));
 
 		    // Create an occurrence at the next position
 		    Occurrence occ = new Occurrence(docID, position);
@@ -108,9 +93,9 @@ public class DocumentMapper extends Mapper<LongWritable, Document, TermOccurrenc
 		    position++;
 		    context.getCounter(Counters.INDEXED_OCCURRENCES).increment(1);
 
-		    if (verticalNotHorizontal) {
+		    if (doc.getIndexType() == RDFDocumentFactory.IndexType.VERTICAL) {
 			// Create an entry in the alignment index
-			int predicateID = factory.resourcesHashLookup(fieldName).intValue();
+			int predicateID = ResourcesHashLoader.lookup(fieldName).intValue();
 			if (predicateID >= 0) {
 			    Occurrence predicateOcc = new Occurrence(predicateID, null);
 			    // TODO Why not add to keySet?  
@@ -134,7 +119,5 @@ public class DocumentMapper extends Mapper<LongWritable, Document, TermOccurrenc
 	for (TermOccurrencePair term : keySet) {
 	    context.write(term, term.getOccurrence());
 	}
-	// Close document
-	doc.close();
     }
 }

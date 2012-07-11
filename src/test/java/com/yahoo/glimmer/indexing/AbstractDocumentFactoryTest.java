@@ -11,13 +11,10 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
-import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
-import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
-
 import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Counters;
@@ -35,51 +32,35 @@ public class AbstractDocumentFactoryTest {
     		"<http://subject/> <http://predicate/3> \"object 3\"@en <http://context/1> .  ";
     
     protected Mockery context;
-    protected LcpMonotoneMinimalPerfectHashFunction<CharSequence> resourcesHash;
     protected TaskInputOutputContext<?, ?, ?, ?> taskContext;
     protected Configuration conf;
     protected Counters counters = new Counters();
-    protected Reference2ObjectMap<Enum<?>, Object> metadata = new Reference2ObjectOpenHashMap<Enum<?>, Object>();
+    protected Map<CharSequence, Long> resourcesMap;
     protected ByteArrayInputStream rawContentInputStream;
-    
     
     protected void defineMocks(Mockery context) {
     }
     
     protected Expectations defineExpectations() throws Exception {
 	return new Expectations(){{
-	    allowing(resourcesHash).get("http://object/1");
-	    will(returnValue(45l));
-	    allowing(resourcesHash).get("http://object/2");
-	    will(returnValue(46l));
-	    
 	    allowing(taskContext).getConfiguration();
 	    will(returnValue(conf));
-	    
-	    // Returning null here means the factory won't try and load the file from the FileSystem.
-	    allowing(conf).get(RDFDocumentFactory.RESOURCES_FILENAME_KEY);
-	    will(returnValue(null));
 	        
-	    allowing(taskContext).getCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES);
-	    will(returnValue(counters.findCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES)));
+	    allowing(taskContext).getCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES);
+	    will(returnValue(counters.findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES)));
 	}};
     }
     
-    @SuppressWarnings("unchecked")
     @Before
     public void before() throws Exception {
 	context = new Mockery();
 	context.setImposteriser(ClassImposteriser.INSTANCE);
-	resourcesHash = context.mock(LcpMonotoneMinimalPerfectHashFunction.class, "resourcesHash");
 	taskContext = context.mock(TaskInputOutputContext.class, "taskContext");
-	conf = context.mock(Configuration.class, "conf");
-	
+	conf = new Configuration();
+	resourcesMap = new HashMap<CharSequence, Long>();
 	defineMocks(context);
 	
 	context.checking(defineExpectations());
-	
-	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.ENCODING, "UTF-8");
-	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.TITLE, "The Title");
 	
 	rawContentInputStream = new ByteArrayInputStream(RAW_CONTENT_STRING.getBytes(RAW_CHARSET));
     }

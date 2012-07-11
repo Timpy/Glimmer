@@ -11,10 +11,9 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.io.FastBufferedReader;
+import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
@@ -29,6 +28,8 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.semanticweb.yars.nx.namespace.RDF;
 
+import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
+import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.util.Util;
 
 /**
@@ -47,8 +48,13 @@ class HorizontalDocument extends RDFDocument {
     // uri is strings extracted from the url
     private List<String> uri = new ArrayList<String>();
 
-    protected HorizontalDocument(HorizontalDocumentFactory factory, Reference2ObjectMap<Enum<?>, Object> docMetadata) {
-	super(factory, docMetadata);
+    protected HorizontalDocument(HorizontalDocumentFactory factory) {
+	super(factory);
+    }
+
+    @Override
+    public IndexType getIndexType() {
+	return IndexType.HORIZONTAL;
     }
 
     protected void ensureParsed() throws IOException {
@@ -70,12 +76,12 @@ class HorizontalDocument extends RDFDocument {
 	    throw new IOException("Trying to parse null rawContent");
 	}
 
-	BufferedReader r = new BufferedReader(new InputStreamReader(rawContent, (String) resolveNotNull(PropertyBasedDocumentFactory.MetadataKeys.ENCODING)));
+	BufferedReader r = new BufferedReader(new InputStreamReader(rawContent, factory.getInputStreamEncodeing()));
 	String line = r.readLine();
 	r.close();
 
 	if (line == null || line.trim().equals("")) {
-	    factory.incrementCounter(RDFDocumentFactory.Counters.EMPTY_LINES, 1);
+	    factory.incrementCounter(RdfCounters.EMPTY_LINES, 1);
 	    return;
 	}
 	// First part is URL, second part is docfeed
@@ -83,7 +89,7 @@ class HorizontalDocument extends RDFDocument {
 	String data = line.substring(line.indexOf('\t')).trim();
 
 	if (data.trim().equals("")) {
-	    factory.incrementCounter(RDFDocumentFactory.Counters.EMPTY_DOCUMENTS, 1);
+	    factory.incrementCounter(RdfCounters.EMPTY_DOCUMENTS, 1);
 	    return;
 	}
 
@@ -122,31 +128,31 @@ class HorizontalDocument extends RDFDocument {
 	    String fieldName = Util.encodeFieldName(predicate);
 
 	    // Check if prefix is on blacklist
-	    if (factory.onPredicateBlackList(fieldName)) {
-		factory.incrementCounter(RDFDocumentFactory.Counters.BLACKLISTED_TRIPLES, 1);
+	    if (RDFDocumentFactory.isOnPredicateBlacklist(fieldName)) {
+		factory.incrementCounter(RdfCounters.BLACKLISTED_TRIPLES, 1);
 		continue;
 	    }
 
-	    String contextValue = NULL_URL;
+	    String context = NULL_URL;
 	    if (factory.isWithContexts() && stmt.getContext() != null) {
 		String s = stmt.getContext().toString();
-		Long l = factory.resourcesHashLookup(s);
+		Long l = ResourcesHashLoader.lookup(s);
 		if (l == null) {
 		    throw new IllegalStateException("Context " + stmt.getContext().toString() + " not in resources hash function!");
 		}
-		contextValue = l.toString();
+		context = l.toString();
 	    }
 
 	    if (stmt.getObject() instanceof Resource) {
 		if (predicate.equals(RDF.TYPE.toString())) {
-		    factory.incrementCounter(RDFDocumentFactory.Counters.RDF_TYPE_TRIPLES, 1);
+		    factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
 		    tokens.add(stmt.getObject().toString());
 		} else {
-		    tokens.add(factory.resourcesHashLookup(stmt.getObject().toString()).toString());
+		    tokens.add(ResourcesHashLoader.lookup(stmt.getObject().toString()).toString());
 		}
 		properties.add(fieldName);
-		if (contextValue != null) {
-		    contexts.add(contextValue);
+		if (context != null) {
+		    contexts.add(context);
 		}
 	    } else {
 		String object = ((Literal) stmt.getObject()).getLabel();
@@ -162,8 +168,8 @@ class HorizontalDocument extends RDFDocument {
 			    // contexts
 			    properties.add(fieldName);
 
-			    if (contextValue != null) {
-				contexts.add(contextValue);
+			    if (context != null) {
+				contexts.add(context);
 			    }
 			}
 
@@ -172,20 +178,16 @@ class HorizontalDocument extends RDFDocument {
 		fbr.close();
 	    }
 
-	    factory.incrementCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES, 1);
+	    factory.incrementCounter(RdfCounters.INDEXED_TRIPLES, 1);
 	}
-    }
-
-    public CharSequence title() {
-	CharSequence title = (CharSequence) resolve(PropertyBasedDocumentFactory.MetadataKeys.TITLE);
-	return title == null ? "" : title;
     }
 
     public String toString() {
 	return uri().toString();
     }
 
-    public Object content(final int field) throws IOException {
+    @Override
+    public WordReader content(final int field) throws IOException {
 	factory.ensureFieldIndex(field);
 	ensureParsed();
 	switch (field) {

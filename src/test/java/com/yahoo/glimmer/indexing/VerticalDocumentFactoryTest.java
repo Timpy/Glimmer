@@ -17,58 +17,45 @@ import static org.junit.Assert.assertTrue;
 import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
-import org.jmock.Expectations;
 import org.junit.Test;
 
+import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
+
 public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
-    @Override
-    protected Expectations defineExpectations() throws Exception {
-        Expectations e = super.defineExpectations();
-        
-        // Returning null here means the factory won't try and load the predicates 
-        e.allowing(conf).get(VerticalDocumentFactory.PREDICATES_FILENAME_KEY);
-        e.will(Expectations.returnValue(null));
-        
-        return e; 
-    }
-    
     @Test
     public void test1() throws IOException {
-	VerticalDocumentFactory factory = new VerticalDocumentFactory(metadata);
-	factory.setTaskAttemptContext(taskContext);
-	factory.init();
-	factory.setResourcesHash(resourcesHash);
-	List<String> indexedProperties = Arrays.asList(new String[]{
-		"http://predicate/1",
-		"http://predicate/2", 
-		"http://predicate/3"});
-	factory.setIndexedProperties(indexedProperties);
+	VerticalDocumentFactory.setupConf(conf, IndexType.VERTICAL, true, new String[] { "http://predicate/1", "http://predicate/2", "http://predicate/3" });
+
+	resourcesMap.put("http://context/1", 55l);
+	resourcesMap.put("http://object/1", 45l);
+	resourcesMap.put("http://object/2", 46l);
+	ResourcesHashLoader.setHash(resourcesMap);
+
+	VerticalDocumentFactory factory = (VerticalDocumentFactory) RDFDocumentFactory.buildFactory(conf);
 	assertEquals(3, factory.numberOfFields());
-	
-	VerticalDocument document = (VerticalDocument)factory.getDocument(rawContentInputStream, metadata);
-	
+	VerticalDocument document = (VerticalDocument) factory.getDocument();
+	document.setContent(rawContentInputStream);
+
+
 	assertEquals("http://subject/", document.uri());
-	assertEquals("The Title", document.title());
-	
+
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
-	
-	WordArrayReader reader = (WordArrayReader)document.content(0);
+
+	WordArrayReader reader = (WordArrayReader) document.content(0);
 	assertTrue(reader.next(word, nonWord));
 	assertEquals("45", word.toString());
 	assertEquals("", nonWord.toString());
 	assertFalse(reader.next(word, nonWord));
-	
-	reader = (WordArrayReader)document.content(1);
+
+	reader = (WordArrayReader) document.content(1);
 	assertTrue(reader.next(word, nonWord));
 	assertEquals("46", word.toString());
 	assertEquals("", nonWord.toString());
 	assertFalse(reader.next(word, nonWord));
-	
-	reader = (WordArrayReader)document.content(2);
+
+	reader = (WordArrayReader) document.content(2);
 	assertTrue(reader.next(word, nonWord));
 	assertEquals("object", word.toString());
 	assertEquals("", nonWord.toString());
@@ -76,9 +63,9 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("3", word.toString());
 	assertEquals("", nonWord.toString());
 	assertFalse(reader.next(word, nonWord));
-	
+
 	context.assertIsSatisfied();
-	
-	assertEquals(3l, counters.findCounter(RDFDocumentFactory.Counters.INDEXED_TRIPLES).getValue());
+
+	assertEquals(3l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
 }

@@ -46,12 +46,13 @@ public class Index {
     private IndexWriter indexWriter;
 
     private FileSystem fs;
-    private String outputDir, indexName;
+    private Path outputDir;
+    private String indexName;
     private int numDocs;
 
     private boolean positions;
 
-    public Index(FileSystem fs, String outputDir, String indexName, int numDocs, boolean positions) {
+    public Index(FileSystem fs, Path outputDir, String indexName, int numDocs, boolean positions) {
 	this.fs = fs;
 	this.outputDir = outputDir;
 	// It seems like MG4J doesn't like index names with the '-' char
@@ -61,22 +62,22 @@ public class Index {
     }
 
     public void open() throws IOException {
-	Path indexPath = new Path(outputDir + "/" + indexName + DiskBasedIndex.INDEX_EXTENSION);
+	Path indexPath = new Path(outputDir, indexName + DiskBasedIndex.INDEX_EXTENSION);
 	FSDataOutputStream indexOutputStream = fs.create(indexPath, true);
 	index = new OutputBitStream(indexOutputStream);// overwrite
 
-	Path termsPath = new Path(outputDir + "/" + indexName + DiskBasedIndex.TERMS_EXTENSION);
+	Path termsPath = new Path(outputDir, indexName + DiskBasedIndex.TERMS_EXTENSION);
 	terms = new PrintWriter(new BufferedWriter(new OutputStreamWriter(fs.create(termsPath, true), "UTF-8")));// overwrite
 
-	Path offsetsPath = new Path(outputDir + "/" + indexName + DiskBasedIndex.OFFSETS_EXTENSION);
+	Path offsetsPath = new Path(outputDir, indexName + DiskBasedIndex.OFFSETS_EXTENSION);
 	offsets = new OutputBitStream(fs.create(offsetsPath, true));// overwrite
 
 	if (positions) {
-	    Path posNumBitsPath = new Path(outputDir + "/" + indexName + DiskBasedIndex.POSITIONS_NUMBER_OF_BITS_EXTENSION);
+	    Path posNumBitsPath = new Path(outputDir, indexName + DiskBasedIndex.POSITIONS_NUMBER_OF_BITS_EXTENSION);
 	    posNumBits = new OutputBitStream(fs.create(posNumBitsPath, true));// overwrite
 	}
 
-	Path propertiesPath = new Path(outputDir + "/" + indexName + DiskBasedIndex.PROPERTIES_EXTENSION);
+	Path propertiesPath = new Path(outputDir, indexName + DiskBasedIndex.PROPERTIES_EXTENSION);
 	properties = fs.create(propertiesPath, true);// overwrite
 
 	Map<Component, Coding> defaultStandardIndex = new Object2ObjectOpenHashMap<Component, Coding>(CompressionFlags.DEFAULT_STANDARD_INDEX);

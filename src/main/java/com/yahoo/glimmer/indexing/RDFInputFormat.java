@@ -11,10 +11,7 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.document.DocumentFactory;
-import it.unimi.dsi.mg4j.document.PropertyBasedDocumentFactory;
-
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.compress.CompressionCodec;
@@ -25,10 +22,7 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 
-public class RDFInputFormat extends FileInputFormat<LongWritable, Document> {
-
-    public static final String DOCUMENTFACTORY_CLASS = "documentfactory.class";
-
+public class RDFInputFormat extends FileInputFormat<LongWritable, RDFDocument> {
     @Override
     protected boolean isSplitable(JobContext context, Path file) {
 	CompressionCodec codec = new CompressionCodecFactory(context.getConfiguration()).getCodec(file);
@@ -36,11 +30,10 @@ public class RDFInputFormat extends FileInputFormat<LongWritable, Document> {
     }
 
     @Override
-    public RecordReader<LongWritable, Document> createRecordReader(InputSplit split, TaskAttemptContext context) {
-	// Configure the document factory
-	Class<?> documentFactoryClass = context.getConfiguration().getClass(DOCUMENTFACTORY_CLASS, PropertyBasedDocumentFactory.class);
-	DocumentFactory factory = RDFDocumentFactory.buildFactory(documentFactoryClass, context);
-	
+    public RecordReader<LongWritable, RDFDocument> createRecordReader(InputSplit split, TaskAttemptContext context) {
+	Configuration conf = context.getConfiguration();
+	RDFDocumentFactory factory = RDFDocumentFactory.buildFactory(conf);
+	ResourcesHashLoader.load(conf);
 	return new RDFRecordReader(factory);
     }
 }

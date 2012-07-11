@@ -11,9 +11,6 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.document.DocumentFactory;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
@@ -33,23 +30,21 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.hadoop.util.LineReader;
 
-public class RDFRecordReader extends RecordReader<LongWritable, Document> {
-
+public class RDFRecordReader extends RecordReader<LongWritable, RDFDocument> {
     private static final Log LOG = LogFactory.getLog(RDFRecordReader.class);
-
+    
     private CompressionCodecFactory compressionCodecs = null;
     private long start;
     private long pos;
     private long end;
     private LineReader in;
     private int maxLineLength;
-    private DocumentFactory factory = null;
 
-    private LongWritable key = null;
-    private Document value = null;
+    private LongWritable key;
+    private RDFDocument value;
 
-    public RDFRecordReader(DocumentFactory factory) {
-	this.factory = factory;
+    public RDFRecordReader(RDFDocumentFactory factory) {
+	value = factory.getDocument();
     }
 
     @Override
@@ -108,7 +103,7 @@ public class RDFRecordReader extends RecordReader<LongWritable, Document> {
     }
 
     @Override
-    public Document getCurrentValue() {
+    public RDFDocument getCurrentValue() {
 	return value;
     }
 
@@ -118,10 +113,6 @@ public class RDFRecordReader extends RecordReader<LongWritable, Document> {
 	    key = new LongWritable();
 	}
 	key.set(pos);
-
-	// Always create a new document...
-	// TODO: find out if we can reuse the same document
-	value = factory.getDocument(null, null);
 
 	int newSize = 0;
 	while (pos < end) {
