@@ -15,9 +15,7 @@ import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +26,8 @@ import org.openrdf.model.Statement;
 import org.openrdf.model.Value;
 import org.semanticweb.yars.nx.namespace.RDF;
 
-import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
+import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
 
 /**
  * A RDF document.
@@ -45,53 +43,17 @@ class VerticalDocument extends RDFDocument {
     protected VerticalDocument(VerticalDocumentFactory factory) {
 	super(factory);
     }
-    
+
     @Override
     public IndexType getIndexType() {
-        return IndexType.VERTICAL;
+	return IndexType.VERTICAL;
     }
 
-    protected void ensureParsed() throws IOException {
-	if (parsed) {
-	    return;
-	}
-	parsed = true;
-
+    protected void ensureParsed_(StatementCollectorHandler handler) throws IOException {
 	// Initialize fields
 	fields.clear();
 	for (int i = 0; i < factory.numberOfFields(); i++) {
 	    fields.add(new ArrayList<String>());
-	}
-
-	if (rawContent == null) {
-	    throw new IOException("Trying to parse null rawContent");
-	}
-
-	BufferedReader r = new BufferedReader(new InputStreamReader(rawContent, factory.getInputStreamEncodeing()));
-	String line = r.readLine();
-	r.close();
-
-	if (line == null || line.trim().equals("")) {
-	    factory.incrementCounter(RdfCounters.EMPTY_LINES, 1);
-	}
-	// First part is URL, second part is docfeed
-	url = line.substring(0, line.indexOf('\t')).trim();
-	String data = line.substring(line.indexOf('\t')).trim();
-
-	if (data.trim().equals("")) {
-	    factory.incrementCounter(RdfCounters.EMPTY_DOCUMENTS, 1);
-	    return;
-	}
-
-	// Docfeed parsing
-	StatementCollectorHandler handler;
-	try {
-	    handler = factory.parseStatements(url, data);
-	} catch (IOException e) {
-	    throw e;
-	} catch (Exception e) {
-	    System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
-	    return;
 	}
 
 	for (Statement stmt : handler.getStatements()) {
@@ -121,7 +83,11 @@ class VerticalDocument extends RDFDocument {
 		    factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
 		    fields.get(fieldIndex).add(stmt.getObject().toString());
 		} else {
-		    fields.get(fieldIndex).add(ResourcesHashLoader.lookup(stmt.getObject().stringValue()).toString());
+		    Integer objectId = factory.lookupResource(stmt.getObject().stringValue());
+		    if (objectId == null) {
+			throw new IllegalStateException("Object " + stmt.getObject().toString() + " not in resources hash function!");
+		    }
+		    fields.get(fieldIndex).add(objectId.toString());
 		}
 	    } else {
 		Value object = stmt.getObject();
@@ -150,10 +116,6 @@ class VerticalDocument extends RDFDocument {
 	    }
 	    factory.incrementCounter(RdfCounters.INDEXED_TRIPLES, 1);
 	}
-    }
-
-    public String toString() {
-	return uri().toString();
     }
     
     @Override

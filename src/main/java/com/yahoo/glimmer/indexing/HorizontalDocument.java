@@ -15,10 +15,7 @@ import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +25,8 @@ import org.openrdf.model.Resource;
 import org.openrdf.model.Statement;
 import org.semanticweb.yars.nx.namespace.RDF;
 
-import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
+import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
 import com.yahoo.glimmer.util.Util;
 
 /**
@@ -57,51 +54,21 @@ class HorizontalDocument extends RDFDocument {
 	return IndexType.HORIZONTAL;
     }
 
-    protected void ensureParsed() throws IOException {
-	if (parsed) {
-	    return;
-	}
-	parsed = true;
-
-	if (rawContent == null) {
-	    rawContent = new ByteArrayInputStream(new byte[0]);
-	}
-
+    protected void ensureParsed_(StatementCollectorHandler handler) throws IOException {
 	tokens.clear();
 	properties.clear();
 	contexts.clear();
 	uri.clear();
 
-	if (rawContent == null) {
-	    throw new IOException("Trying to parse null rawContent");
-	}
-
-	BufferedReader r = new BufferedReader(new InputStreamReader(rawContent, factory.getInputStreamEncodeing()));
-	String line = r.readLine();
-	r.close();
-
-	if (line == null || line.trim().equals("")) {
-	    factory.incrementCounter(RdfCounters.EMPTY_LINES, 1);
-	    return;
-	}
-	// First part is URL, second part is docfeed
-	url = line.substring(0, line.indexOf('\t')).trim();
-	String data = line.substring(line.indexOf('\t')).trim();
-
-	if (data.trim().equals("")) {
-	    factory.incrementCounter(RdfCounters.EMPTY_DOCUMENTS, 1);
-	    return;
-	}
-
 	// Index URI except the protocol, if exists
 	FastBufferedReader fbr;
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
-	int firstColon = url.indexOf(':');
+	int firstColon = getSubject().indexOf(':');
 	if (firstColon < 0) {
-	    fbr = new FastBufferedReader(new StringReader(url));
+	    fbr = new FastBufferedReader(new StringReader(getSubject()));
 	} else {
-	    fbr = new FastBufferedReader(new StringReader(url.substring(firstColon + 1)));
+	    fbr = new FastBufferedReader(new StringReader(getSubject().substring(firstColon + 1)));
 	}
 	while (fbr.next(word, nonWord)) {
 	    if (word != null && !word.equals("")) {
@@ -111,17 +78,6 @@ class HorizontalDocument extends RDFDocument {
 	    }
 	}
 	fbr.close();
-
-	// Docfeed parsing
-	StatementCollectorHandler handler;
-	try {
-	    handler = factory.parseStatements(url, data);
-	} catch (IOException e) {
-	    throw e;
-	} catch (Exception e) {
-	    System.err.println("Parsing failed for " + url + ": " + e.getMessage() + "Content was: \n" + line);
-	    return;
-	}
 
 	for (Statement stmt : handler.getStatements()) {
 	    String predicate = stmt.getPredicate().toString();
@@ -133,14 +89,17 @@ class HorizontalDocument extends RDFDocument {
 		continue;
 	    }
 
-	    String context = NULL_URL;
-	    if (factory.isWithContexts() && stmt.getContext() != null) {
-		String s = stmt.getContext().toString();
-		Long l = ResourcesHashLoader.lookup(s);
-		if (l == null) {
-		    throw new IllegalStateException("Context " + stmt.getContext().toString() + " not in resources hash function!");
+	    String context = NO_CONTEXT;
+	    if (factory.isWithContexts()) {
+		if (stmt.getContext() == null) {
+		    throw new IllegalArgumentException("Relations of " + getSubject() + " is missing it's context.");
+	        }
+		context = stmt.getContext().toString();
+		Integer contextId = factory.lookupResource(context);
+		if (contextId == null) {
+		    throw new IllegalStateException("Context " + context + " not in resources hash function!");
 		}
-		context = l.toString();
+		context = contextId.toString();
 	    }
 
 	    if (stmt.getObject() instanceof Resource) {
@@ -148,12 +107,14 @@ class HorizontalDocument extends RDFDocument {
 		    factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
 		    tokens.add(stmt.getObject().toString());
 		} else {
-		    tokens.add(ResourcesHashLoader.lookup(stmt.getObject().toString()).toString());
+		    Integer objectId = factory.lookupResource(stmt.getObject().toString());
+		    if (objectId == null) {
+			throw new IllegalStateException("Object " + stmt.getObject().toString() + " not in resources hash function!");
+		    }
+		    tokens.add(objectId.toString());
 		}
 		properties.add(fieldName);
-		if (context != null) {
-		    contexts.add(context);
-		}
+		contexts.add(context);
 	    } else {
 		String object = ((Literal) stmt.getObject()).getLabel();
 		// Iterate over the words of the value
@@ -167,10 +128,7 @@ class HorizontalDocument extends RDFDocument {
 			    // Preserve casing for properties and
 			    // contexts
 			    properties.add(fieldName);
-
-			    if (context != null) {
-				contexts.add(context);
-			    }
+			    contexts.add(context);
 			}
 
 		    }
@@ -180,10 +138,6 @@ class HorizontalDocument extends RDFDocument {
 
 	    factory.incrementCounter(RdfCounters.INDEXED_TRIPLES, 1);
 	}
-    }
-
-    public String toString() {
-	return uri().toString();
     }
 
     @Override

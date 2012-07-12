@@ -55,9 +55,9 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 //	super(property);
 //    }
 
-    public static void setupConf(Configuration conf, boolean withContexts, Path predicatesPath) throws IOException {
+    public static void setupConf(Configuration conf, boolean withContexts, String resourcesHash, String predicates) throws IOException {
 	FileSystem fs = FileSystem.get(conf);
-	FSDataInputStream predicatesInputStream = fs.open(predicatesPath);
+	FSDataInputStream predicatesInputStream = fs.open(new Path(predicates));
 	
 	ArrayList<String> arrayList = new ArrayList<String>();
 
@@ -86,7 +86,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 	    throw new RuntimeException(e);
 	}
 	System.out.println("Loaded " + arrayList.size() + " fields.");
-	setupConf(conf, IndexType.VERTICAL, withContexts, arrayList.toArray(new String[0]));
+	setupConf(conf, IndexType.VERTICAL, withContexts, resourcesHash, arrayList.toArray(new String[0]));
     }
 
     private void readObject(final ObjectInputStream s) throws IOException, ClassNotFoundException {

@@ -270,17 +270,11 @@ public class DocSizesGenerator extends Configured implements Tool {
 	@Override
 	public void map(LongWritable key, RDFDocument doc, Context context) throws IOException, InterruptedException {
 
-	    if (doc == null || doc.uri().equals(RDFDocument.NULL_URL)) {
+	    if (doc == null || doc.getSubject() == null) {
 		// Failed parsing
 		context.getCounter(Counters.FAILED_PARSING).increment(1);
 		System.out.println("Document failed parsing");
 		return;
-	    }
-
-	    int docID = ResourcesHashLoader.lookup(doc.uri().toString()).intValue();
-
-	    if (docID < 0) {
-		throw new RuntimeException("Negative DocID for URI: " + doc.uri());
 	    }
 
 	    // Iterate over all indices
@@ -308,7 +302,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 		}
 		// Position now contains the size of the current field
 		if (position > 0) {
-		    DocSize ds = new DocSize(docID, position);
+		    DocSize ds = new DocSize(doc.getId(), position);
 		    context.write(new IndexDocSizePair(i, ds), ds);
 		}
 	    }
@@ -438,8 +432,6 @@ public class DocSizesGenerator extends Configured implements Tool {
 	job.setGroupingComparatorClass(FirstGroupingComparator.class);
 
 	Configuration conf = job.getConfiguration();
-	ResourcesHashLoader.setCacheFilenameInConf(conf, args.getString(RESOURCES_HASH_ARG));
-
 
 	conf.setInt(NUMBER_OF_DOCUMENTS_ARG, args.getInt("numdocs"));
 
@@ -452,13 +444,12 @@ public class DocSizesGenerator extends Configured implements Tool {
 	// Set the document factory class: HorizontalDocumentFactory or
 	// VerticalDocumentFactory
 	if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
-	    HorizontalDocumentFactory.setupConf(conf, false);
+	    HorizontalDocumentFactory.setupConf(conf, false, args.getString(RESOURCES_HASH_ARG));
 	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)) {
 	    if (!args.contains(PREDICATES_ARG)) {
 		throw new IllegalArgumentException("When '" + METHOD_ARG + "' is '" + METHOD_ARG_VALUE_VERTICAL + "' you have to give a predicates file too.");
 	    }
-	    Path predicatesPath = new Path(args.getString(PREDICATES_ARG));
-	    VerticalDocumentFactory.setupConf(conf, false, predicatesPath);
+	    VerticalDocumentFactory.setupConf(conf, false, args.getString(RESOURCES_HASH_ARG), args.getString(PREDICATES_ARG));
 	} else {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}

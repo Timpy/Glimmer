@@ -11,10 +11,10 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+
 import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.Counters;
@@ -35,7 +35,7 @@ public class AbstractDocumentFactoryTest {
     protected TaskInputOutputContext<?, ?, ?, ?> taskContext;
     protected Configuration conf;
     protected Counters counters = new Counters();
-    protected Map<CharSequence, Long> resourcesMap;
+    protected Object2LongOpenHashMap<CharSequence> resourcesHash;
     protected ByteArrayInputStream rawContentInputStream;
     
     protected void defineMocks(Mockery context) {
@@ -57,7 +57,7 @@ public class AbstractDocumentFactoryTest {
 	context.setImposteriser(ClassImposteriser.INSTANCE);
 	taskContext = context.mock(TaskInputOutputContext.class, "taskContext");
 	conf = new Configuration();
-	resourcesMap = new HashMap<CharSequence, Long>();
+	resourcesHash = new Object2LongOpenHashMap<CharSequence>();
 	defineMocks(context);
 	
 	context.checking(defineExpectations());

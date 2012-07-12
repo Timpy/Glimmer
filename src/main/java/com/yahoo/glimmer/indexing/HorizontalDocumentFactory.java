@@ -40,8 +40,8 @@ public class HorizontalDocumentFactory extends RDFDocumentFactory {
 //	super();
 //    }
     
-    public static void setupConf(Configuration conf, boolean withContext) {
-	setupConf(conf, IndexType.HORIZONTAL, withContext, "token", "property", "context", "uri");
+    public static void setupConf(Configuration conf, boolean withContext, String resourcesHash) {
+	setupConf(conf, IndexType.HORIZONTAL, withContext, resourcesHash, "token", "property", "context", "uri");
     }
 
     @Override

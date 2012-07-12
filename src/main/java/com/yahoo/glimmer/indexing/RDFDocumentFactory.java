@@ -11,6 +11,8 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.dsi.fastutil.io.BinIO;
+import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.mg4j.document.DocumentFactory.FieldType;
 
 import java.io.IOException;
@@ -22,7 +24,12 @@ import java.util.Collection;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Counters;
 import org.openrdf.rio.RDFHandlerException;
 import org.openrdf.rio.RDFParseException;
@@ -34,9 +41,12 @@ import com.yahoo.glimmer.util.Util;
  * 
  */
 public abstract class RDFDocumentFactory {
-    private static final String CONF_FIELDNAMES_KEY = "RdfFieldNames";
-    private static final String CONF_WITH_CONTEXTS_KEY = "WithContexts";
+    private static final Log LOG = LogFactory.getLog(RDFDocumentFactory.class);
+    
     private static final String CONF_INDEX_TYPE_KEY = "IndexType";
+    private static final String CONF_WITH_CONTEXTS_KEY = "WithContexts";
+    private static final String CONF_FIELDNAMES_KEY = "RdfFieldNames";
+    private static final String CONF_RESOURCES_HASH_KEY = "ResourcesFilename";
 
     private static final Collection<String> PREDICATE_BLACKLIST = Arrays.asList("stag", "tagspace", "ctag", "rel", "mm");
 
@@ -45,37 +55,39 @@ public abstract class RDFDocumentFactory {
     public static final char NAMESPACE_SEPARATOR = '_';
 
     private String[] fields;
+    private AbstractObject2LongFunction<CharSequence> resourcesHashFunction;
 
     // TODO How to read these?
     private Counters counters = new Counters();
 
     // Include NQuad contexts in processing.
     private boolean withContexts;
-    
+
     public static enum IndexType {
-	VERTICAL(VerticalDocumentFactory.class),
-	HORIZONTAL(HorizontalDocumentFactory.class),
-	UNDEFINED(null);
-	
+	VERTICAL(VerticalDocumentFactory.class), HORIZONTAL(HorizontalDocumentFactory.class), UNDEFINED(null);
+
 	private final Class<?> factoryClass;
-	
+
 	private IndexType(Class<?> factoryClass) {
 	    this.factoryClass = factoryClass;
 	}
+
 	public Class<?> getFactoryClass() {
 	    return factoryClass;
 	}
     }
-    
+
     public abstract RDFDocument getDocument();
 
-    
-    protected static void setupConf(Configuration conf, IndexType type, boolean withContexts, String... fields) {
+    protected static void setupConf(Configuration conf, IndexType type, boolean withContexts, String resourcesHash, String... fields) {
 	conf.setEnum(CONF_INDEX_TYPE_KEY, type);
 	conf.setBoolean(CONF_WITH_CONTEXTS_KEY, withContexts);
 	conf.setStrings(CONF_FIELDNAMES_KEY, fields);
+	if (resourcesHash != null) {
+	    conf.set(CONF_RESOURCES_HASH_KEY, resourcesHash);
+	}
     }
-    
+
     public static String[] getFieldsFromConf(Configuration conf) {
 	String[] fields = conf.getStrings(CONF_FIELDNAMES_KEY);
 	if (fields == null) {
@@ -83,7 +95,7 @@ public abstract class RDFDocumentFactory {
 	}
 	return fields;
     }
-    
+
     public static IndexType getIndexType(Configuration conf) {
 	return conf.getEnum(CONF_INDEX_TYPE_KEY, null);
     }
@@ -93,7 +105,7 @@ public abstract class RDFDocumentFactory {
 	if (indexType == IndexType.UNDEFINED) {
 	    throw new IllegalStateException("Index type not set in config.");
 	}
-	
+
 	RDFDocumentFactory factory;
 	try {
 	    Constructor<?> factoryConstructor = indexType.factoryClass.getConstructor();
@@ -103,10 +115,25 @@ public abstract class RDFDocumentFactory {
 	}
 	factory.setFields(getFieldsFromConf(conf));
 	factory.setWithContexts(conf.getBoolean(CONF_WITH_CONTEXTS_KEY, false));
+	String resourcesHashFilename = conf.get(CONF_RESOURCES_HASH_KEY);
+	if (resourcesHashFilename != null) {
+	    // Load the hash func.
+	    try {
+		FileSystem fs = FileSystem.get(conf);
+		FSDataInputStream resourcesHashInputStream = fs.open(new Path(resourcesHashFilename));
+		@SuppressWarnings("unchecked")
+		AbstractObject2LongFunction<CharSequence> hash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(resourcesHashInputStream);
+		factory.setResourcesHashFunction(hash);
+		LOG.info("Loaded resource hash from " + resourcesHashFilename + " with " + hash.size() + " entires.");
+	    } catch (Exception e) {
+		throw new RuntimeException(e);
+	    }
+	} else {
+	    LOG.info("No resource hash filename set in conf.  No hash has been loaded.");
+	}
 	return factory;
     }
 
-    
     protected StatementCollectorHandler parseStatements(String url, String data) throws TransformerConfigurationException, RDFParseException,
 	    RDFHandlerException, MalformedURLException, IOException, TransformerException, ParseException {
 	StatementCollectorHandler handler = new StatementCollectorHandler();
@@ -118,9 +145,32 @@ public abstract class RDFDocumentFactory {
 	return handler;
     }
 
+    public void setResourcesHashFunction(AbstractObject2LongFunction<CharSequence> resourcesHashFunction) {
+	this.resourcesHashFunction = resourcesHashFunction;
+    }
+    
+    /**
+     * @param url
+     * @return The hash value for the given url, or null if the url is not in
+     *         the hash function. nulls will only be returned when the hash
+     *         function being used is signed. For unsigned hash functions some
+     *         value smaller than the size of the hash will be returned.
+     */
+    public Integer lookupResource(String url) {
+	Long value = resourcesHashFunction.get(url);
+	if (value == null || value < 0) {
+	    return null;
+	}
+	if (value > Integer.MAX_VALUE) {
+	    throw new RuntimeException("Hash value bigger that max int.");
+	}
+	return value.intValue();
+    }
+
     public boolean isWithContexts() {
 	return withContexts;
     }
+
     public void setWithContexts(Boolean withContexts) {
 	this.withContexts = withContexts;
     }
@@ -128,7 +178,7 @@ public abstract class RDFDocumentFactory {
     public static boolean isOnPredicateBlacklist(final String predicate) {
 	return PREDICATE_BLACKLIST.contains(predicate);
     }
-    
+
     public void setFields(String[] fields) {
 	this.fields = fields;
     }
@@ -174,7 +224,7 @@ public abstract class RDFDocumentFactory {
     public void incrementCounter(RdfCounters counter, int by) {
 	counters.findCounter(counter).increment(by);
     }
-    
+
     public Counters getCounters() {
 	return counters;
     }

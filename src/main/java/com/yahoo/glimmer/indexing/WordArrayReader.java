@@ -24,8 +24,8 @@ import java.util.List;
  * @author pmika
  * 
  */
-@SuppressWarnings("serial")
 public class WordArrayReader implements WordReader {
+    private static final long serialVersionUID = -5084427095759689812L;
 
     private static final MutableString EMPTY_NONWORD = new MutableString("");
 

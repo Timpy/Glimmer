@@ -25,20 +25,22 @@ import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
     @Test
     public void test1() throws IOException {
-	VerticalDocumentFactory.setupConf(conf, IndexType.VERTICAL, true, new String[] { "http://predicate/1", "http://predicate/2", "http://predicate/3" });
+	VerticalDocumentFactory.setupConf(conf, IndexType.VERTICAL, true, null, new String[] { "http://predicate/1", "http://predicate/2", "http://predicate/3" });
 
-	resourcesMap.put("http://context/1", 55l);
-	resourcesMap.put("http://object/1", 45l);
-	resourcesMap.put("http://object/2", 46l);
-	ResourcesHashLoader.setHash(resourcesMap);
+	resourcesHash.put("http://subject/", 33l);
+	resourcesHash.put("http://context/1", 55l);
+	resourcesHash.put("http://object/1", 45l);
+	resourcesHash.put("http://object/2", 46l);
 
 	VerticalDocumentFactory factory = (VerticalDocumentFactory) RDFDocumentFactory.buildFactory(conf);
+	factory.setResourcesHashFunction(resourcesHash);
 	assertEquals(3, factory.numberOfFields());
 	VerticalDocument document = (VerticalDocument) factory.getDocument();
 	document.setContent(rawContentInputStream);
 
 
-	assertEquals("http://subject/", document.uri());
+	assertEquals("http://subject/", document.getSubject());
+	assertEquals(33, document.getId());
 
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();

@@ -30,7 +30,6 @@ import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
 import com.yahoo.glimmer.indexing.HorizontalDocumentFactory;
 import com.yahoo.glimmer.indexing.RDFInputFormat;
-import com.yahoo.glimmer.indexing.ResourcesHashLoader;
 import com.yahoo.glimmer.indexing.VerticalDocumentFactory;
 
 /**
@@ -106,22 +105,19 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	conf.setClass("mapred.output.key.comparator.class", TermOccurrencePair.Comparator.class, WritableComparator.class);
 	conf.set("mapreduce.user.classpath.first", "true");
 
-	ResourcesHashLoader.setCacheFilenameInConf(conf, args.getString(RESOURCES_HASH_ARG));
 
 	conf.setInt(NUMBER_OF_DOCUMENTS, args.getInt("numdocs"));
 
 	conf.set(OUTPUT_DIR, args.getString("output"));
 
 	boolean withContexts = !args.getBoolean(NO_CONTEXTS_ARG, false);
-	
 	if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
-	    HorizontalDocumentFactory.setupConf(conf, withContexts);
+	    HorizontalDocumentFactory.setupConf(conf, withContexts, args.getString(RESOURCES_HASH_ARG));
 	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)) {
 	    if (!args.contains(PREDICATES_ARG)) {
 		throw new IllegalArgumentException("When '" + METHOD_ARG + "' is '" + METHOD_ARG_VALUE_VERTICAL + "' you have to give a predicates file too.");
 	    }
-	    Path predicatesPath = new Path(args.getString(PREDICATES_ARG));
-	    VerticalDocumentFactory.setupConf(conf, withContexts, predicatesPath);
+	    VerticalDocumentFactory.setupConf(conf, withContexts, args.getString(RESOURCES_HASH_ARG), args.getString(PREDICATES_ARG));
 	} else {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}

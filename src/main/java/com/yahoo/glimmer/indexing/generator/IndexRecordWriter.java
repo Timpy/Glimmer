@@ -37,7 +37,7 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
 	    // Open the alignment index
 	    Index index = new Index(fs, taskWorkPath, TripleIndexGenerator.ALIGNMENT_INDEX_NAME, numberOfDocs, false);
 	    index.open();
-	    indices.put(HorizontalBySubjectMapper.ALIGNMENT_INDEX, new IndexWrapper(index));
+	    indices.put(DocumentMapper.ALIGNMENT_INDEX, new IndexWrapper(index));
 	}
 
 	

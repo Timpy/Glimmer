@@ -24,19 +24,20 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
     
     @Test
     public void withContextTest() throws IOException {
-	HorizontalDocumentFactory.setupConf(conf, true);
+	HorizontalDocumentFactory.setupConf(conf, true, null);
 	
-	resourcesMap.put("http://context/1", 55l);
-	resourcesMap.put("http://object/1", 45l);
-	resourcesMap.put("http://object/2", 46l);
-	ResourcesHashLoader.setHash(resourcesMap);
+	resourcesHash.put("http://subject/", 33l);
+	resourcesHash.put("http://context/1", 55l);
+	resourcesHash.put("http://object/1", 45l);
+	resourcesHash.put("http://object/2", 46l);
 	
 	HorizontalDocumentFactory factory = (HorizontalDocumentFactory)RDFDocumentFactory.buildFactory(conf);
+	factory.setResourcesHashFunction(resourcesHash);
 	assertEquals(4, factory.numberOfFields());
 	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
 	document.setContent(rawContentInputStream);
 	
-	assertEquals("http://subject/", document.uri());
+	assertEquals("http://subject/", document.getSubject());
 	
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
@@ -53,7 +54,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("http_predicate_1", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
-	assertEquals(RDFDocument.NULL_URL, word.toString());
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(tokenReader.next(word, nonWord));
@@ -83,7 +84,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("http_predicate_2", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
-	assertEquals(RDFDocument.NULL_URL, word.toString());
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertFalse(tokenReader.next(word, nonWord));
@@ -103,18 +104,19 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
     
     @Test
     public void withoutContextTest() throws IOException {
-	HorizontalDocumentFactory.setupConf(conf, false);
+	HorizontalDocumentFactory.setupConf(conf, false, null);
 	
-	resourcesMap.put("http://context/1", 55l);
-	resourcesMap.put("http://object/1", 45l);
-	resourcesMap.put("http://object/2", 46l);
-	ResourcesHashLoader.setHash(resourcesMap);
+	resourcesHash.put("http://subject/", 33l);
+	resourcesHash.put("http://context/1", 55l);
+	resourcesHash.put("http://object/1", 45l);
+	resourcesHash.put("http://object/2", 46l);
 	
 	HorizontalDocumentFactory factory = (HorizontalDocumentFactory) RDFDocumentFactory.buildFactory(conf);
+	factory.setResourcesHashFunction(resourcesHash);
 	assertEquals(4, factory.numberOfFields());
 	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
 	document.setContent(rawContentInputStream);
-	assertEquals("http://subject/", document.uri());
+	assertEquals("http://subject/", document.getSubject());
 	
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
@@ -131,7 +133,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("http_predicate_1", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
-	assertEquals(RDFDocument.NULL_URL, word.toString());
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(tokenReader.next(word, nonWord));
@@ -141,7 +143,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("http_predicate_3", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
-	assertEquals(RDFDocument.NULL_URL, word.toString());
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(tokenReader.next(word, nonWord));
@@ -151,7 +153,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("http_predicate_3", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
-	assertEquals(RDFDocument.NULL_URL, word.toString());
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(tokenReader.next(word, nonWord));
@@ -161,7 +163,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("http_predicate_2", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
-	assertEquals(RDFDocument.NULL_URL, word.toString());
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
 	assertFalse(tokenReader.next(word, nonWord));

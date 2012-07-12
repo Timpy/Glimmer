@@ -33,7 +33,6 @@ public class RDFInputFormat extends FileInputFormat<LongWritable, RDFDocument> {
     public RecordReader<LongWritable, RDFDocument> createRecordReader(InputSplit split, TaskAttemptContext context) {
 	Configuration conf = context.getConfiguration();
 	RDFDocumentFactory factory = RDFDocumentFactory.buildFactory(conf);
-	ResourcesHashLoader.load(conf);
 	return new RDFRecordReader(factory);
     }
 }
