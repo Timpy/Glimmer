@@ -9,8 +9,6 @@
 #  See the License for the specific language governing permissions and limitations under the License.
 #  See accompanying LICENSE file.
 #
-#first param: query
-#second param: method
 
 METHOD=${1}
 
@@ -19,11 +17,11 @@ if [ ! -z ${2} ] ; then
 	BUILD_NAME=${2}
 fi
 
-LOCAL_BUILD_DIR="${HOME}/tmp/nq2index.${BUILD_NAME}"
+LOCAL_BUILD_DIR="${HOME}/tmp/index-${BUILD_NAME}"
 INDEX_DIR="${LOCAL_BUILD_DIR}/${METHOD}"
 
 
-PROJECT_JAR="../Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
+PROJECT_JAR="../target/Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
 
 RLWRAP=$(which rlwrap)
 if [ -z ${RLWRAP} ] ; then
@@ -52,4 +50,4 @@ do
   fi
 done
 echo $BASENAMES
-${RLWRAP} java -Xmx4G -cp $PROJECT_JAR it.unimi.dsi.mg4j.query.Query -n -v -T ${LOCAL_BUILD_DIR}/subjects.txt $BASENAMES
+${RLWRAP} java -Xmx4G -cp $PROJECT_JAR it.unimi.dsi.mg4j.query.Query -n -v -T ${LOCAL_BUILD_DIR}/all.txt $BASENAMES

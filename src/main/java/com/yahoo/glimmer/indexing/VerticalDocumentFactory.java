@@ -13,13 +13,14 @@ package com.yahoo.glimmer.indexing;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 /**
@@ -34,6 +35,7 @@ import org.apache.hadoop.fs.Path;
  * 
  */
 public class VerticalDocumentFactory extends RDFDocumentFactory {
+    private static final Log LOG = LogFactory.getLog(VerticalDocumentFactory.class);
     /**
      * Returns a copy of this document factory. A new parser is allocated for
      * the copy.
@@ -56,9 +58,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 //    }
 
     public static void setupConf(Configuration conf, boolean withContexts, String resourcesHash, String predicates) throws IOException {
-	FileSystem fs = FileSystem.get(conf);
-	FSDataInputStream predicatesInputStream = fs.open(new Path(predicates));
-	
+	InputStream predicatesInputStream = CompressionCodecHelper.openInputStream(conf, new Path(predicates));
 	ArrayList<String> arrayList = new ArrayList<String>();
 
 	try {
@@ -75,8 +75,8 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		    // Only include if it's in the namespaces table and not
 		    // blacklisted
 		    if (predicate != null && !isOnPredicateBlacklist(predicate)) {
-			System.out.println("Going to index predicate:" + predicate);
 			arrayList.add(predicate);
+			LOG.info("Indexing predicate:" + predicate);
 		    }
 		}
 	    }
@@ -85,7 +85,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 	} catch (IOException e) {
 	    throw new RuntimeException(e);
 	}
-	System.out.println("Loaded " + arrayList.size() + " fields.");
+	LOG.info("Loaded " + arrayList.size() + " fields.");
 	setupConf(conf, IndexType.VERTICAL, withContexts, resourcesHash, arrayList.toArray(new String[0]));
     }
 

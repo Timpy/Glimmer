@@ -1,6 +1,7 @@
 package com.yahoo.glimmer.indexing.generator;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import it.unimi.dsi.mg4j.index.FileIndex;
 import it.unimi.dsi.mg4j.index.IndexIterator;
@@ -23,6 +24,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.indexing.generator.IndexRecordWriter.OutputFormat;
 
 public class IndexRecordWriterTest {
@@ -66,14 +68,22 @@ public class IndexRecordWriterTest {
 	OutputFormat outputFormat = new IndexRecordWriter.OutputFormat();
 	
 	conf.setStrings("RdfFieldNames", "index0", "index1");
+	conf.setEnum("IndexType", RDFDocumentFactory.IndexType.VERTICAL);
 
 	RecordWriter<TermOccurrencePair, TermOccurrences> recordWriter = outputFormat.getRecordWriter(taskContext);
-
-	TermOccurrencePair key = new TermOccurrencePair("term1", 0, null);
+	
+	TermOccurrencePair alignmentKey = new TermOccurrencePair("term1", DocumentMapper.ALIGNMENT_INDEX, null);
 	TermOccurrences value = new TermOccurrences(16);
+	value.setTermFrequency(1);
+	recordWriter.write(alignmentKey, value);
+	value.setDocument(0); // term1 occurres in index 0
+	recordWriter.write(alignmentKey, value);
+	
+	TermOccurrencePair key = new TermOccurrencePair("term1", 0, null);
 	value.setTermFrequency(3);
 	recordWriter.write(key, value);
 	value.setDocument(3);
+	value.clearOccerrences();
 	value.addOccurrence(11);
 	value.addOccurrence(15);
 	recordWriter.write(key, value);
@@ -87,6 +97,14 @@ public class IndexRecordWriterTest {
 	value.addOccurrence(17);
 	value.addOccurrence(18);
 	recordWriter.write(key, value);
+	
+	value.setTermFrequency(2);
+	value.clearOccerrences();
+	recordWriter.write(alignmentKey, value);
+	value.setDocument(0); // term2 occurres in index 0 & 1
+	recordWriter.write(alignmentKey, value);
+	value.setDocument(1); // term2 occurres in index 0 & 1
+	recordWriter.write(alignmentKey, value);
 	
 	key = new TermOccurrencePair("term2", 0, null);
 	value.setTermFrequency(2);
@@ -110,6 +128,12 @@ public class IndexRecordWriterTest {
 	value.addOccurrence(14);
 	recordWriter.write(key, value);
 	
+	value.setTermFrequency(1);
+	value.clearOccerrences();
+	recordWriter.write(alignmentKey, value);
+	value.setDocument(1); // term3 occurres in index 1
+	recordWriter.write(alignmentKey, value);
+	
 	key = new TermOccurrencePair("term3", 1, null);
 	value.setTermFrequency(1);
 	recordWriter.write(key, value);
@@ -118,6 +142,8 @@ public class IndexRecordWriterTest {
 	value.addOccurrence(10);
 	value.addOccurrence(11);
 	recordWriter.write(key, value);
+	
+	
 	
 	recordWriter.close(taskContext);
 
@@ -142,6 +168,17 @@ public class IndexRecordWriterTest {
 	checkOccurrences(index1.documents(0), 1, "(1:14)");
 	// term3
 	checkOccurrences(index1.documents(1), 1, "(3:10,11)");
+	
+	FileIndex indexAlignment = (FileIndex) FileIndex.getInstance(workPath.toString() + "/alignment", true);
+	assertEquals(7, indexAlignment.numberOfDocuments);
+	assertEquals(3, indexAlignment.numberOfTerms);
+	assertFalse(indexAlignment.hasPositions);
+	// term1
+	assertEquals(1, indexAlignment.documents(0).frequency());
+	// term2
+	assertEquals(2, indexAlignment.documents(1).frequency());
+	// term3
+	assertEquals(1, indexAlignment.documents(2).frequency());
     }
 
     private void checkOccurrences(IndexIterator documents, int frequencey, String expected) throws IOException {

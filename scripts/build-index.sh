@@ -44,6 +44,8 @@ COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,${COMPRESSION_COD
 
 HASH_EXTENSION=".smap"
 
+INDEX_FILE_EXTENSIONS="frequencies index offsets positions posnumbits properties stats termmap terms"
+
 if [ ! -f ${PROJECT_JAR} ] ; then
 	echo "Projects jar file missing!! ${PROJECT_JAR}"
 	exit 1
@@ -232,9 +234,6 @@ function generateIndex () {
 		echo "TripleIndexGenerator MR job exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi
-	
-	# Remove empty MR part-... files
-	${HADOOP_CMD} fs -rmr -skipTrash "${OUTPUT_DIR}/part-*"
 }
 
 function getSubIndexes () {
@@ -243,22 +242,22 @@ function getSubIndexes () {
 	echo "COPYING SUB INDEXES TO LOCAL DISK FOR METHOD:" ${METHOD}
 	echo
 	
-	MR_OUT_DIR="${LOCAL_BUILD_DIR}/${METHOD}/mrOut"
-	if [ -d ${MR_OUT_DIR} ] ; then
-		read -p "${MR_OUT_DIR} exists already! Overwrite, Continue using existing local files or otherwise quit? (O/C)" -n 1 -r
+	INDEX_DIR="${LOCAL_BUILD_DIR}/${METHOD}"
+	if [ -d ${INDEX_DIR} ] ; then
+		read -p "${INDEX_DIR} exists already! Overwrite, Continue using existing local files or otherwise quit? (O/C)" -n 1 -r
 		echo
 		if [[ $REPLY =~ ^[Cc]$ ]] ; then
 			return 0
 		elif [[ ! $REPLY =~ ^[Oo]$ ]] ; then
-			echo ${MR_OUT_DIR} exists. Exiting..
+			echo ${INDEX_DIR} exists. Exiting..
 			exit 1
 		fi
-		echo Deleting ${MR_OUT_DIR}
-		rm -rf "${MR_OUT_DIR}"
+		echo Deleting ${INDEX_DIR}
+		rm -rf "${INDEX_DIR}"
 	fi
 	
-	mkdir -p ${MR_OUT_DIR}
-	CMD="${HADOOP_CMD} fs -copyToLocal ${DFS_BUILD_DIR}/${METHOD}/index/* ${MR_OUT_DIR}"
+	mkdir -p ${INDEX_DIR}
+	CMD="${HADOOP_CMD} fs -copyToLocal ${DFS_BUILD_DIR}/${METHOD}/part-r-????? ${INDEX_DIR}"
 	echo ${CMD}
 	${CMD}
 	
@@ -271,39 +270,38 @@ function getSubIndexes () {
 
 function mergeSubIndexes() {
 	METHOD=${1}
-	MR_OUT_DIR="${LOCAL_BUILD_DIR}/${METHOD}/mrOut"
+	INDEX_DIR="${LOCAL_BUILD_DIR}/${METHOD}"
 	echo
 	echo "MERGING SUB INDEXES FOR METHOD:" ${METHOD}
 	echo
 	
-	EXISTING_INDEX_FILES=`ls ${LOCAL_BUILD_DIR}/${METHOD}/*.index`
-	if [ ! -z "${EXISTING_INDEX_FILES}" ] ; then
-		read -p "Local .index files exist in ${LOCAL_BUILD_DIR}/${METHOD}! Continue(delete them) or otherwise quit? (C)" -n 1 -r
+	if [ -e "${INDEX_DIR}/*.index" ] ; then
+		read -p "Local .index files exist in ${INDEX_DIR}! Continue(delete them) or otherwise quit? (C)" -n 1 -r
 		echo
 		if [[ ! $REPLY =~ ^[Cc]$ ]] ; then
 			echo Exiting..
 			exit 1
 		fi
-		echo Deleting old index files from ${LOCAL_BUILD_DIR}/${METHOD}...
-		for FILE_EXT in frequencies index offsets positions posnumbits properties stats termmap terms ; do
-			rm -f ${LOCAL_BUILD_DIR}/${METHOD}/*.${FILE_EXT}
+		echo Deleting old index files from ${INDEX_DIR}...
+		for FILE_EXT in ${INDEX_FILE_EXTENSIONS} ; do
+			rm -f ${INDEX_DIR}/*.${FILE_EXT}
 		done
 	fi
 	
-	MR_UUID_DIRS=`ls "${MR_OUT_DIR}"`
-	echo "Map Reduce sub-index dirs are:"
-	echo ${MR_UUID_DIRS[@]}
+	PART_DIRS=(`ls -1d ${INDEX_DIR}/part-r-?????`)
+	echo "Map Reduce part dirs are:"
+	echo ${PART_DIRS[@]}
 	echo
 	
-	INDEX_NAMES=`ls ${MR_OUT_DIR}/${MR_UUID_DIRS[0]} | awk '/\.index/{sub("\.index$","") ; print $0}'`
+	INDEX_NAMES=`ls ${PART_DIRS[0]} | awk '/\.index/{sub("\.index$","") ; print $0}'`
 	echo "Index names are:"
 	echo ${INDEX_NAMES[@]}
 	echo
 	
 	for INDEX_NAME in ${INDEX_NAMES[@]}; do
 		SUB_INDEXES=""
-		for MR_UUID_DIR in ${MR_UUID_DIRS[@]}; do
-			SUB_INDEXES="${SUB_INDEXES} ${MR_OUT_DIR}/${MR_UUID_DIR}/${INDEX_NAME}"
+		for PART_DIR in ${PART_DIRS[@]}; do
+			SUB_INDEXES="${SUB_INDEXES} ${PART_DIR}/${INDEX_NAME}"
 		done
 		
 		# When merging the alignment index there are no counts.
@@ -312,9 +310,14 @@ function mergeSubIndexes() {
 			NO_COUNTS_OPTIONS="-cCOUNTS:NONE -cPOSITIONS:NONE"
 		fi
 		
-		CMD="java -Xmx2G -cp ${PROJECT_JAR} it.unimi.dsi.mg4j.tool.Merge ${NO_COUNTS_OPTIONS} ${LOCAL_BUILD_DIR}/${METHOD}/${INDEX_NAME} ${SUB_INDEXES}"
+		CMD="java -Xmx2G -cp ${PROJECT_JAR} it.unimi.dsi.mg4j.tool.Merge ${NO_COUNTS_OPTIONS} ${INDEX_DIR}/${INDEX_NAME} ${SUB_INDEXES}"
 		echo ${CMD}
 		${CMD}
+		
+		echo "Removing part files for index ${INDEX_NAME}"
+		for PART_DIR in ${PART_DIRS[@]}; do
+			rm ${PART_DIR}/${INDEX_NAME}.*
+		done
 		
 		EXIT_CODE=$?
 		if [ $EXIT_CODE -ne 0 ] ; then
@@ -322,7 +325,7 @@ function mergeSubIndexes() {
 			exit $EXIT_CODE
 		fi
 		
-		CMD="java -cp ${PROJECT_JAR} it.unimi.dsi.util.ImmutableExternalPrefixMap ${LOCAL_BUILD_DIR}/${METHOD}/${INDEX_NAME}.termmap -o ${LOCAL_BUILD_DIR}/${METHOD}/${INDEX_NAME}.terms"
+		CMD="java -cp ${PROJECT_JAR} it.unimi.dsi.util.ImmutableExternalPrefixMap ${INDEX_DIR}/${INDEX_NAME}.termmap -o ${INDEX_DIR}/${INDEX_NAME}.terms"
 		echo ${CMD}
 		${CMD}
 		
@@ -332,7 +335,7 @@ function mergeSubIndexes() {
 			exit $EXIT_CODE
 		fi
 	done	
-	echo rm -rf ${MR_OUT_DIR}
+	rm -rf ${INDEX_DIR}/part-r-?????
 }
 
 	
@@ -367,6 +370,7 @@ function generateDocSizes () {
 }	
 
 function buildCollection () {
+	BY_SUBJECT_DIR=${1}
 	echo
 	echo BUILDING COLLECTION..
 	echo
@@ -405,7 +409,7 @@ mergeSubIndexes vertical
 # These could be run in parallel with index generation.
 generateDocSizes ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS}
 
-buildCollection
+buildCollection ${DFS_BUILD_DIR}/bysubject
 
 ${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/bysubject/all.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/all.txt"
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/bysubject/all.smap" "${LOCAL_BUILD_DIR}"

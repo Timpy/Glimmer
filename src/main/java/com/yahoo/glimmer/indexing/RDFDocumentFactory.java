@@ -16,6 +16,7 @@ import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.mg4j.document.DocumentFactory.FieldType;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.util.Arrays;
@@ -27,8 +28,6 @@ import javax.xml.transform.TransformerException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Counters;
 import org.openrdf.rio.RDFHandlerException;
@@ -97,14 +96,15 @@ public abstract class RDFDocumentFactory {
     }
 
     public static IndexType getIndexType(Configuration conf) {
-	return conf.getEnum(CONF_INDEX_TYPE_KEY, null);
-    }
-
-    public static RDFDocumentFactory buildFactory(Configuration conf) {
 	IndexType indexType = conf.getEnum(CONF_INDEX_TYPE_KEY, IndexType.UNDEFINED);
 	if (indexType == IndexType.UNDEFINED) {
 	    throw new IllegalStateException("Index type not set in config.");
 	}
+	return indexType;
+    }
+
+    public static RDFDocumentFactory buildFactory(Configuration conf) {
+	IndexType indexType = getIndexType(conf);
 
 	RDFDocumentFactory factory;
 	try {
@@ -119,8 +119,9 @@ public abstract class RDFDocumentFactory {
 	if (resourcesHashFilename != null) {
 	    // Load the hash func.
 	    try {
-		FileSystem fs = FileSystem.get(conf);
-		FSDataInputStream resourcesHashInputStream = fs.open(new Path(resourcesHashFilename));
+		Path resourcesHashPath = new Path(resourcesHashFilename);
+		InputStream resourcesHashInputStream = CompressionCodecHelper.openInputStream(conf, resourcesHashPath);
+		
 		@SuppressWarnings("unchecked")
 		AbstractObject2LongFunction<CharSequence> hash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(resourcesHashInputStream);
 		factory.setResourcesHashFunction(hash);
