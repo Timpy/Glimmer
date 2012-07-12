@@ -90,10 +90,7 @@ class HorizontalDocument extends RDFDocument {
 	    }
 
 	    String context = NO_CONTEXT;
-	    if (factory.isWithContexts()) {
-		if (stmt.getContext() == null) {
-		    throw new IllegalArgumentException("Relations of " + getSubject() + " is missing it's context.");
-	        }
+	    if (factory.isWithContexts() && stmt.getContext() != null) {
 		context = stmt.getContext().toString();
 		Integer contextId = factory.lookupResource(context);
 		if (contextId == null) {

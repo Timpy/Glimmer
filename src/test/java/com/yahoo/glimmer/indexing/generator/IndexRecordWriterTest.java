@@ -78,9 +78,11 @@ public class IndexRecordWriterTest {
 	value.addOccurrence(15);
 	recordWriter.write(key, value);
 	value.setDocument(4);
+	value.clearOccerrences();
 	value.addOccurrence(12);
 	recordWriter.write(key, value);
 	value.setDocument(7);
+	value.clearOccerrences();
 	value.addOccurrence(14);
 	value.addOccurrence(17);
 	value.addOccurrence(18);
@@ -90,10 +92,12 @@ public class IndexRecordWriterTest {
 	value.setTermFrequency(2);
 	recordWriter.write(key, value);
 	value.setDocument(1);
+	value.clearOccerrences();
 	value.addOccurrence(10);
 	value.addOccurrence(19);
 	recordWriter.write(key, value);
 	value.setDocument(7);
+	value.clearOccerrences();
 	value.addOccurrence(13);
 	value.addOccurrence(16);
 	recordWriter.write(key, value);
@@ -102,6 +106,7 @@ public class IndexRecordWriterTest {
 	value.setTermFrequency(1);
 	recordWriter.write(key, value);
 	value.setDocument(1);
+	value.clearOccerrences();
 	value.addOccurrence(14);
 	recordWriter.write(key, value);
 	
@@ -109,6 +114,7 @@ public class IndexRecordWriterTest {
 	value.setTermFrequency(1);
 	recordWriter.write(key, value);
 	value.setDocument(3);
+	value.clearOccerrences();
 	value.addOccurrence(10);
 	value.addOccurrence(11);
 	recordWriter.write(key, value);
