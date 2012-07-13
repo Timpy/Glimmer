@@ -446,12 +446,12 @@ public class DocSizesGenerator extends Configured implements Tool {
 	// Set the document factory class: HorizontalDocumentFactory or
 	// VerticalDocumentFactory
 	if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
-	    HorizontalDocumentFactory.setupConf(conf, false, HASH_VALUE_PREFIX, args.getString(RESOURCES_HASH_ARG));
+	    HorizontalDocumentFactory.setupConf(conf, false, args.getString(RESOURCES_HASH_ARG), HASH_VALUE_PREFIX);
 	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)) {
 	    if (!args.contains(PREDICATES_ARG)) {
 		throw new IllegalArgumentException("When '" + METHOD_ARG + "' is '" + METHOD_ARG_VALUE_VERTICAL + "' you have to give a predicates file too.");
 	    }
-	    VerticalDocumentFactory.setupConf(conf, false, HASH_VALUE_PREFIX, args.getString(RESOURCES_HASH_ARG), args.getString(PREDICATES_ARG));
+	    VerticalDocumentFactory.setupConf(conf, false, args.getString(RESOURCES_HASH_ARG), HASH_VALUE_PREFIX, args.getString(PREDICATES_ARG));
 	} else {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}
