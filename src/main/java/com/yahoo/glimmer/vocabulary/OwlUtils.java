@@ -18,7 +18,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.openrdf.model.impl.URIImpl;
 import org.semanticweb.owlapi.model.IRI;
 import org.semanticweb.owlapi.model.OWLAnnotation;
 import org.semanticweb.owlapi.model.OWLAxiom;
@@ -40,8 +39,42 @@ public class OwlUtils {
     public final static IRI DC_CREATOR = IRI.create("http://purl.org/dc/terms/creator");
     public final static IRI DC_CREATOR_DEPRECATED = IRI.create("http://purl.org/dc/elements/1.1/creator");
 
-    public static String getLocalName(IRI iri) {
-	return new URIImpl(iri.toString()).getLocalName();
+    /** Implementation of URIImpl's getLocalName() method;
+     * {@link http://www.openrdf.org/doc/sesame2/api/org/openrdf/model/URI.html}
+     */ 
+    public static String getLocalName(IRI url) {
+	if (url == null) {
+	    throw new IllegalArgumentException("Give IRI is null.");
+	}
+	String s = url.toString();
+	int end = s.length() - 1;
+	int start = s.indexOf('#') + 1;
+	if (start > 0) {
+	    if (start <= end) {
+		return s.substring(start, end + 1);
+	    } else {
+		// ends with '#'. ignore it.
+		end--;
+	    }
+	}
+	
+	// Ignore trailing '/'
+	while(end >= 0 && s.charAt(end) == '/') {end--;}
+	start = s.lastIndexOf('/',end) + 1;
+	
+	if (start > 0) {
+	    if (start <= end) {
+		return s.substring(start, end + 1);
+	    } else {
+		end--;
+	    }
+	}
+	
+	start = s.lastIndexOf(':', end) + 1;
+	if (start > 0 && start <= end) {
+	    return s.substring(start, end + 1);
+	}
+	throw new IllegalArgumentException("Give IRI " + s + " isn't a valid URL.");
     }
 
     private static String getLocalName(OWLNamedObject entity) {

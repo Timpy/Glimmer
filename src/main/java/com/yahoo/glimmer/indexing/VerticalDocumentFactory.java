@@ -36,57 +36,33 @@ import org.apache.hadoop.fs.Path;
  */
 public class VerticalDocumentFactory extends RDFDocumentFactory {
     private static final Log LOG = LogFactory.getLog(VerticalDocumentFactory.class);
-    /**
-     * Returns a copy of this document factory. A new parser is allocated for
-     * the copy.
-     */
-//    public VerticalDocumentFactory copy() {
-//	VerticalDocumentFactory factory = new VerticalDocumentFactory(defaultMetadata);
-//	return factory;
-//    }
-//
-//    public VerticalDocumentFactory(final Properties properties) throws ConfigurationException {
-//	super(properties);
-//    }
-//
-//    public VerticalDocumentFactory(final Reference2ObjectMap<Enum<?>, Object> defaultMetadata) {
-//	super(defaultMetadata);
-//    }
-//
-//    public VerticalDocumentFactory(final String[] property) throws ConfigurationException {
-//	super(property);
-//    }
 
-    public static void setupConf(Configuration conf, boolean withContexts, String resourcesHash, String predicates) throws IOException {
+    public static void setupConf(Configuration conf, boolean withContexts, String resourcesHash, String hashValuePrefix, String predicates) throws IOException {
 	InputStream predicatesInputStream = CompressionCodecHelper.openInputStream(conf, new Path(predicates));
 	ArrayList<String> arrayList = new ArrayList<String>();
 
-	try {
-	    BufferedReader reader = new BufferedReader(new InputStreamReader(predicatesInputStream));
-	    String nextLine = "";
+	BufferedReader reader = new BufferedReader(new InputStreamReader(predicatesInputStream));
+	String nextLine = "";
 
-	    while ((nextLine = reader.readLine()) != null) {
-		nextLine = nextLine.trim();
-		if (!nextLine.isEmpty()) {
-		    // Take the first column
-		    String predicate = nextLine.split("\\s+")[0];
-		    // if no match, returns the whole string
+	while ((nextLine = reader.readLine()) != null) {
+	    nextLine = nextLine.trim();
+	    if (!nextLine.isEmpty()) {
+		// Take the first column
+		String predicate = nextLine.split("\\s+")[0];
+		// if no match, returns the whole string
 
-		    // Only include if it's in the namespaces table and not
-		    // blacklisted
-		    if (predicate != null && !isOnPredicateBlacklist(predicate)) {
-			arrayList.add(predicate);
-			LOG.info("Indexing predicate:" + predicate);
-		    }
+		// Only include if it's in the namespaces table and not
+		// blacklisted
+		if (predicate != null && !isOnPredicateBlacklist(predicate)) {
+		    arrayList.add(predicate);
+		    LOG.info("Indexing predicate:" + predicate);
 		}
 	    }
-	    reader.close();
-
-	} catch (IOException e) {
-	    throw new RuntimeException(e);
 	}
+	reader.close();
+
 	LOG.info("Loaded " + arrayList.size() + " fields.");
-	setupConf(conf, IndexType.VERTICAL, withContexts, resourcesHash, arrayList.toArray(new String[0]));
+	setupConf(conf, IndexType.VERTICAL, withContexts, resourcesHash, hashValuePrefix, arrayList.toArray(new String[0]));
     }
 
     private void readObject(final ObjectInputStream s) throws IOException, ClassNotFoundException {

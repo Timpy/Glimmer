@@ -26,6 +26,9 @@ if [ ! -z ${3} ] ; then
 	SUBINDICES=${3}
 fi
 
+# Set to "-C" to exclude context from processing. 
+EXCLUDE_CONTEXTS=""
+
 # To allow the use of commons-configuration version 1.8 over Hadoop's version 1.6 we export HADOOP_USER_CLASSPATH_FIRST=true
 # See https://issues.apache.org/jira/browse/MAPREDUCE-1938 and hadoop.apache.org/common/docs/r0.20.204.0/releasenotes.html
 export HADOOP_USER_CLASSPATH_FIRST=true
@@ -145,7 +148,7 @@ function groupBySubject () {
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=true \
-		${INPUT_FILE} ${OUTPUT_DIR}"
+		${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${OUTPUT_DIR}"
 	echo ${CMD}
 	${CMD}
 		
@@ -225,7 +228,7 @@ function generateIndex () {
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
+		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 		

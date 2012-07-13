@@ -55,13 +55,15 @@ public class DocSizesGenerator extends Configured implements Tool {
     private static final String METHOD_ARG_VALUE_HORIZONTAL = "horizontal";
     private static final String PREDICATES_ARG = "properties";
     
+    
     // Job configuration attribute names
     private static final String PROPERTIES_ARGS = "properties";
     private static final String RESOURCES_HASH_ARG = "resourcesHash";
     private static final String OUTPUT_DIR_ARG = "OUTPUT_DIR";
     private static final String NUMBER_OF_DOCUMENTS_ARG = "NUMBER_OF_DOCUMENTS";
     
-    private final static FsPermission ALL_PERMISSIONS = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
+    private static final FsPermission ALL_PERMISSIONS = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
+    private static final String HASH_VALUE_PREFIX = "@";
     
     private static enum Counters {
 	NUMBER_OF_RECORDS, INDEXED_OCCURRENCES, FAILED_PARSING
@@ -444,12 +446,12 @@ public class DocSizesGenerator extends Configured implements Tool {
 	// Set the document factory class: HorizontalDocumentFactory or
 	// VerticalDocumentFactory
 	if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
-	    HorizontalDocumentFactory.setupConf(conf, false, args.getString(RESOURCES_HASH_ARG));
+	    HorizontalDocumentFactory.setupConf(conf, false, HASH_VALUE_PREFIX, args.getString(RESOURCES_HASH_ARG));
 	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)) {
 	    if (!args.contains(PREDICATES_ARG)) {
 		throw new IllegalArgumentException("When '" + METHOD_ARG + "' is '" + METHOD_ARG_VALUE_VERTICAL + "' you have to give a predicates file too.");
 	    }
-	    VerticalDocumentFactory.setupConf(conf, false, args.getString(RESOURCES_HASH_ARG), args.getString(PREDICATES_ARG));
+	    VerticalDocumentFactory.setupConf(conf, false, HASH_VALUE_PREFIX, args.getString(RESOURCES_HASH_ARG), args.getString(PREDICATES_ARG));
 	} else {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}

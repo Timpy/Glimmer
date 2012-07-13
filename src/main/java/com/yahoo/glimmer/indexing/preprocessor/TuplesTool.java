@@ -42,7 +42,7 @@ import com.yahoo.glimmer.util.MergeSortTool;
 
 public class TuplesTool extends Configured implements Tool {
     private static final String COUNTS_FILENAME = "counts";
-    public static final String CONTEXTS_ARG = "includeContexts";
+    public static final String NO_CONTEXTS_ARG = "excludeContexts";
     private static final String OUTPUT_ARG = "output";
     private static final String INPUT_ARG = "input";
 
@@ -50,12 +50,12 @@ public class TuplesTool extends Configured implements Tool {
 	int ret = ToolRunner.run(new TuplesTool(), args);
 	System.exit(ret);
     }
-    
+
     @Override
     public int run(String[] args) throws Exception {
 
 	SimpleJSAP jsap = new SimpleJSAP(TuplesTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
-	    	new Switch(CONTEXTS_ARG, 'c', "with-contexts", "Included the nquads context in the generated output."),
+		new Switch(NO_CONTEXTS_ARG, 'C', "withoutContexts", "Don't process the contexts for each tuple."),
 		new UnflaggedOption(INPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
 		new UnflaggedOption(OUTPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the out data."),
 
@@ -67,9 +67,11 @@ public class TuplesTool extends Configured implements Tool {
 	    System.exit(1);
 	}
 	
+	boolean withContexts = !jsapResult.getBoolean(NO_CONTEXTS_ARG, false);
+
 	Configuration config = getConf();
-	config.set(TuplesToResourcesMapper.INCLUDE_CONTEXTS_KEY, Boolean.toString(jsapResult.getBoolean(CONTEXTS_ARG, false)));
-	
+	config.setBoolean(TuplesToResourcesMapper.INCLUDE_CONTEXTS_KEY, withContexts);
+
 	Job job = new Job(config);
 	job.setJarByClass(TuplesTool.class);
 
@@ -79,14 +81,13 @@ public class TuplesTool extends Configured implements Tool {
 	job.setMapperClass(TuplesToResourcesMapper.class);
 	job.setMapOutputKeyClass(Text.class);
 	job.setMapOutputValueClass(Text.class);
-	
+
 	job.setCombinerClass(ResourcesReducer.class);
 	job.setReducerClass(ResourcesReducer.class);
 	job.setOutputKeyClass(Text.class);
 	job.setOutputValueClass(Text.class);
-	
-	job.setOutputFormatClass(ResourceRecordWriter.OutputFormat.class);
 
+	job.setOutputFormatClass(ResourceRecordWriter.OutputFormat.class);
 
 	FileInputFormat.setInputPaths(job, new Path(jsapResult.getString(INPUT_ARG)));
 
@@ -97,26 +98,31 @@ public class TuplesTool extends Configured implements Tool {
 	    System.err.print("Failed to process tuples from " + jsapResult.getString(INPUT_ARG));
 	    return 1;
 	}
-	
+
 	// We now have:
-	// 	One file per reducer containing lists of urls(recourses) for subjects, predicates, objects and contexts.
-	// 	One file per reducer that contains all resources.  subjects + predicates + objects + contexts.
-	// 	One file per reducer that contains the subjects + all <predicate> <object>|"Literal" <context> on that subject.
-	// All the files are sorted but we need to merge each reducers output into one file that is also sorted.
-	
-	// Maybe quicker to use a MR job with one reducer..  Currently decompression, merge and compression are all done in this thread..
-	
+	// One file per reducer containing lists of urls(recourses) for
+	// subjects, predicates, objects and contexts.
+	// One file per reducer that contains all resources. subjects +
+	// predicates + objects + contexts.
+	// One file per reducer that contains the subjects + all <predicate>
+	// <object>|"Literal" <context> on that subject.
+	// All the files are sorted but we need to merge each reducers output
+	// into one file that is also sorted.
+
+	// Maybe quicker to use a MR job with one reducer.. Currently
+	// decompression, merge and compression are all done in this thread..
+
 	FileSystem fs = FileSystem.get(config);
-	
+
 	Map<String, List<Path>> filenamesToPartPaths = new HashMap<String, List<Path>>();
-	
+
 	FileStatus[] outputPartStatuses = fs.listStatus(outputDir, new Utils.OutputFileUtils.OutputFilesFilter());
 	for (FileStatus outputPartStatus : outputPartStatuses) {
 	    FileStatus[] outputFileStatuses = fs.listStatus(outputPartStatus.getPath());
 	    for (FileStatus outputFileStatus : outputFileStatuses) {
 		String fullFilename = outputFileStatus.getPath().toString();
 		String filename = fullFilename.substring(fullFilename.lastIndexOf('/') + 1);
-		
+
 		List<Path> partPaths = filenamesToPartPaths.get(filename);
 		if (partPaths == null) {
 		    partPaths = new ArrayList<Path>();
@@ -125,12 +131,12 @@ public class TuplesTool extends Configured implements Tool {
 		partPaths.add(outputFileStatus.getPath());
 	    }
 	}
-	
+
 	CompressionCodecFactory factory = new CompressionCodecFactory(config);
-	
+
 	Path countsPath = new Path(outputDir, COUNTS_FILENAME);
 	FSDataOutputStream countsOutputStream = fs.create(countsPath);
-	
+
 	for (String filename : filenamesToPartPaths.keySet()) {
 	    Path outputPath = new Path(outputDir, filename);
 	    List<Path> sourcePaths = filenamesToPartPaths.get(filename);
@@ -140,7 +146,7 @@ public class TuplesTool extends Configured implements Tool {
 	}
 	countsOutputStream.flush();
 	countsOutputStream.close();
-	
+
 	return 0;
     }
 }

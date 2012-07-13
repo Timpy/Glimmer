@@ -15,33 +15,8 @@ import org.apache.hadoop.conf.Configuration;
 
 
 public class HorizontalDocumentFactory extends RDFDocumentFactory {
-
-    /**
-     * Returns a copy of this document factory. A new parser is allocated for
-     * the copy.
-     */
-//    public HorizontalDocumentFactory copy() {
-//	return new HorizontalDocumentFactory(defaultMetadata);
-//    }
-//
-//    public HorizontalDocumentFactory(final Properties properties) throws ConfigurationException {
-//	super(properties);
-//    }
-//
-//    public HorizontalDocumentFactory(final Reference2ObjectMap<Enum<?>, Object> defaultMetadata) {
-//	super(defaultMetadata);
-//    }
-//
-//    public HorizontalDocumentFactory(final String[] property) throws ConfigurationException {
-//	super(property);
-//    }
-//
-//    public HorizontalDocumentFactory() {
-//	super();
-//    }
-    
-    public static void setupConf(Configuration conf, boolean withContext, String resourcesHash) {
-	setupConf(conf, IndexType.HORIZONTAL, withContext, resourcesHash, "token", "property", "context", "uri");
+    public static void setupConf(Configuration conf, boolean withContext, String resourcesHash, String hashValuePrefix) {
+	setupConf(conf, IndexType.HORIZONTAL, withContext, resourcesHash, hashValuePrefix, "object", "predicate", "context", "subject");
     }
 
     @Override

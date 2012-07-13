@@ -16,14 +16,10 @@ import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
-import org.openrdf.model.Value;
+import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
@@ -42,6 +38,10 @@ class VerticalDocument extends RDFDocument {
 
     protected VerticalDocument(VerticalDocumentFactory factory) {
 	super(factory);
+	fields = new ArrayList<List<String>>(factory.getFieldCount());
+	while (fields.size() < factory.getFieldCount()) {
+	    fields.add(new ArrayList<String>());
+	}
     }
 
     @Override
@@ -49,66 +49,53 @@ class VerticalDocument extends RDFDocument {
 	return IndexType.VERTICAL;
     }
 
-    protected void ensureParsed_(StatementCollectorHandler handler) throws IOException {
-	// Initialize fields
-	fields.clear();
-	for (int i = 0; i < factory.numberOfFields(); i++) {
-	    fields.add(new ArrayList<String>());
+    protected void ensureParsed_(List<Relation> relations) throws IOException {
+	// clear fields
+	for (List<String> field : fields) {
+	    field.clear();
 	}
 
-	for (Statement stmt : handler.getStatements()) {
-
-	    String predicate = stmt.getPredicate().toString();
-
-	    String fieldName = predicate;
-
+	for (Relation relation : relations) {
+	    String predicate = relation.getPredicate().toString();
 	    // Check if prefix is on blacklist
-	    if (RDFDocumentFactory.isOnPredicateBlacklist(fieldName)) {
+	    if (RDFDocumentFactory.isOnPredicateBlacklist(predicate)) {
 		factory.incrementCounter(RdfCounters.BLACKLISTED_TRIPLES, 1);
 		continue;
 	    }
-
 	    // Determine whether we need to index, and the field
-	    int fieldIndex = factory.fieldIndex(fieldName);
+	    int fieldIndex = factory.getFieldIndex(predicate);
 	    if (fieldIndex == -1) {
-		System.err.println("Field not indexed: " + fieldName);
+		System.err.println("Field not indexed: " + predicate);
 		factory.incrementCounter(RdfCounters.UNINDEXED_PREDICATE_TRIPLES, 1);
 		continue;
 	    }
+	    
+	    List<String> fieldForPredicate = fields.get(fieldIndex);
 
-	    if (stmt.getObject() instanceof Resource) {
+	    if (relation.getObject() instanceof Resource) {
 		// For all fields except type, encode the resource URI
 		// or bnode ID using the resources hash
 		if (predicate.equals(RDF.TYPE.toString())) {
 		    factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
-		    fields.get(fieldIndex).add(stmt.getObject().toString());
+		    fieldForPredicate.add(relation.getObject().toString());
 		} else {
-		    Integer objectId = factory.lookupResource(stmt.getObject().stringValue());
+		    String objectId = factory.lookupResource(relation.getObject().toString(), true);
 		    if (objectId == null) {
-			throw new IllegalStateException("Object " + stmt.getObject().toString() + " not in resources hash function!");
+			throw new IllegalStateException("Object " + relation.getObject().toString() + " not in resources hash function!");
 		    }
-		    fields.get(fieldIndex).add(objectId.toString());
+		    fieldForPredicate.add(objectId);
 		}
 	    } else {
-		Value object = stmt.getObject();
-		String objectAsString;
-		if (object instanceof Literal) {
-		    // If we treat a Literal as just a Value we index the
-		    // @lang and ^^<type> too
-		    objectAsString = ((Literal) object).stringValue();
-		} else {
-		    objectAsString = object.stringValue();
-		}
+		String object = relation.getObject().toString();
 
 		// Iterate over the words of the value
-		FastBufferedReader fbr = new FastBufferedReader(new StringReader(objectAsString));
+		FastBufferedReader fbr = new FastBufferedReader(object.toCharArray());
 		MutableString word = new MutableString();
 		MutableString nonWord = new MutableString();
-
 		while (fbr.next(word, nonWord)) {
 		    if (word != null && !word.equals("")) {
 			if (CombinedTermProcessor.getInstance().processTerm(word)) {
-			    fields.get(fieldIndex).add(word.toString());
+			    fieldForPredicate.add(word.toString());
 			}
 		    }
 		}

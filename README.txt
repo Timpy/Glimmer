@@ -79,11 +79,7 @@ this project, but instead are separately downloaded from the respective provider
 * Java Mail version 1.4.5 (Oracle Binary Code License - http://www.oracle.com/technetwork/java/javase/terms/license/index.html)
   Java mail implementation. 
   http://www.oracle.com/technetwork/java/javamail/index.html
-			
-* Sesame version 2.3.2 (a BSD-style license - http://www.openrdf.org/download.jsp)
-  Sesame is a de-facto standard framework for processing RDF data.
-  http://www.openrdf.org/
-			
+
 * Guava version 11.0.2 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
   Collection of several of Google's core libraries.
   http://code.google.com/p/guava-libraries/

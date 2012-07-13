@@ -25,7 +25,7 @@ import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
     @Test
     public void test1() throws IOException {
-	VerticalDocumentFactory.setupConf(conf, IndexType.VERTICAL, true, null, new String[] { "http://predicate/1", "http://predicate/2", "http://predicate/3" });
+	VerticalDocumentFactory.setupConf(conf, IndexType.VERTICAL, true, null, "@", new String[] { "http://predicate/1", "http://predicate/2", "http://predicate/3" });
 
 	resourcesHash.put("http://subject/", 33l);
 	resourcesHash.put("http://context/1", 55l);
@@ -34,7 +34,7 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 
 	VerticalDocumentFactory factory = (VerticalDocumentFactory) RDFDocumentFactory.buildFactory(conf);
 	factory.setResourcesHashFunction(resourcesHash);
-	assertEquals(3, factory.numberOfFields());
+	assertEquals(3, factory.getFieldCount());
 	VerticalDocument document = (VerticalDocument) factory.getDocument();
 	document.setContent(rawContentInputStream);
 
@@ -47,13 +47,13 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 
 	WordArrayReader reader = (WordArrayReader) document.content(0);
 	assertTrue(reader.next(word, nonWord));
-	assertEquals("45", word.toString());
+	assertEquals("@45", word.toString());
 	assertEquals("", nonWord.toString());
 	assertFalse(reader.next(word, nonWord));
 
 	reader = (WordArrayReader) document.content(1);
 	assertTrue(reader.next(word, nonWord));
-	assertEquals("46", word.toString());
+	assertEquals("@46", word.toString());
 	assertEquals("", nonWord.toString());
 	assertFalse(reader.next(word, nonWord));
 

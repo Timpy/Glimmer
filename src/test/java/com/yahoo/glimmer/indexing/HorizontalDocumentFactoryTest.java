@@ -24,16 +24,11 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
     
     @Test
     public void withContextTest() throws IOException {
-	HorizontalDocumentFactory.setupConf(conf, true, null);
-	
-	resourcesHash.put("http://subject/", 33l);
-	resourcesHash.put("http://context/1", 55l);
-	resourcesHash.put("http://object/1", 45l);
-	resourcesHash.put("http://object/2", 46l);
-	
+	HorizontalDocumentFactory.setupConf(conf, true, null, "@");
 	HorizontalDocumentFactory factory = (HorizontalDocumentFactory)RDFDocumentFactory.buildFactory(conf);
 	factory.setResourcesHashFunction(resourcesHash);
-	assertEquals(4, factory.numberOfFields());
+	assertEquals(4, factory.getFieldCount());
+	
 	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
 	document.setContent(rawContentInputStream);
 	
@@ -43,21 +38,31 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	MutableString nonWord = new MutableString();
 	
 	// token, predicate & context are positional/parallel indexes.
-	WordArrayReader tokenReader = (WordArrayReader)document.content(0);
+	WordArrayReader objectReader = (WordArrayReader)document.content(0);
 	WordArrayReader predicateReader = (WordArrayReader)document.content(1);
 	WordArrayReader contextReader = (WordArrayReader)document.content(2);
 	
-	assertTrue(tokenReader.next(word, nonWord));
-	assertEquals("45", word.toString());
+	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("@45", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
 	assertEquals("http_predicate_1", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
+	assertEquals("22", word.toString());
+	assertEquals("", nonWord.toString());
+	
+	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("@46", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(predicateReader.next(word, nonWord));
+	assertEquals("http_predicate_2", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
-	assertTrue(tokenReader.next(word, nonWord));
+	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("object", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
@@ -67,7 +72,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("55", word.toString());
 	assertEquals("", nonWord.toString());
 	
-	assertTrue(tokenReader.next(word, nonWord));
+	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("3", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
@@ -77,17 +82,17 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("55", word.toString());
 	assertEquals("", nonWord.toString());
 	
-	assertTrue(tokenReader.next(word, nonWord));
-	assertEquals("46", word.toString());
+	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("88", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("http_predicate_2", word.toString());
+	assertEquals("http_predicate_4", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
-	assertFalse(tokenReader.next(word, nonWord));
+	assertFalse(objectReader.next(word, nonWord));
 	assertFalse(predicateReader.next(word, nonWord));
 	assertFalse(contextReader.next(word, nonWord));
 	
@@ -99,21 +104,16 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(3l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(4l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
     
     @Test
     public void withoutContextTest() throws IOException {
-	HorizontalDocumentFactory.setupConf(conf, false, null);
-	
-	resourcesHash.put("http://subject/", 33l);
-	resourcesHash.put("http://context/1", 55l);
-	resourcesHash.put("http://object/1", 45l);
-	resourcesHash.put("http://object/2", 46l);
-	
+	HorizontalDocumentFactory.setupConf(conf, false, null, "@");
 	HorizontalDocumentFactory factory = (HorizontalDocumentFactory) RDFDocumentFactory.buildFactory(conf);
 	factory.setResourcesHashFunction(resourcesHash);
-	assertEquals(4, factory.numberOfFields());
+	assertEquals(4, factory.getFieldCount());
+	
 	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
 	document.setContent(rawContentInputStream);
 	assertEquals("http://subject/", document.getSubject());
@@ -122,12 +122,12 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	MutableString nonWord = new MutableString();
 	
 	// token, predicate & context are positional/parallel indexes.
-	WordArrayReader tokenReader = (WordArrayReader)document.content(0);
+	WordArrayReader objectReader = (WordArrayReader)document.content(0);
 	WordArrayReader predicateReader = (WordArrayReader)document.content(1);
 	WordArrayReader contextReader = (WordArrayReader)document.content(2);
 	
-	assertTrue(tokenReader.next(word, nonWord));
-	assertEquals("45", word.toString());
+	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("@45", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
 	assertEquals("http_predicate_1", word.toString());
@@ -136,7 +136,17 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
-	assertTrue(tokenReader.next(word, nonWord));
+	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("@46", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(predicateReader.next(word, nonWord));
+	assertEquals("http_predicate_2", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(contextReader.next(word, nonWord));
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
+	assertEquals("", nonWord.toString());
+	
+	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("object", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
@@ -146,7 +156,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
-	assertTrue(tokenReader.next(word, nonWord));
+	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("3", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
@@ -156,17 +166,17 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
-	assertTrue(tokenReader.next(word, nonWord));
-	assertEquals("46", word.toString());
+	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("88", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
-	assertEquals("http_predicate_2", word.toString());
+	assertEquals("http_predicate_4", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(contextReader.next(word, nonWord));
 	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
 	assertEquals("", nonWord.toString());
 	
-	assertFalse(tokenReader.next(word, nonWord));
+	assertFalse(objectReader.next(word, nonWord));
 	assertFalse(predicateReader.next(word, nonWord));
 	assertFalse(contextReader.next(word, nonWord));
 	
@@ -178,6 +188,6 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(3l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(4l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
 }

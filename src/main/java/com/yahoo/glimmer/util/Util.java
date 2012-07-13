@@ -48,18 +48,6 @@ import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.log4j.Logger;
-import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
-import org.openrdf.model.URI;
-import org.openrdf.model.Value;
-import org.openrdf.model.impl.BNodeImpl;
-import org.openrdf.model.impl.ContextStatementImpl;
-import org.openrdf.model.impl.LiteralImpl;
-import org.openrdf.model.impl.StatementImpl;
-import org.openrdf.model.impl.URIImpl;
-import org.semanticweb.yars.nx.Node;
-import org.semanticweb.yars.nx.parser.NxParser;
-import org.semanticweb.yars.nx.parser.ParseException;
 import org.w3c.dom.Document;
 
 public class Util {
@@ -389,72 +377,6 @@ public class Util {
 	md.update(text.getBytes("iso-8859-1"), 0, text.length());
 	md5hash = md.digest();
 	return convertToHex(md5hash);
-    }
-
-    /**
-     * Parse an NQuad string and convert it to Sesame's Statement object
-     * 
-     * @throws ParseException
-     * 
-     */
-    public final static Statement parseStatement(String line) throws ParseException {
-	Node[] nodes = NxParser.parseNodes(line);
-	return parseStatement(nodes);
-
-    }
-
-    /**
-     * Convert an NQuad to Sesame's Statement object
-     * 
-     * @throws ParseException
-     * 
-     */
-    public final static Statement parseStatement(Node[] nodes) throws ParseException {
-	try {
-	    Resource subject = null;
-	    if (nodes[0] instanceof org.semanticweb.yars.nx.Resource) {
-		subject = new URIImpl(nodes[0].toString());
-	    } else if (nodes[0] instanceof org.semanticweb.yars.nx.BNode) {
-		String nodeID = nodes[0].toString().substring(org.semanticweb.yars.nx.BNode.PREFIX.length());
-		subject = new BNodeImpl(nodeID);
-	    }
-	    URI predicate = new URIImpl(nodes[1].toString());
-	    Value object = null;
-	    if (nodes[2] instanceof org.semanticweb.yars.nx.Resource) {
-		object = new URIImpl(nodes[2].toString());
-	    } else if (nodes[2] instanceof org.semanticweb.yars.nx.BNode) {
-		String nodeID = nodes[2].toString().substring(org.semanticweb.yars.nx.BNode.PREFIX.length());
-		object = new BNodeImpl(nodeID);
-	    } else {
-		if (((org.semanticweb.yars.nx.Literal) nodes[2]).getDatatype() != null) {
-		    URI datatype = new URIImpl(((org.semanticweb.yars.nx.Literal) nodes[2]).getDatatype().toString());
-		    object = new LiteralImpl(((org.semanticweb.yars.nx.Literal) nodes[2]).getUnescapedData(), datatype);
-
-		} else if (((org.semanticweb.yars.nx.Literal) nodes[2]).getLanguageTag() != null) {
-		    String language = ((org.semanticweb.yars.nx.Literal) nodes[2]).getLanguageTag();
-		    object = new LiteralImpl(((org.semanticweb.yars.nx.Literal) nodes[2]).getUnescapedData(), language);
-		} else {
-		    object = new LiteralImpl(((org.semanticweb.yars.nx.Literal) nodes[2]).getUnescapedData());
-		}
-	    }
-	    // Check if there is context
-	    Resource context = null;
-	    if (nodes.length > 3) {
-		if (nodes[3] instanceof org.semanticweb.yars.nx.Resource) {
-		    context = new URIImpl(nodes[3].toString());
-		} else if (nodes[3] instanceof org.semanticweb.yars.nx.BNode) {
-		    String nodeID = nodes[3].toString().substring(org.semanticweb.yars.nx.BNode.PREFIX.length());
-		    context = new BNodeImpl(nodeID);
-		}
-	    }
-	    if (context != null) {
-		return new ContextStatementImpl(subject, predicate, object, context);
-	    } else {
-		return new StatementImpl(subject, predicate, object);
-	    }
-	} catch (IllegalArgumentException iae) {
-	    throw new ParseException(iae);
-	}
     }
 
     public static String encodeFieldName(String name) {

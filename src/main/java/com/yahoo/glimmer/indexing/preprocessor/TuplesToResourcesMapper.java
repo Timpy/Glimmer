@@ -61,9 +61,8 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
     private StringBuilder relations = new StringBuilder();
     
     protected void setup(Mapper<LongWritable,Text,Text,Text>.Context context) throws java.io.IOException ,InterruptedException {
-	String includeContextsString = context.getConfiguration().get(INCLUDE_CONTEXTS_KEY);
-	assert includeContextsString != null;
-	setIncludeContexts(Boolean.parseBoolean(includeContextsString));
+	boolean includeContexts = context.getConfiguration().getBoolean(INCLUDE_CONTEXTS_KEY, true);
+	setIncludeContexts(includeContexts);
     };
 
     public void setIncludeContexts(boolean includeContexts) {

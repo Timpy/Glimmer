@@ -15,46 +15,34 @@ import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.mg4j.document.DocumentFactory.FieldType;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
-import java.net.MalformedURLException;
 import java.util.Arrays;
 import java.util.Collection;
-
-import javax.xml.transform.TransformerConfigurationException;
-import javax.xml.transform.TransformerException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Counters;
-import org.openrdf.rio.RDFHandlerException;
-import org.openrdf.rio.RDFParseException;
-import org.semanticweb.yars.nx.parser.ParseException;
-
-import com.yahoo.glimmer.util.Util;
 
 /* Common superclass to HorizontalDocumentFactory and VerticalDocumentFactory.
  * 
  */
 public abstract class RDFDocumentFactory {
     private static final Log LOG = LogFactory.getLog(RDFDocumentFactory.class);
-    
+
+    private static final String CONF_FIELDNAMES_KEY = "RdfFieldNames";
     private static final String CONF_INDEX_TYPE_KEY = "IndexType";
     private static final String CONF_WITH_CONTEXTS_KEY = "WithContexts";
-    private static final String CONF_FIELDNAMES_KEY = "RdfFieldNames";
+    private static final String CONF_HASH_VALUE_PREFIX_KEY = "HashValuePrefix";
     private static final String CONF_RESOURCES_HASH_KEY = "ResourcesFilename";
 
     private static final Collection<String> PREDICATE_BLACKLIST = Arrays.asList("stag", "tagspace", "ctag", "rel", "mm");
 
-    /** Determines if we use the namespaces table for abbreviating field names */
-    public static final boolean USE_NAMESPACES = false;
-    public static final char NAMESPACE_SEPARATOR = '_';
-
     private String[] fields;
     private AbstractObject2LongFunction<CharSequence> resourcesHashFunction;
+    private String hashValuePrefix = "";
 
     // TODO How to read these?
     private Counters counters = new Counters();
@@ -78,13 +66,14 @@ public abstract class RDFDocumentFactory {
 
     public abstract RDFDocument getDocument();
 
-    protected static void setupConf(Configuration conf, IndexType type, boolean withContexts, String resourcesHash, String... fields) {
+    protected static void setupConf(Configuration conf, IndexType type, boolean withContexts, String resourcesHash, String hashValuePrefix, String... fields) {
 	conf.setEnum(CONF_INDEX_TYPE_KEY, type);
 	conf.setBoolean(CONF_WITH_CONTEXTS_KEY, withContexts);
-	conf.setStrings(CONF_FIELDNAMES_KEY, fields);
 	if (resourcesHash != null) {
 	    conf.set(CONF_RESOURCES_HASH_KEY, resourcesHash);
 	}
+	conf.set(CONF_HASH_VALUE_PREFIX_KEY, hashValuePrefix);
+	conf.setStrings(CONF_FIELDNAMES_KEY, fields);
     }
 
     public static String[] getFieldsFromConf(Configuration conf) {
@@ -114,14 +103,15 @@ public abstract class RDFDocumentFactory {
 	    throw new RuntimeException(e);
 	}
 	factory.setFields(getFieldsFromConf(conf));
-	factory.setWithContexts(conf.getBoolean(CONF_WITH_CONTEXTS_KEY, false));
+	factory.setWithContexts(conf.getBoolean(CONF_WITH_CONTEXTS_KEY, true));
+	factory.setHashValuePrefix(conf.get(CONF_HASH_VALUE_PREFIX_KEY, ""));
 	String resourcesHashFilename = conf.get(CONF_RESOURCES_HASH_KEY);
 	if (resourcesHashFilename != null) {
 	    // Load the hash func.
 	    try {
 		Path resourcesHashPath = new Path(resourcesHashFilename);
 		InputStream resourcesHashInputStream = CompressionCodecHelper.openInputStream(conf, resourcesHashPath);
-		
+
 		@SuppressWarnings("unchecked")
 		AbstractObject2LongFunction<CharSequence> hash = (AbstractObject2LongFunction<CharSequence>) BinIO.loadObject(resourcesHashInputStream);
 		factory.setResourcesHashFunction(hash);
@@ -135,30 +125,28 @@ public abstract class RDFDocumentFactory {
 	return factory;
     }
 
-    protected StatementCollectorHandler parseStatements(String url, String data) throws TransformerConfigurationException, RDFParseException,
-	    RDFHandlerException, MalformedURLException, IOException, TransformerException, ParseException {
-	StatementCollectorHandler handler = new StatementCollectorHandler();
-	// NTuples format where tuples are separated by double spaces
-	String[] lines = data.split("  ");
-	for (String line : lines) {
-	    handler.handleStatement(Util.parseStatement(line));
-	}
-	return handler;
-    }
-
     public void setResourcesHashFunction(AbstractObject2LongFunction<CharSequence> resourcesHashFunction) {
 	this.resourcesHashFunction = resourcesHashFunction;
     }
-    
+
+    public String getHashValuePrefix() {
+	return hashValuePrefix;
+    }
+
+    public void setHashValuePrefix(String hashValuePrefix) {
+	this.hashValuePrefix = hashValuePrefix;
+    }
+
     /**
      * @param url
-     * @return The hash value for the given url, or null if the url is not in
-     *         the hash function. nulls will only be returned when the hash
-     *         function being used is signed. For unsigned hash functions some
-     *         value smaller than the size of the hash will be returned.
+     * @return The hash value for the given URL/BNode or null if the given
+     *         URL/BNode is not in the hash function. nulls will only be
+     *         returned when the hash function being used is signed. For
+     *         unsigned hash functions some value smaller than the size of the
+     *         hash will be returned.
      */
-    public Integer lookupResource(String url) {
-	Long value = resourcesHashFunction.get(url);
+    public Integer lookupResource(String key) {
+	Long value = resourcesHashFunction.get(key);
 	if (value == null || value < 0) {
 	    return null;
 	}
@@ -166,6 +154,18 @@ public abstract class RDFDocumentFactory {
 	    throw new RuntimeException("Hash value bigger that max int.");
 	}
 	return value.intValue();
+    }
+
+    public String lookupResource(String key, boolean prefixed) {
+	Integer intValue = lookupResource(key);
+	if (intValue != null) {
+	    if (prefixed) {
+		return hashValuePrefix + intValue.toString();
+	    } else {
+		return intValue.toString();
+	    }
+	}
+	return null;
     }
 
     public boolean isWithContexts() {
@@ -184,17 +184,17 @@ public abstract class RDFDocumentFactory {
 	this.fields = fields;
     }
 
-    public int numberOfFields() {
+    public int getFieldCount() {
 	ensureFieldIndex(0);
 	return fields.length;
     }
 
-    public String fieldName(final int index) {
+    public String getFieldName(final int index) {
 	ensureFieldIndex(index);
 	return fields[index];
     }
 
-    public int fieldIndex(final String fieldName) {
+    public int getFieldIndex(final String fieldName) {
 	ensureFieldIndex(0);
 	for (int i = 0; i < fields.length; i++) {
 	    if (fields[i].equals(fieldName)) {
@@ -204,7 +204,7 @@ public abstract class RDFDocumentFactory {
 	return -1;
     }
 
-    public FieldType fieldType(final int index) {
+    public FieldType getFieldType(final int index) {
 	ensureFieldIndex(index);
 	return FieldType.TEXT;
     }

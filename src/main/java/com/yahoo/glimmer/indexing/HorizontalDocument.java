@@ -16,13 +16,11 @@ import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.openrdf.model.Literal;
-import org.openrdf.model.Resource;
-import org.openrdf.model.Statement;
+import org.semanticweb.yars.nx.BNode;
+import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
@@ -38,12 +36,23 @@ import com.yahoo.glimmer.util.Util;
  */
 
 class HorizontalDocument extends RDFDocument {
-    /** Field content **/
-    private List<String> tokens = new ArrayList<String>();
-    private List<String> properties = new ArrayList<String>();
+    /*
+     * The fields objects, predicates & contexts are used in 'parallel' So the
+     * value at index I from the three lists refers to the same relation. If the
+     * object is a Resource or BNode it's single hash value is put in the
+     * objects list at index I. If the object is a Literal with n terms. The
+     * terms are put in the objects list at indexes I to I+n-1
+     */
+    // Literals objects are the terms.
+    // Resource/NBode objects are the hash values.
+    private List<String> objects = new ArrayList<String>();
+    // Predicates holds the encoded urls http_www_blar_com_something
+    private List<String> predicates = new ArrayList<String>();
+    // Contexts are the hash values.
     private List<String> contexts = new ArrayList<String>();
-    // uri is strings extracted from the url
-    private List<String> uri = new ArrayList<String>();
+
+    // subjectTokens are tokens extracted from the subject Resource/BNode
+    private List<String> subjectTokens = new ArrayList<String>();
 
     protected HorizontalDocument(HorizontalDocumentFactory factory) {
 	super(factory);
@@ -54,33 +63,37 @@ class HorizontalDocument extends RDFDocument {
 	return IndexType.HORIZONTAL;
     }
 
-    protected void ensureParsed_(StatementCollectorHandler handler) throws IOException {
-	tokens.clear();
-	properties.clear();
+    protected void ensureParsed_(List<Relation> relations) throws IOException {
+	objects.clear();
+	predicates.clear();
 	contexts.clear();
-	uri.clear();
+	subjectTokens.clear();
 
-	// Index URI except the protocol, if exists
+	// Index subject tokens
+	// We index the BNode id. Do we need it?
+	String subject = getSubject();
 	FastBufferedReader fbr;
+	// remove http/https or _:
+	int startAt = subject.indexOf(':');
+	if (startAt < 0) {
+	    fbr = new FastBufferedReader(subject.toCharArray());
+	} else {
+	    startAt++;
+	    fbr = new FastBufferedReader(subject.toCharArray(), startAt, subject.length() - startAt);
+	}
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
-	int firstColon = getSubject().indexOf(':');
-	if (firstColon < 0) {
-	    fbr = new FastBufferedReader(new StringReader(getSubject()));
-	} else {
-	    fbr = new FastBufferedReader(new StringReader(getSubject().substring(firstColon + 1)));
-	}
 	while (fbr.next(word, nonWord)) {
 	    if (word != null && !word.equals("")) {
 		if (CombinedTermProcessor.getInstance().processTerm(word)) {
-		    uri.add(word.toString().toLowerCase());
+		    subjectTokens.add(word.toString().toLowerCase());
 		}
 	    }
 	}
 	fbr.close();
 
-	for (Statement stmt : handler.getStatements()) {
-	    String predicate = stmt.getPredicate().toString();
+	for (Relation relation : relations) {
+	    String predicate = relation.getPredicate().toString();
 	    String fieldName = Util.encodeFieldName(predicate);
 
 	    // Check if prefix is on blacklist
@@ -89,43 +102,53 @@ class HorizontalDocument extends RDFDocument {
 		continue;
 	    }
 
-	    String context = NO_CONTEXT;
-	    if (factory.isWithContexts() && stmt.getContext() != null) {
-		context = stmt.getContext().toString();
-		Integer contextId = factory.lookupResource(context);
-		if (contextId == null) {
-		    throw new IllegalStateException("Context " + context + " not in resources hash function!");
+	    String contextId = NO_CONTEXT;
+	    if (factory.isWithContexts() && relation.getContext() != null) {
+		if (relation.getContext() instanceof Resource) {
+		    contextId = factory.lookupResource(relation.getContext().toString(), false);
+		    if (contextId == null) {
+			throw new IllegalStateException("Context " + relation.getContext() + " not in resources hash function!");
+		    }
+		} else {
+		    throw new IllegalStateException("Context " + relation.getContext() + " is not a Resource.");
 		}
-		context = contextId.toString();
 	    }
 
-	    if (stmt.getObject() instanceof Resource) {
+	    if (relation.getObject() instanceof Resource) {
 		if (predicate.equals(RDF.TYPE.toString())) {
 		    factory.incrementCounter(RdfCounters.RDF_TYPE_TRIPLES, 1);
-		    tokens.add(stmt.getObject().toString());
+		    objects.add(relation.getObject().toString());
 		} else {
-		    Integer objectId = factory.lookupResource(stmt.getObject().toString());
+		    String objectId = factory.lookupResource(relation.getObject().toString(), true);
 		    if (objectId == null) {
-			throw new IllegalStateException("Object " + stmt.getObject().toString() + " not in resources hash function!");
+			throw new IllegalStateException("Object " + relation.getObject() + " not in resources hash function!");
 		    }
-		    tokens.add(objectId.toString());
+		    objects.add(objectId);
 		}
-		properties.add(fieldName);
-		contexts.add(context);
+		predicates.add(fieldName);
+		contexts.add(contextId);
+	    } else if (relation.getObject() instanceof BNode) {
+		String objectId = factory.lookupResource(relation.getObject().toString(), false);
+		if (objectId == null) {
+		    throw new IllegalStateException("Object " + relation.getObject() + " not in resources hash function!");
+		}
+		objects.add(objectId);
+		predicates.add(fieldName);
+		contexts.add(contextId);
 	    } else {
-		String object = ((Literal) stmt.getObject()).getLabel();
+		String object = relation.getObject().toString();
 		// Iterate over the words of the value
-		fbr = new FastBufferedReader(new StringReader(object));
+		fbr = new FastBufferedReader(object.toCharArray());
 		while (fbr.next(word, nonWord)) {
 		    if (word != null && !word.equals("")) {
 			if (CombinedTermProcessor.getInstance().processTerm(word)) {
 			    // Lowercase terms
-			    tokens.add(word.toString());
+			    objects.add(word.toString());
 
 			    // Preserve casing for properties and
 			    // contexts
-			    properties.add(fieldName);
-			    contexts.add(context);
+			    predicates.add(fieldName);
+			    contexts.add(contextId);
 			}
 
 		    }
@@ -143,13 +166,13 @@ class HorizontalDocument extends RDFDocument {
 	ensureParsed();
 	switch (field) {
 	case 0:
-	    return new WordArrayReader(tokens);
+	    return new WordArrayReader(objects);
 	case 1:
-	    return new WordArrayReader(properties);
+	    return new WordArrayReader(predicates);
 	case 2:
 	    return new WordArrayReader(contexts);
 	case 3:
-	    return new WordArrayReader(uri);
+	    return new WordArrayReader(subjectTokens);
 	default:
 	    throw new IllegalArgumentException();
 	}

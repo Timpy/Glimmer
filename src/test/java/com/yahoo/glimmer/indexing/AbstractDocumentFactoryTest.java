@@ -27,9 +27,10 @@ import org.junit.Before;
 public class AbstractDocumentFactoryTest {
     protected static final Charset RAW_CHARSET = Charset.forName("UTF-8");
     protected static final String RAW_CONTENT_STRING = "http://subject/\t" +
-    		"<http://subject/> <http://predicate/1> <http://object/1> \"literal context\" .  " +
+    		"<http://subject/> <http://predicate/1> <http://object/1> <file:/tmp/source> .  " +
     		"<http://subject/> <http://predicate/2> <http://object/2> .  " +
-    		"<http://subject/> <http://predicate/3> \"object 3\"@en <http://context/1> .  ";
+    		"<http://subject/> <http://predicate/3> \"object 3\"@en <http://context/1> .  " + 
+    		"<http://subject/> <http://predicate/4> _:BNodeId123 .";
     
     protected Mockery context;
     protected TaskInputOutputContext<?, ?, ?, ?> taskContext;
@@ -61,6 +62,13 @@ public class AbstractDocumentFactoryTest {
 	defineMocks(context);
 	
 	context.checking(defineExpectations());
+	
+	resourcesHash.put("file:/tmp/source", 22l);
+	resourcesHash.put("http://subject/", 33l);
+	resourcesHash.put("http://context/1", 55l);
+	resourcesHash.put("http://object/1", 45l);
+	resourcesHash.put("http://object/2", 46l);
+	resourcesHash.put("BNodeId123", 88l);
 	
 	rawContentInputStream = new ByteArrayInputStream(RAW_CONTENT_STRING.getBytes(RAW_CHARSET));
     }

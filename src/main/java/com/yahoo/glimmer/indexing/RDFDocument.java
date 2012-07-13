@@ -17,14 +17,21 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.semanticweb.yars.nx.Node;
+import org.semanticweb.yars.nx.parser.NxParser;
+import org.semanticweb.yars.nx.parser.ParseException;
 
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
 
 public abstract class RDFDocument {
     public static final String NO_CONTEXT = "";
-    
-    // TODO RDFDocumnet should implement Hadoop's Writable but as we have a ref to an InputStream for lazy parsing this isn't possible.
+
+    // TODO RDFDocumnet should implement Hadoop's Writable but as we have a ref
+    // to an InputStream for lazy parsing this isn't possible.
     protected final RDFDocumentFactory factory;
     /** Whether we already parsed the document. */
     private boolean parsed;
@@ -34,8 +41,10 @@ public abstract class RDFDocument {
     private String subject;
 
     public abstract WordReader content(final int field) throws IOException;
+
     public abstract IndexType getIndexType();
-    protected abstract void ensureParsed_(StatementCollectorHandler handler) throws IOException;
+
+    protected abstract void ensureParsed_(List<Relation> relations) throws IOException;
 
     public RDFDocument(RDFDocumentFactory factory) {
 	this.factory = factory;
@@ -47,7 +56,7 @@ public abstract class RDFDocument {
 	id = null;
 	subject = null;
     }
-    
+
     protected void ensureParsed() throws IOException {
 	if (parsed) {
 	    return;
@@ -66,33 +75,35 @@ public abstract class RDFDocument {
 	    factory.incrementCounter(RdfCounters.EMPTY_LINES, 1);
 	    return;
 	}
-	// First part is subject URL, second part is it's relations
+	// First part is subjects URL or BNode, second is the relations
 	subject = line.substring(0, line.indexOf('\t')).trim();
 	id = factory.lookupResource(subject);
 	if (id == null) {
 	    throw new IllegalStateException("Subject " + subject + " not in resources hash function!");
 	}
 
-	String relations = line.substring(line.indexOf('\t')).trim();
-	if (relations.isEmpty()) {
+	String relationsString = line.substring(line.indexOf('\t')).trim();
+	if (relationsString.isEmpty()) {
 	    factory.incrementCounter(RdfCounters.EMPTY_DOCUMENTS, 1);
 	    return;
 	}
-	
-	// parsing relations
-	StatementCollectorHandler handler;
-	try {
-	    handler = factory.parseStatements(subject, relations);
-	} catch (IOException e) {
-	    throw e;
-	} catch (Exception e) {
-	    System.err.println("Parsing failed for " + subject + ": " + e.getMessage() + "Content was: \n" + line);
-	    return;
+
+	String[] relationsSplit = relationsString.split("  ");
+	List<Relation> relations = new ArrayList<Relation>(relationsSplit.length);
+	for (String relationLine : relationsSplit) {
+	    try {
+		Node[] relationNodes = NxParser.parseNodes(relationLine);
+		Relation relation = new Relation(relationNodes);
+		relations.add(relation);
+	    } catch (ParseException e) {
+		System.err.println("Parsing failed for " + subject + ": " + e.getMessage() + "Content was: \n" + line);
+		return;
+	    }
 	}
-	
-	ensureParsed_(handler);
+
+	ensureParsed_(relations);
     }
-    
+
     public int getId() {
 	try {
 	    ensureParsed();
@@ -110,8 +121,31 @@ public abstract class RDFDocument {
 	}
 	return subject;
     }
-    
+
     public String toString() {
 	return getSubject().toString();
+    }
+    
+    protected static class Relation {
+	private final Node[] nodes;
+	public Relation(Node[] nodes) {
+	    this.nodes = nodes;
+	}
+	
+	public Node getSubject() {
+	    return nodes[0];
+	}
+	public Node getPredicate() {
+	    return nodes[1];
+	}
+	public Node getObject() {
+	    return nodes[2];
+	}
+	public Node getContext() {
+	    if (nodes.length > 3) {
+		return nodes[3];
+	    }
+	    return null;
+	}
     }
 }

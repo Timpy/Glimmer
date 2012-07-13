@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.openrdf.model.vocabulary.RDFS;
 import org.semanticweb.yars.nx.Literal;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.Quad;
@@ -191,7 +190,7 @@ public class RDFResultItem extends ResultItem {
 
 	    // if rdfs:label or woo:label found, use either to assign a value to
 	    // label
-	    if (key.getPredicate().equals(RDFS.LABEL) || key.getPredicate().toString().endsWith("label")) {
+	    if (key.getPredicate().toString().endsWith("label")) {
 		label = key.getObject().toString();
 	    }
 

@@ -41,6 +41,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
     private static final String METHOD_ARG_VALUE_HORIZONTAL = "horizontal";
     private static final String PREDICATES_ARG = "properties";
     private static final String NO_CONTEXTS_ARG = "noContexts";
+    private static final String RESOURCE_PREFIX_ARG = "resourcePrefix";
 
     // Job configuration attribute names
     static final String OUTPUT_DIR = "OUTPUT_DIR";
@@ -54,12 +55,14 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	WritableComparator.define(TermOccurrencePair.class, new TermOccurrencePair.Comparator());
     }
 
-    public int run(String[] arg) throws Exception {
+    public int run(String[] args) throws Exception {
 	SimpleJSAP jsap = new SimpleJSAP(TripleIndexGenerator.class.getName(), "Generates a keyword index from RDF data.", new Parameter[] {
-	    	new Switch(NO_CONTEXTS_ARG, 'C', "withoutContexts", "Don't process the contexts for each tuple."),
+		new Switch(NO_CONTEXTS_ARG, 'C', "withoutContexts", "Don't process the contexts for each tuple."),
 		new FlaggedOption(METHOD_ARG, JSAP.STRING_PARSER, "horizontal", JSAP.REQUIRED, 'm', METHOD_ARG, "horizontal or vertical."),
 		new FlaggedOption(PREDICATES_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', PREDICATES_ARG,
 			"Subset of the properties to be indexed."),
+		new FlaggedOption(RESOURCE_PREFIX_ARG, JSAP.STRING_PARSER, "@", JSAP.NOT_REQUIRED, 'r', RESOURCE_PREFIX_ARG,
+			"Prefix to add to object resource hash values when indexing. Stops queries for numbers matching resource hash values. Default is '@'"),
 
 		new UnflaggedOption("input", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
 		new UnflaggedOption("numdocs", JSAP.INTEGER_PARSER, JSAP.REQUIRED, "Number of documents to index"),
@@ -68,11 +71,11 @@ public class TripleIndexGenerator extends Configured implements Tool {
 
 	});
 
-	JSAPResult args = jsap.parse(arg);
+	JSAPResult jsapResult = jsap.parse(args);
 
 	// check whether the command line was valid, and if it wasn't,
 	// display usage information and exit.
-	if (!args.success()) {
+	if (!jsapResult.success()) {
 	    System.err.println();
 	    System.err.println("Usage: java " + TripleIndexGenerator.class.getName());
 	    System.err.println("                " + jsap.getUsage());
@@ -84,7 +87,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.setJarByClass(TripleIndexGenerator.class);
 	job.setJobName("TripleIndexGenerator" + System.currentTimeMillis());
 
-	FileInputFormat.setInputPaths(job, new Path(args.getString("input")));
+	FileInputFormat.setInputPaths(job, new Path(jsapResult.getString("input")));
 	job.setInputFormatClass(RDFInputFormat.class);
 
 	job.setMapperClass(DocumentMapper.class);
@@ -98,26 +101,25 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.setOutputKeyClass(TermOccurrencePair.class);
 	job.setOutputValueClass(TermOccurrences.class);
 	job.setOutputFormatClass(IndexRecordWriter.OutputFormat.class);
-	FileOutputFormat.setOutputPath(job, new Path(args.getString("output")));
+	FileOutputFormat.setOutputPath(job, new Path(jsapResult.getString("output")));
 
 	Configuration conf = job.getConfiguration();
 
 	conf.setClass("mapred.output.key.comparator.class", TermOccurrencePair.Comparator.class, WritableComparator.class);
 	conf.set("mapreduce.user.classpath.first", "true");
 
+	conf.setInt(NUMBER_OF_DOCUMENTS, jsapResult.getInt("numdocs"));
 
-	conf.setInt(NUMBER_OF_DOCUMENTS, args.getInt("numdocs"));
+	conf.set(OUTPUT_DIR, jsapResult.getString("output"));
 
-	conf.set(OUTPUT_DIR, args.getString("output"));
-
-	boolean withContexts = !args.getBoolean(NO_CONTEXTS_ARG, false);
-	if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
-	    HorizontalDocumentFactory.setupConf(conf, withContexts, args.getString(RESOURCES_HASH_ARG));
-	} else if (args.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)) {
-	    if (!args.contains(PREDICATES_ARG)) {
+	boolean withContexts = !jsapResult.getBoolean(NO_CONTEXTS_ARG, false);
+	if (jsapResult.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_HORIZONTAL)) {
+	    HorizontalDocumentFactory.setupConf(conf, withContexts, jsapResult.getString(RESOURCES_HASH_ARG), jsapResult.getString(RESOURCE_PREFIX_ARG));
+	} else if (jsapResult.getString(METHOD_ARG).equalsIgnoreCase(METHOD_ARG_VALUE_VERTICAL)) {
+	    if (!jsapResult.contains(PREDICATES_ARG)) {
 		throw new IllegalArgumentException("When '" + METHOD_ARG + "' is '" + METHOD_ARG_VALUE_VERTICAL + "' you have to give a predicates file too.");
 	    }
-	    VerticalDocumentFactory.setupConf(conf, withContexts, args.getString(RESOURCES_HASH_ARG), args.getString(PREDICATES_ARG));
+	    VerticalDocumentFactory.setupConf(conf, withContexts, jsapResult.getString(RESOURCES_HASH_ARG), jsapResult.getString(RESOURCE_PREFIX_ARG), jsapResult.getString(PREDICATES_ARG));
 	} else {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}
