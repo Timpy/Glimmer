@@ -30,7 +30,7 @@ public class AbstractDocumentFactoryTest {
     		"<http://subject/> <http://predicate/1> <http://object/1> <file:/tmp/source> .  " +
     		"<http://subject/> <http://predicate/2> <http://object/2> .  " +
     		"<http://subject/> <http://predicate/3> \"object 3\"@en <http://context/1> .  " + 
-    		"<http://subject/> <http://predicate/4> _:BNodeId123 .";
+    		"<http://subject/> <http://predicate/4/FOUR> _:BNodeId123 .";
     
     protected Mockery context;
     protected TaskInputOutputContext<?, ?, ?, ?> taskContext;

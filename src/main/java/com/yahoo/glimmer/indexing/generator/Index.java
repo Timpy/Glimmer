@@ -34,6 +34,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 import com.yahoo.glimmer.indexing.CombinedTermProcessor;
+import com.yahoo.glimmer.indexing.ResourceRefTermProcessor;
 
 public class Index {
     private static final int HEIGHT = 10;
@@ -51,8 +52,9 @@ public class Index {
     private int numDocs;
 
     private boolean positions;
+    private String hashValuePrefix;
 
-    public Index(FileSystem fs, Path outputDir, String indexName, int numDocs, boolean positions) {
+    public Index(FileSystem fs, Path outputDir, String indexName, int numDocs, boolean positions, String hashValuePrefix) {
 	this.fs = fs;
 	this.outputDir = outputDir;
 	// It seems like MG4J doesn't like index names with the '-' char
@@ -115,6 +117,7 @@ public class Index {
 	    props.setProperty(it.unimi.dsi.mg4j.index.Index.PropertyKeys.MAXCOUNT, -1);
 	    props.setProperty(it.unimi.dsi.mg4j.index.Index.PropertyKeys.FIELD, indexName);
 	    props.setProperty(it.unimi.dsi.mg4j.index.Index.PropertyKeys.TERMPROCESSOR, CombinedTermProcessor.getInstance());
+	    props.setProperty(ResourceRefTermProcessor.PropertyKeys.REF_PREFIX, hashValuePrefix);
 
 	    props.save(properties);
 	} catch (ConfigurationException e) {

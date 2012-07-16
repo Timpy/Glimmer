@@ -26,7 +26,8 @@ public class CombinedTermProcessor implements TermProcessor {
 
     private static CombinedTermProcessor INSTANCE = new CombinedTermProcessor();
 
-    public final static TermProcessor[] TERM_PROCESSORS = { NonWordTermProcessor.getInstance(), DowncaseTermProcessor.getInstance(),
+    private final static TermProcessor RESOURCE_REF_TERM_PROCESSOR = ResourceRefTermProcessor.getInstance();
+    private final static TermProcessor[] TERM_PROCESSORS = { NonWordTermProcessor.getInstance(), DowncaseTermProcessor.getInstance(),
 	    StopwordTermProcessor.getInstance(), new PorterStemmer() };
 
     private CombinedTermProcessor() {
@@ -37,13 +38,16 @@ public class CombinedTermProcessor implements TermProcessor {
     }
 
     public boolean processTerm(final MutableString term) {
-	boolean process = true;
-	for (TermProcessor tp : TERM_PROCESSORS) {
-	    process = tp.processTerm(term);
-	    if (!process)
-		break;
+	// If the term looks like a resource ref accept it.
+	if (RESOURCE_REF_TERM_PROCESSOR.processTerm(term)) {
+	    return true;
 	}
-	return process;
+	for (TermProcessor tp : TERM_PROCESSORS) {
+	    if (!tp.processTerm(term)) {
+		return false;
+	    }
+	}
+	return true;
     }
 
     public boolean processPrefix(final MutableString prefix) {

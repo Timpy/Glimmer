@@ -32,10 +32,10 @@ import com.yahoo.glimmer.util.Util;
 public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccurrences> {
     private Map<Integer, IndexWrapper> indices = new HashMap<Integer, IndexWrapper>();
 
-    public IndexRecordWriter(FileSystem fs, Path taskWorkPath, int numberOfDocs, RDFDocumentFactory.IndexType indexType, String ... fieldNames) throws IOException {
+    public IndexRecordWriter(FileSystem fs, Path taskWorkPath, int numberOfDocs, RDFDocumentFactory.IndexType indexType, String hashValuePrefix, String ... fieldNames) throws IOException {
 	if (indexType == RDFDocumentFactory.IndexType.VERTICAL) {
 	    // Open the alignment index
-	    Index index = new Index(fs, taskWorkPath, TripleIndexGenerator.ALIGNMENT_INDEX_NAME, numberOfDocs, false);
+	    Index index = new Index(fs, taskWorkPath, TripleIndexGenerator.ALIGNMENT_INDEX_NAME, numberOfDocs, false, hashValuePrefix);
 	    index.open();
 	    indices.put(DocumentMapper.ALIGNMENT_INDEX, new IndexWrapper(index));
 	}
@@ -60,7 +60,7 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
 
 		System.out.println("Opening index for field:" + name + " Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
 
-		Index index = new Index(fs, taskWorkPath, name, numberOfDocs, true);
+		Index index = new Index(fs, taskWorkPath, name, numberOfDocs, true, hashValuePrefix);
 		index.open();
 
 		indices.put(i, new IndexWrapper(index));
@@ -126,7 +126,8 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
 
 	    IndexType indexType = RDFDocumentFactory.getIndexType(conf);
 	    String[] fields = RDFDocumentFactory.getFieldsFromConf(conf);
-	    return new IndexRecordWriter(fs, taskWorkPath, numberOfDocuments, indexType, fields);
+	    String hashValuePrefix = RDFDocumentFactory.getHashValuePrefix(conf);
+	    return new IndexRecordWriter(fs, taskWorkPath, numberOfDocuments, indexType, hashValuePrefix, fields);
 	}
     }
 }

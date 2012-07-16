@@ -14,26 +14,53 @@ package com.yahoo.glimmer.indexing;
 import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.mg4j.index.TermProcessor;
 
-/** A term processor that excludes words with non-alphanumeric characters. */
+/**
+ * A term processor that returns true if the term looks like a Resource
+ * Reference. Eg, The prefix string concatenated with a number.
+ * 
+ */
 
-public class NonWordTermProcessor implements TermProcessor {
+public class ResourceRefTermProcessor implements TermProcessor {
     private static final long serialVersionUID = 1L;
 
-    private final static NonWordTermProcessor INSTANCE = new NonWordTermProcessor();
+    public static enum PropertyKeys {
+	REF_PREFIX
+    };
+
+    private String refPrefix = "@";
+
+    // TODO How to set the Ref Prefix when loading the index?
+    public void setRefPrefix(String refPrefix) {
+	this.refPrefix = refPrefix;
+    }
+
+    private static ResourceRefTermProcessor INSTANCE = new ResourceRefTermProcessor();
+
+    private ResourceRefTermProcessor() {
+    }
 
     public final static TermProcessor getInstance() {
 	return INSTANCE;
     }
 
-    private NonWordTermProcessor() {
-    }
-
     public boolean processTerm(final MutableString term) {
-	if (term == null)
-	    return false;
-	if (!term.toString().matches("[a-zA-Z0-9_]+"))
-	    return false;
-	return true;
+	if (term.length() > refPrefix.length()) {
+	    char[] chars = term.array();
+	    int i = 0;
+	    while (i < refPrefix.length()) {
+		if (chars[i] != refPrefix.charAt(i)) {
+		    return false;
+		}
+		i++;
+	    }
+	    while (i < term.length()) {
+		if (!Character.isDigit(chars[i++])) {
+		    return false;
+		}
+	    }
+	    return true;
+	}
+	return false;
     }
 
     public boolean processPrefix(final MutableString prefix) {
@@ -41,14 +68,18 @@ public class NonWordTermProcessor implements TermProcessor {
     }
 
     private Object readResolve() {
-	return INSTANCE;
+	return this;
     }
 
     public String toString() {
 	return this.getClass().getName();
     }
 
-    public NonWordTermProcessor copy() {
+    public String toSpec() {
+	return toString();
+    }
+
+    public ResourceRefTermProcessor copy() {
 	return this;
     }
 }

@@ -94,7 +94,7 @@ class HorizontalDocument extends RDFDocument {
 
 	for (Relation relation : relations) {
 	    String predicate = relation.getPredicate().toString();
-	    String fieldName = Util.encodeFieldName(predicate);
+	    String fieldName = Util.encodeFieldName(predicate).toLowerCase();
 
 	    // Check if prefix is on blacklist
 	    if (RDFDocumentFactory.isOnPredicateBlacklist(fieldName)) {

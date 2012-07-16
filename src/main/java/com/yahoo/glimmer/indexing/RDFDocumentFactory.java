@@ -91,6 +91,14 @@ public abstract class RDFDocumentFactory {
 	}
 	return indexType;
     }
+    
+    public static boolean getWithContexts(Configuration conf) {
+	return conf.getBoolean(CONF_WITH_CONTEXTS_KEY, true);
+    }
+    
+    public static String getHashValuePrefix(Configuration conf) {
+	return conf.get(CONF_HASH_VALUE_PREFIX_KEY, "");
+    }
 
     public static RDFDocumentFactory buildFactory(Configuration conf) {
 	IndexType indexType = getIndexType(conf);
@@ -103,8 +111,8 @@ public abstract class RDFDocumentFactory {
 	    throw new RuntimeException(e);
 	}
 	factory.setFields(getFieldsFromConf(conf));
-	factory.setWithContexts(conf.getBoolean(CONF_WITH_CONTEXTS_KEY, true));
-	factory.setHashValuePrefix(conf.get(CONF_HASH_VALUE_PREFIX_KEY, ""));
+	factory.setWithContexts(getWithContexts(conf));
+	factory.setHashValuePrefix(getHashValuePrefix(conf));
 	String resourcesHashFilename = conf.get(CONF_RESOURCES_HASH_KEY);
 	if (resourcesHashFilename != null) {
 	    // Load the hash func.

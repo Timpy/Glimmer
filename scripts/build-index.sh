@@ -33,7 +33,8 @@ EXCLUDE_CONTEXTS=""
 # See https://issues.apache.org/jira/browse/MAPREDUCE-1938 and hadoop.apache.org/common/docs/r0.20.204.0/releasenotes.html
 export HADOOP_USER_CLASSPATH_FIRST=true
 
-HADOOP_NAME_NODE="localhost:9000"
+#HADOOP_NAME_NODE="localhost:9000"
+HADOOP_NAME_NODE=""
 DFS_ROOT_DIR="hdfs://${HADOOP_NAME_NODE}"
 DFS_USER_DIR="${DFS_ROOT_DIR}/user/${USER}"
 DFS_BUILD_DIR="${DFS_USER_DIR}/index-${BUILD_NAME}"
@@ -148,6 +149,7 @@ function groupBySubject () {
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=true \
+		-Dmapred.job.queue.name=${QUEUE} \
 		${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${OUTPUT_DIR}"
 	echo ${CMD}
 	${CMD}
@@ -227,6 +229,7 @@ function generateIndex () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
+		-Dmapred.job.queue.name=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
@@ -347,28 +350,33 @@ function generateDocSizes () {
 	METHOD=${2}
 	NUMBER_OF_DOCS=${3}
 	DFS_SIZES_DIR="${DFS_BUILD_DIR}/${METHOD}.sizes"
+	REDUCE_TASKS=$(( 1 + ${NUMBER_OF_DOCS} / 1000000 ))
 	
 	echo
 	echo GENERATING DOC SIZES..
 	echo
+	
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.DocSizesGenerator \
 		-Dmapred.max.map.failures.percent=1 \
 		-Dmapred.map.tasks.speculative.execution=true \
-		-Dmapred.reduce.tasks=300 \
+		-Dmapred.reduce.tasks=${REDUCE_TASKS} \
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-D=mapred.job.reduce.memory.mb=2000 \
+		-Dmapred.job.queue.name=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
+	
+	${HADOOP_CMD} fs -rmr -skipTrash "${DFS_SIZES_DIR}/*-temp"
+	
 	if [ $EXIT_CODE -ne 0 ] ; then
 		echo "DocSizesGenerator failed with value of $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi
 	
-	${HADOOP_CMD} fs -rmr -skipTrash "${DFS_SIZES_DIR}/*temp"
 	${HADOOP_CMD} fs -copyToLocal "${DFS_SIZES_DIR}/*.sizes" "${LOCAL_BUILD_DIR}/${METHOD}"
 }	
 
@@ -383,7 +391,7 @@ function buildCollection () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
-		-Dmapred.job.queue.name=$QUEUE \
+		-Dmapred.job.queue.name=${QUEUE} \
 		-Dmapred.min.split.size=8500000000 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 ${DFS_BUILD_DIR}/collection/"
 	echo ${CMD}
 	${CMD}
