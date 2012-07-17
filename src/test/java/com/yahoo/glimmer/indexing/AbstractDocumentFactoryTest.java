@@ -27,10 +27,10 @@ import org.junit.Before;
 public class AbstractDocumentFactoryTest {
     protected static final Charset RAW_CHARSET = Charset.forName("UTF-8");
     protected static final String RAW_CONTENT_STRING = "http://subject/\t" +
-    		"<http://subject/> <http://predicate/1> <http://object/1> <file:/tmp/source> .  " +
-    		"<http://subject/> <http://predicate/2> <http://object/2> .  " +
-    		"<http://subject/> <http://predicate/3> \"object 3\"@en <http://context/1> .  " + 
-    		"<http://subject/> <http://predicate/4/FOUR> _:BNodeId123 .";
+    		"<http://predicate/1> <http://object/1> <file:/tmp/source> .  " +
+    		"<http://predicate/2> <http://object/2> .  " +
+    		"<http://predicate/3> \"object 3\"@en <http://context/1> .  " + 
+    		"<http://predicate/4/FOUR> _:BNodeId123 .";
     
     protected Mockery context;
     protected TaskInputOutputContext<?, ?, ?, ?> taskContext;

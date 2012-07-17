@@ -128,22 +128,24 @@ public abstract class RDFDocument {
     
     protected static class Relation {
 	private final Node[] nodes;
+	
+	/**
+	 * 
+	 * @param nodes The array of Nodes excluding the subject.
+	 */
 	public Relation(Node[] nodes) {
 	    this.nodes = nodes;
 	}
 	
-	public Node getSubject() {
+	public Node getPredicate() {
 	    return nodes[0];
 	}
-	public Node getPredicate() {
+	public Node getObject() {
 	    return nodes[1];
 	}
-	public Node getObject() {
-	    return nodes[2];
-	}
 	public Node getContext() {
-	    if (nodes.length > 3) {
-		return nodes[3];
+	    if (nodes.length > 2) {
+		return nodes[2];
 	    }
 	    return null;
 	}

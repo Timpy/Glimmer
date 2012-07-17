@@ -28,6 +28,8 @@ fi
 
 # Set to "-C" to exclude context from processing. 
 EXCLUDE_CONTEXTS=""
+# Set BySubjectTool's -s -p -o -c -a options here to exclude tuples not matching the given regexes.
+BY_SUBJECT_FILTERS=""
 
 # To allow the use of commons-configuration version 1.8 over Hadoop's version 1.6 we export HADOOP_USER_CLASSPATH_FIRST=true
 # See https://issues.apache.org/jira/browse/MAPREDUCE-1938 and hadoop.apache.org/common/docs/r0.20.204.0/releasenotes.html
@@ -139,9 +141,9 @@ fi
 function groupBySubject () {
 	local INPUT_FILE=${1}
 	local OUTPUT_DIR=${2}
-	echo Processing tuples from file ${INPUT_FILENAME}...
+	echo Processing tuples from file ${INPUT_FILE}...
 	echo
-	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.TuplesTool \
+	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.BySubjectTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapred.map.tasks.speculative.execution=true \
 		-Dmapred.child.java.opts=-Xmx800m \
@@ -150,13 +152,13 @@ function groupBySubject () {
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=true \
 		-Dmapred.job.queue.name=${QUEUE} \
-		${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${OUTPUT_DIR}"
+		${BY_SUBJECT_FILTERS} ${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${OUTPUT_DIR}"
 	echo ${CMD}
 	${CMD}
 		
 	local EXIT_CODE=$?
 	if [ $EXIT_CODE -ne "0" ] ; then
-		echo "TuplesTool exited with code $EXIT_CODE. exiting.."
+		echo "BySubjectTool exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi	
 }

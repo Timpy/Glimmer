@@ -36,7 +36,6 @@ import com.martiansoftware.jsap.JSAPResult;
 import com.martiansoftware.jsap.Parameter;
 import com.martiansoftware.jsap.SimpleJSAP;
 import com.martiansoftware.jsap.UnflaggedOption;
-import com.yahoo.glimmer.indexing.preprocessor.TuplesTool;
 
 public class MergeSortTool extends Configured implements Tool {
     private static final Log LOG = LogFactory.getLog(MergeSortTool.class);
@@ -51,7 +50,7 @@ public class MergeSortTool extends Configured implements Tool {
     @Override
     public int run(String[] args) throws Exception {
 
-	SimpleJSAP jsap = new SimpleJSAP(TuplesTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
+	SimpleJSAP jsap = new SimpleJSAP(MergeSortTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
 		new FlaggedOption(OUTPUT_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.REQUIRED, 'o', OUTPUT_ARG, "output filename"),
 		new UnflaggedOption(SOURCES_ARG, JSAP.STRING_PARSER, "", JSAP.REQUIRED, JSAP.GREEDY, "list of source files to merge.")
 	});

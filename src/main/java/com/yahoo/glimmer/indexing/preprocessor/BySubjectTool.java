@@ -32,6 +32,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
+import com.martiansoftware.jsap.FlaggedOption;
 import com.martiansoftware.jsap.JSAP;
 import com.martiansoftware.jsap.JSAPResult;
 import com.martiansoftware.jsap.Parameter;
@@ -40,22 +41,33 @@ import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
 import com.yahoo.glimmer.util.MergeSortTool;
 
-public class TuplesTool extends Configured implements Tool {
+public class BySubjectTool extends Configured implements Tool {
     private static final String COUNTS_FILENAME = "counts";
+    
+    public static final String SUBJECT_FILTER_ARG = "subjectFilter";
+    public static final String PREDICATE_FILTER_ARG = "predicateFilter";
+    public static final String OBJECT_FILTER_ARG = "objectFilter";
+    public static final String CONTEXT_FILTER_ARG = "contextFilter";
+    public static final String AND_FILTER_CONJUNCTION_ARG = "andConjunction";
     public static final String NO_CONTEXTS_ARG = "excludeContexts";
     private static final String OUTPUT_ARG = "output";
     private static final String INPUT_ARG = "input";
 
     public static void main(String[] args) throws Exception {
-	int ret = ToolRunner.run(new TuplesTool(), args);
+	int ret = ToolRunner.run(new BySubjectTool(), args);
 	System.exit(ret);
     }
 
     @Override
     public int run(String[] args) throws Exception {
 
-	SimpleJSAP jsap = new SimpleJSAP(TuplesTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
-		new Switch(NO_CONTEXTS_ARG, 'C', "withoutContexts", "Don't process the contexts for each tuple."),
+	SimpleJSAP jsap = new SimpleJSAP(BySubjectTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
+	    	new FlaggedOption(SUBJECT_FILTER_ARG, JSAP.STRING_PARSER, null, JSAP.NOT_REQUIRED, 's', SUBJECT_FILTER_ARG, "Only process tuples with their subject matching this regex."),
+	    	new FlaggedOption(PREDICATE_FILTER_ARG, JSAP.STRING_PARSER, null, JSAP.NOT_REQUIRED, 'p', PREDICATE_FILTER_ARG, "Only process tuples with their predicate matching this regex."),
+	    	new FlaggedOption(OBJECT_FILTER_ARG, JSAP.STRING_PARSER, null, JSAP.NOT_REQUIRED, 'o', OBJECT_FILTER_ARG, "Only process tuples with their object matching this regex."),
+	    	new FlaggedOption(CONTEXT_FILTER_ARG, JSAP.STRING_PARSER, null, JSAP.NOT_REQUIRED, 'c', CONTEXT_FILTER_ARG, "Only process tuples with their context matching this regex."),
+	    	new Switch(AND_FILTER_CONJUNCTION_ARG, 'a', AND_FILTER_CONJUNCTION_ARG, "If more than one filter is set use AND conjunction to include tuples. Default is OR."),
+		new Switch(NO_CONTEXTS_ARG, 'C', NO_CONTEXTS_ARG, "Don't process the contexts for each tuple."),
 		new UnflaggedOption(INPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
 		new UnflaggedOption(OUTPUT_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the out data."),
 
@@ -67,15 +79,37 @@ public class TuplesTool extends Configured implements Tool {
 	    System.exit(1);
 	}
 	
-	boolean withContexts = !jsapResult.getBoolean(NO_CONTEXTS_ARG, false);
 
 	Configuration config = getConf();
+	
+	if (jsapResult.contains(SUBJECT_FILTER_ARG)) {
+	    config.set(TuplesToResourcesMapper.SUBJECT_REGEX_KEY, jsapResult.getString(SUBJECT_FILTER_ARG));
+	    System.out.println("Subject filter set to " + jsapResult.getString(SUBJECT_FILTER_ARG));
+	}
+	if (jsapResult.contains(PREDICATE_FILTER_ARG)) {
+	    config.set(TuplesToResourcesMapper.PREDICATE_REGEX_KEY, jsapResult.getString(PREDICATE_FILTER_ARG));
+	    System.out.println("Predicate filter set to " + jsapResult.getString(PREDICATE_FILTER_ARG));
+	}
+	if (jsapResult.contains(OBJECT_FILTER_ARG)) {
+	    config.set(TuplesToResourcesMapper.OBJECT_REGEX_KEY, jsapResult.getString(OBJECT_FILTER_ARG));
+	    System.out.println("Object filter set to " + jsapResult.getString(OBJECT_FILTER_ARG));
+	}
+	if (jsapResult.contains(CONTEXT_FILTER_ARG)) {
+	    config.set(TuplesToResourcesMapper.CONTEXT_REGEX_KEY, jsapResult.getString(CONTEXT_FILTER_ARG));
+	    System.out.println("Context filter set to " + jsapResult.getString(CONTEXT_FILTER_ARG));
+	}
+	if (jsapResult.getBoolean(AND_FILTER_CONJUNCTION_ARG, false)) {
+	    config.setBoolean(TuplesToResourcesMapper.FILTER_CONJUNCTION_KEY, true);
+	    System.out.println("Filter conjunction is AND");
+	}
+	
+	boolean withContexts = !jsapResult.getBoolean(NO_CONTEXTS_ARG, false);
 	config.setBoolean(TuplesToResourcesMapper.INCLUDE_CONTEXTS_KEY, withContexts);
 
 	Job job = new Job(config);
-	job.setJarByClass(TuplesTool.class);
+	job.setJarByClass(BySubjectTool.class);
 
-	job.setJobName(TuplesTool.class.getName() + "-part1-" + System.currentTimeMillis());
+	job.setJobName(BySubjectTool.class.getName() + "-part1-" + System.currentTimeMillis());
 	job.setInputFormatClass(TextInputFormat.class);
 
 	job.setMapperClass(TuplesToResourcesMapper.class);
