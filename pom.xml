@@ -5,7 +5,7 @@
 	<artifactId>Glimmer</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>war</packaging>
-	<name>Glimmer a RDF Search Engine</name>
+	<name>Glimmer - An RDF Search Engine</name>
 	<description>An implementation of the methods described in the papers Distributed Indexing for Semantic Search by Peter Mika and Effective and Efficient Entity Search in RDF data by Roi Blanco, Peter Mika and Sebastiano Vigna.</description>
 
 	<properties>
