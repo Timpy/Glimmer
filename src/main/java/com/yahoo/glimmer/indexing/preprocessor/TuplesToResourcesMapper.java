@@ -21,7 +21,9 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.parser.NxParser;
@@ -68,7 +70,9 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
     private StringBuilder relations = new StringBuilder();
     private String[] nodesAsN3 = new String[MAX_NODES];
     private Pattern[] patterns = new Pattern[MAX_NODES];
-    private boolean andNotOrConjunction = false; // Default is OR
+    private boolean andNotOrConjunction; // Default is OR
+
+    private InputSplit lastInputSplit;
 
     protected void setup(Mapper<LongWritable, Text, Text, Text>.Context context) throws java.io.IOException, InterruptedException {
 	Configuration conf = context.getConfiguration();
@@ -116,6 +120,21 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
     @Override
     protected void map(LongWritable key, Text valueText, Mapper<LongWritable, Text, Text, Text>.Context context) throws java.io.IOException,
 	    InterruptedException {
+
+	if (!context.getInputSplit().equals(lastInputSplit)) {
+	    lastInputSplit = context.getInputSplit();
+	    if (lastInputSplit instanceof FileSplit) {
+		FileSplit fileSplit = (FileSplit) lastInputSplit;
+		LOG.info("Current FileSplit " + fileSplit.getPath().toString() + " start(length) bytes " + fileSplit.getStart() + "(" + fileSplit.getLength()
+			+ ")");
+	    } else {
+		LOG.info("Current InputSplit " + lastInputSplit.toString());
+	    }
+	}
+
+	// context.setStatus(key.toString());
+	// LOG.info("Key:" + key.toString());
+
 	String value = valueText.toString().trim();
 	if (value.isEmpty()) {
 	    return;
@@ -124,16 +143,16 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	try {
 	    nodes = NxParser.parseNodes(value);
 	} catch (ParseException e) {
-	    // NxParser has problems with typed literals like: "27"^^<int uri>
+	    // NxParser 1.2.2 has problems with typed literals like:
+	    // "27"^^<int uri>. This is fixed in 1.2.3
 	    context.getCounter(MapCounters.NX_PARSER_EXCEPTION).increment(1l);
-	    LOG.info("Failed parsing at postion:" + key.toString());
 	    String s = value.replaceAll("\\^\\^<[^>]+>", "");
 	    try {
 		nodes = NxParser.parseNodes(s);
+		LOG.info("Only parsed after remove of literal types:" + value);
 	    } catch (ParseException e1) {
 		context.getCounter(MapCounters.NX_PARSER_RETRY_EXCEPTION).increment(1l);
-		LOG.info("Failed parsing retry after remove of literal type:" + s);
-		// throw new IOException("Map input at:" + key.toString(), e);
+		LOG.info("Failed parsing even after remove of literal types:" + value);
 		return;
 	    }
 	}

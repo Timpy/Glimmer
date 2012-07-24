@@ -141,6 +141,7 @@ fi
 function groupBySubject () {
 	local INPUT_FILE=${1}
 	local OUTPUT_DIR=${2}
+	local REDUCER_TASKS=${3}
 	echo Processing tuples from file ${INPUT_FILE}...
 	echo
 	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.BySubjectTool \
@@ -149,6 +150,7 @@ function groupBySubject () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
+		-Dmapred.reduce.tasks=${REDUCER_TASKS} \
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=true \
 		-Dmapred.job.queue.name=${QUEUE} \
@@ -160,7 +162,25 @@ function groupBySubject () {
 	if [ $EXIT_CODE -ne "0" ] ; then
 		echo "BySubjectTool exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
-	fi	
+	fi
+		
+	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.util.MergeSortTool \
+		-Dio.compression.codecs=${COMPRESSION_CODECS} \
+		-Dmapred.child.java.opts=-Xmx800m \
+		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
+		-Dmapred.output.compress=true \
+		-i ${OUTPUT_DIR}/part-r-?????/all.bz2 -o ${OUTPUT_DIR}/all.bz2 -c all.count"
+	echo ${CMD}
+	${CMD}
+	
+	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.util.MergeSortTool \
+		-Dio.compression.codecs=${COMPRESSION_CODECS} \
+		-Dmapred.child.java.opts=-Xmx800m \
+		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
+		-Dmapred.output.compress=true \
+		-i ${OUTPUT_DIR}/part-r-?????/predicate.bz2 -o ${OUTPUT_DIR}/predicate.bz2 -c predicate.count"
+	echo ${CMD}
+	${CMD}
 }
 
 function computeHashes () {
@@ -406,7 +426,7 @@ function buildCollection () {
 	${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/collection" "${LOCAL_BUILD_DIR}"
 }
 
-groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/bysubject
+groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/bysubject ${SUBINDICES}
 computeHashes ${DFS_BUILD_DIR}/bysubject/all.bz2
 
 getDocCount ${DFS_BUILD_DIR}/bysubject

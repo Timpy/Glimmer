@@ -11,20 +11,10 @@ package com.yahoo.glimmer.indexing.preprocessor;
  *  See accompanying LICENSE file.
  */
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.compress.CompressionCodecFactory;
-import org.apache.hadoop.mapred.Utils;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
@@ -39,11 +29,8 @@ import com.martiansoftware.jsap.Parameter;
 import com.martiansoftware.jsap.SimpleJSAP;
 import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
-import com.yahoo.glimmer.util.MergeSortTool;
 
 public class BySubjectTool extends Configured implements Tool {
-    private static final String COUNTS_FILENAME = "counts";
-    
     public static final String SUBJECT_FILTER_ARG = "subjectFilter";
     public static final String PREDICATE_FILTER_ARG = "predicateFilter";
     public static final String OBJECT_FILTER_ARG = "objectFilter";
@@ -140,47 +127,7 @@ public class BySubjectTool extends Configured implements Tool {
 	// predicates + objects + contexts.
 	// One file per reducer that contains the subjects + all <predicate>
 	// <object>|"Literal" <context> on that subject.
-	// All the files are sorted but we need to merge each reducers output
-	// into one file that is also sorted.
-
-	// Maybe quicker to use a MR job with one reducer.. Currently
-	// decompression, merge and compression are all done in this thread..
-
-	FileSystem fs = FileSystem.get(config);
-
-	Map<String, List<Path>> filenamesToPartPaths = new HashMap<String, List<Path>>();
-
-	FileStatus[] outputPartStatuses = fs.listStatus(outputDir, new Utils.OutputFileUtils.OutputFilesFilter());
-	for (FileStatus outputPartStatus : outputPartStatuses) {
-	    FileStatus[] outputFileStatuses = fs.listStatus(outputPartStatus.getPath());
-	    for (FileStatus outputFileStatus : outputFileStatuses) {
-		String fullFilename = outputFileStatus.getPath().toString();
-		String filename = fullFilename.substring(fullFilename.lastIndexOf('/') + 1);
-
-		List<Path> partPaths = filenamesToPartPaths.get(filename);
-		if (partPaths == null) {
-		    partPaths = new ArrayList<Path>();
-		    filenamesToPartPaths.put(filename, partPaths);
-		}
-		partPaths.add(outputFileStatus.getPath());
-	    }
-	}
-
-	CompressionCodecFactory factory = new CompressionCodecFactory(config);
-
-	Path countsPath = new Path(outputDir, COUNTS_FILENAME);
-	FSDataOutputStream countsOutputStream = fs.create(countsPath);
-
-	for (String filename : filenamesToPartPaths.keySet()) {
-	    Path outputPath = new Path(outputDir, filename);
-	    List<Path> sourcePaths = filenamesToPartPaths.get(filename);
-	    int lineCount = MergeSortTool.mergeSort(fs, sourcePaths, outputPath, factory);
-	    System.out.println("Merged " + lineCount + " lines into " + filename);
-	    countsOutputStream.writeBytes(filename + '\t' + lineCount + '\n');
-	}
-	countsOutputStream.flush();
-	countsOutputStream.close();
-
+	
 	return 0;
     }
 }

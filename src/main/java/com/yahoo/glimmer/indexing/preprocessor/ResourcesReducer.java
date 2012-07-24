@@ -19,9 +19,10 @@ import org.apache.hadoop.mapreduce.Reducer;
 /**
  * Reducer(and Combiner)
  * 
- * For the given Subject resource key concatanates all <predicate> <object> <context> . for that key 
- * + appends PREDICATE, OBJECT and/or CONTEXT keywords if that keyword occurs once or more as a value.
- *
+ * For the given Subject resource key concatanates all <predicate> <object>
+ * <context> . for that key + appends PREDICATE, OBJECT and/or CONTEXT keywords
+ * if that keyword occurs once or more as a value.
+ * 
  */
 public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
     public static final String VALUE_DELIMITER = "  ";
@@ -31,12 +32,23 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
     private StringBuilder relations = new StringBuilder();
     private String[] singleSplit = new String[1];
 
+    public enum Counters {
+	TOO_MANY_RELATIONS, LONG_TUPLES;
+    }
+
     protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Text>.Context context) throws IOException, InterruptedException {
 	relations.setLength(0);
+	int valueCount = 0;
 	for (Text value : values) {
 	    String valueString = value.toString();
-	    
-	    String[] split; 
+	    valueCount++;
+	    if (valueCount > 10000) {
+		System.out.println("Too many relations for subject:" + key.toString());
+		context.getCounter(Counters.TOO_MANY_RELATIONS).increment(1);
+		return;
+	    }
+
+	    String[] split;
 	    if (valueString.contains(VALUE_DELIMITER)) {
 		split = valueString.split(VALUE_DELIMITER);
 	    } else {
@@ -51,11 +63,21 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
 		} else if (TuplesToResourcesMapper.CONTEXT_VALUE.equals(s)) {
 		    keyContext = true;
 		} else {
-		    prefixDelimiterAppender(s);
+		    if (s.length() > 100000) {
+			System.out.println("Long tuple. Length:" + s.length() + " starting with " + s.substring(0, 100));
+			context.getCounter(Counters.LONG_TUPLES).increment(1);
+		    } else {
+			try {
+			    prefixDelimiterAppender(s);
+			} catch (OutOfMemoryError e) {
+			    System.out.println("OOM l:" + relations.length() + " valueCount:" + valueCount + " when appending " + s.length() + " chars.");
+			    throw e;
+			}
+		    }
 		}
 	    }
 	}
-	
+
 	if (keyPredicate) {
 	    prefixDelimiterAppender(TuplesToResourcesMapper.PREDICATE_VALUE);
 	    keyPredicate = false;
@@ -68,10 +90,10 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
 	    prefixDelimiterAppender(TuplesToResourcesMapper.CONTEXT_VALUE);
 	    keyContext = false;
 	}
-	
+
 	context.write(key, new Text(relations.toString()));
     };
-    
+
     private void prefixDelimiterAppender(String s) {
 	if (relations.length() > 0) {
 	    relations.append(ResourcesReducer.VALUE_DELIMITER);
