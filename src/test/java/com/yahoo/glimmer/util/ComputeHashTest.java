@@ -108,7 +108,7 @@ public class ComputeHashTest {
 	expectations.oneOf(fs).setPermission(expectations.with(unsignedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
 	context.checking(expectations);
 	
-	long hashSize = computeMph.buildHash(fs, "filename", 0, true, Charset.forName("UTF-8"), false);
+	long hashSize = computeMph.buildHash(fs, "filename", 0, true, true, Charset.forName("UTF-8"), false);
 
 	assertEquals(4, hashSize);
 	context.assertIsSatisfied();
@@ -134,7 +134,7 @@ public class ComputeHashTest {
 	expectations.will(Expectations.returnValue(new FSDataOutputStream(signedStream, new Statistics("outStats"))));
 	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
 	context.checking(expectations);
-	long hashSize = computeMph.buildHash(fs, "filename", 32, false, Charset.forName("UTF-8"), true);
+	long hashSize = computeMph.buildHash(fs, "filename", 32, true, false, Charset.forName("UTF-8"), true);
 
 	assertEquals(4, hashSize);
 	context.assertIsSatisfied();
@@ -167,7 +167,7 @@ public class ComputeHashTest {
 	expectations.will(Expectations.returnValue(new FSDataOutputStream(signedStream, new Statistics("outStats"))));
 	expectations.oneOf(fs).setPermission(expectations.with(signedPath), expectations.with(ComputeHashTool.ALL_PERMISSIONS));
 	context.checking(expectations);
-	long hashSize = computeMph.buildHash(fs, "filename", 16, true, Charset.forName("UTF-8"), true);
+	long hashSize = computeMph.buildHash(fs, "filename", 16, true, true, Charset.forName("UTF-8"), true);
 
 	assertEquals(4, hashSize);
 	context.assertIsSatisfied();
