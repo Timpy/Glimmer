@@ -13,6 +13,7 @@ package com.yahoo.glimmer.util;
 
 import it.unimi.dsi.big.util.ShiftAddXorSignedStringMap;
 import it.unimi.dsi.bits.TransformationStrategies;
+import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.SafelyCloseable;
 import it.unimi.dsi.lang.MutableString;
@@ -20,6 +21,7 @@ import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Reader;
@@ -31,6 +33,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -87,7 +90,7 @@ public class ComputeHashTool extends Configured implements Tool {
 	String[] srcFilenames = jsapResult.getStringArray(SRC_FILES_ARG);
 	Charset srcFileCharset = (Charset) jsapResult.getObject(FILE_ENCODING_ARG);
 	int signatureWidth = 0;
-	boolean keepUnsigned = true;
+	boolean generateUnsigned = true;
 	if (jsapResult.getBoolean(SIGNED_ARG)) {
 	    signatureWidth = jsapResult.getInt(SIGNATURE_WIDTH_ARG);
 
@@ -97,7 +100,7 @@ public class ComputeHashTool extends Configured implements Tool {
 	    } else {
 		LOGGER.info("Building signed hashes with signature width of " + signatureWidth + " bits for " + srcFileCharset.displayName() + " files:"
 			+ Arrays.toString(srcFilenames));
-		keepUnsigned = false;
+		generateUnsigned = false;
 	    }
 	} else {
 	    LOGGER.info("Building unsigned hashes for " + srcFileCharset.displayName() + " files:" + srcFilenames);
@@ -105,15 +108,15 @@ public class ComputeHashTool extends Configured implements Tool {
 
 	JobConf job = new JobConf(getConf(), ComputeHashTool.class);
 	FileSystem fs = FileSystem.get(job);
-	for (String filename : srcFilenames) {
-	    LOGGER.info("Building hash of " + filename);
-	    buildHash(fs, filename, signatureWidth, keepUnsigned, srcFileCharset, jsapResult.getBoolean(WRITE_INFO_ARG, false));
+	for (String srcFilename : srcFilenames) {
+	    LOGGER.info("Building hash of " + srcFilename);
+	    buildHash(fs, srcFilename, signatureWidth, generateUnsigned, true, srcFileCharset, jsapResult.getBoolean(WRITE_INFO_ARG, false));
 	}
 	return 0;
     }
 
-    public long buildHash(FileSystem fs, String srcFilename, int signatureWidth, boolean keepUnsigned, final Charset charset, boolean writeInfoFile)
-	    throws IOException {
+    public long buildHash(FileSystem fs, String srcFilename, int signatureWidth, boolean generateUnsigned, boolean keepUnsigned, final Charset charset, boolean writeInfoFile)
+	    throws IOException, ClassNotFoundException {
 	final MapReducePartInputStreamEnumeration inputStreamEnumeration;
 	try {
 	    inputStreamEnumeration = new MapReducePartInputStreamEnumeration(fs, new Path(srcFilename));
@@ -128,19 +131,23 @@ public class ComputeHashTool extends Configured implements Tool {
 		return new InputStreamReader(new SequenceInputStream(inputStreamEnumeration), charset);
 	    }
 	});
-
-	LcpMonotoneMinimalPerfectHashFunction<CharSequence> unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection,
-		TransformationStrategies.prefixFreeUtf16());
-
+	
 	String destFilename = inputStreamEnumeration.removeCompressionSuffixIfAny(srcFilename);
+	Path unsigendPath = new Path(destFilename + DOT_UNSIGNED);
 
-	if (signatureWidth <= 0 || keepUnsigned) {
-	    writeObjectToFile(unsignedHash, fs, new Path(destFilename + DOT_UNSIGNED));
+	LcpMonotoneMinimalPerfectHashFunction<CharSequence> unsignedHash;
+	if (generateUnsigned) {
+	    unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, TransformationStrategies.prefixFreeUtf16());
+	    if (signatureWidth <= 0 || keepUnsigned) {
+		writeMapToFile(unsignedHash, fs, unsigendPath);
+	    }
+	} else {
+	    unsignedHash = readMpHashFromFile(fs, unsigendPath);
 	}
 
 	if (signatureWidth > 0) {
 	    ShiftAddXorSignedStringMap signedHash = new ShiftAddXorSignedStringMap(inCollection.iterator(), unsignedHash, signatureWidth);
-	    writeObjectToFile(signedHash, fs, new Path(destFilename + DOT_SIGNED));
+	    writeMapToFile(signedHash, fs, new Path(destFilename + DOT_SIGNED));
 	}
 
 	if (writeInfoFile) {
@@ -168,27 +175,48 @@ public class ComputeHashTool extends Configured implements Tool {
 	return unsignedHash.size64();
     }
 
-    private static void writeObjectToFile(Object object, FileSystem fs, Path path) throws IOException {
-	FSDataOutputStream outStream = fs.create(path, true);// overwrite
-	fs.setPermission(path, ALL_PERMISSIONS);
-	ObjectOutputStream outOs = new ObjectOutputStream(outStream);
-	outOs.writeObject(object);
-	outOs.close();
+    private static void writeMapToFile(AbstractObject2LongFunction<CharSequence> object, FileSystem fs, Path path) throws IOException {
+	FSDataOutputStream outStream = null;
+	try {
+	    outStream = fs.create(path, true);// overwrite
+	    fs.setPermission(path, ALL_PERMISSIONS);
+	    
+	    ObjectOutputStream oOutStream = null;
+	    try {
+		oOutStream = new ObjectOutputStream(outStream);
+		oOutStream.writeObject(object);
+	    } finally {
+		if (oOutStream != null) {
+		    oOutStream.close();
+		}
+	    }
+	} finally {
+	    if (outStream != null) {
+		outStream.close();
+	    }
+	}
     }
 
-    /**
-     * For static invocation from pig via define mph InvokeForInt(
-     * 'com.yahoo.glimmer.util.ComputeMph.pigInvoker', filename, signed); The
-     * hash function itself will be serialized to DFS as filename.<s>map
-     * 
-     * TODO Test it.
-     * 
-     * @param inFilename
-     * @return size of generated hash
-     * @throws IOException
-     */
-    public static long pigInvoker(String filename, int signatureWidth, boolean keepUnsigned, String charsetName, boolean writeInfoFile) throws IOException {
-	return new ComputeHashTool().buildHash(FileSystem.get(null), filename, signatureWidth, keepUnsigned, Charset.forName(charsetName), writeInfoFile);
+    @SuppressWarnings("unchecked")
+    private static LcpMonotoneMinimalPerfectHashFunction<CharSequence> readMpHashFromFile(FileSystem fs, Path path) throws IOException, ClassNotFoundException {
+	FSDataInputStream inStream = null;
+	try {
+	    inStream = fs.open(path);
+	    ObjectInputStream oInStream = null;
+	    try {
+    	    	oInStream = new ObjectInputStream(inStream);
+    	    	Object object = oInStream.readObject();
+    	    	return (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) object;
+	    } finally {
+		if (oInStream != null) {
+		    oInStream.close();
+		}
+	    }
+	} finally {
+	    if (inStream != null) {
+		inStream.close();
+	    }
+	}
     }
 
     public static void main(String[] args) throws Exception {
