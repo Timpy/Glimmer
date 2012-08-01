@@ -62,12 +62,16 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
     public static final String CONTEXT_REGEX_KEY = "contextRegex";
     public static final String FILTER_CONJUNCTION_KEY = "andNotOrConjunction";
 
-    public static final String PREDICATE_VALUE = "PREDICATE";
-    public static final String OBJECT_VALUE = "OBJECT";
-    public static final String CONTEXT_VALUE = "CONTEXT";
+    public static enum TUPLE_ELEMENTS {
+	SUBJECT, PREDICATE, OBJECT, CONTEXT;
+    }
+    
+    public enum Counters {
+	TOO_MANY_RELATIONS, LONG_TUPLES, LONG_TUPLE_ELEMENT;
+    }
 
     private boolean includeContexts = true;
-    private StringBuilder relations = new StringBuilder();
+    private StringBuilder predicateObjectContextDot = new StringBuilder();
     private String[] nodesAsN3 = new String[MAX_NODES];
     private Pattern[] patterns = new Pattern[MAX_NODES];
     private boolean andNotOrConjunction; // Default is OR
@@ -132,9 +136,6 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	    }
 	}
 
-	// context.setStatus(key.toString());
-	// LOG.info("Key:" + key.toString());
-
 	String value = valueText.toString().trim();
 	if (value.isEmpty()) {
 	    return;
@@ -170,11 +171,23 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 
 	int nodeCount = 0;
 
-	// Skip relations that don't match the given patterns
+	// Skip relations that have long elements or don't match the given patterns
 	int patternsTried = 0;
 	int patternsMatched = 0;
 	for (Node node : nodes) {
 	    String n3 = node.toN3();
+	    
+	    if (n3.length() > 5000) {
+		String elementName;
+		if (nodeCount < TUPLE_ELEMENTS.values().length) {
+		    elementName = TUPLE_ELEMENTS.values()[nodeCount].name();
+		} else {
+		    elementName = Integer.toString(nodeCount);
+		}
+		System.out.println("Long tuple element " + elementName + ". Length:" + n3.length() + " starting with " + n3.substring(0, 100));
+		context.getCounter(Counters.LONG_TUPLE_ELEMENT).increment(1);
+		return;
+	    }
 
 	    if (patterns[nodeCount] != null) {
 		Matcher matcher = patterns[nodeCount].matcher(n3);
@@ -210,7 +223,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	    }
 	}
 
-	relations.setLength(0);
+	predicateObjectContextDot.setLength(0);
 
 	Node node = nodes[SUBJECT_IDX];
 	assert node instanceof org.semanticweb.yars.nx.Resource;
@@ -218,27 +231,32 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 
 	node = nodes[PREDICATE_IDX];
 	assert node instanceof org.semanticweb.yars.nx.Resource;
-	context.write(new Text(node.toString()), new Text(PREDICATE_VALUE));
-	relations.append(nodesAsN3[PREDICATE_IDX]);
+	context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.PREDICATE.name()));
+	predicateObjectContextDot.append(nodesAsN3[PREDICATE_IDX]);
 
 	node = nodes[OBJECT_IDX];
 	if (node instanceof org.semanticweb.yars.nx.Resource) {
-	    context.write(new Text(node.toString()), new Text(OBJECT_VALUE));
+	    context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.OBJECT.name()));
 	}
-	relations.append(' ');
-	relations.append(nodesAsN3[OBJECT_IDX]);
+	predicateObjectContextDot.append(' ');
+	predicateObjectContextDot.append(nodesAsN3[OBJECT_IDX]);
 
 	if (includeContexts && nodeCount > CONTEXT_IDX) {
 	    node = nodes[CONTEXT_IDX];
 	    assert node instanceof org.semanticweb.yars.nx.Resource;
-	    context.write(new Text(node.toString()), new Text(CONTEXT_VALUE));
-	    relations.append(' ');
-	    relations.append(nodesAsN3[CONTEXT_IDX]);
+	    context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.CONTEXT.name()));
+	    predicateObjectContextDot.append(' ');
+	    predicateObjectContextDot.append(nodesAsN3[CONTEXT_IDX]);
 	}
-	relations.append(" .");
+	predicateObjectContextDot.append(" .");
 
-	// Write subject with object, predicate, object, context as value
-	context.write(subject, new Text(relations.toString()));
+	if (predicateObjectContextDot.length() > 10000) {
+	    System.out.println("Long tuple. Length:" + predicateObjectContextDot.length() + " starting with " + predicateObjectContextDot.substring(0, 100));
+	    context.getCounter(Counters.LONG_TUPLES).increment(1);
+	} else {
+	    // Write subject with object, predicate, object, context as value
+	    context.write(subject, new Text(predicateObjectContextDot.toString()));
+	}
     };
 
     static enum MapCounters {

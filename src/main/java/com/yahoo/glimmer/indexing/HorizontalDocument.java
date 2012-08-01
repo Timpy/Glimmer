@@ -25,7 +25,6 @@ import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
-import com.yahoo.glimmer.util.Util;
 
 /**
  * A RDF document.
@@ -94,12 +93,16 @@ class HorizontalDocument extends RDFDocument {
 
 	for (Relation relation : relations) {
 	    String predicate = relation.getPredicate().toString();
-	    String fieldName = Util.encodeFieldName(predicate).toLowerCase();
 
 	    // Check if prefix is on blacklist
-	    if (RDFDocumentFactory.isOnPredicateBlacklist(fieldName)) {
+	    if (RDFDocumentFactory.isOnPredicateBlacklist(predicate.toLowerCase())) {
 		factory.incrementCounter(RdfCounters.BLACKLISTED_TRIPLES, 1);
 		continue;
+	    }
+	    
+	    String predicateId = factory.lookupResource(predicate, false);
+	    if (predicateId == null) {
+		throw new IllegalStateException("Predicate " + predicate + " not in resources hash function!");
 	    }
 
 	    String contextId = NO_CONTEXT;
@@ -125,7 +128,7 @@ class HorizontalDocument extends RDFDocument {
 		    }
 		    objects.add(objectId);
 		}
-		predicates.add(fieldName);
+		predicates.add(predicateId);
 		contexts.add(contextId);
 	    } else if (relation.getObject() instanceof BNode) {
 		String objectId = factory.lookupResource(relation.getObject().toString(), false);
@@ -133,7 +136,7 @@ class HorizontalDocument extends RDFDocument {
 		    throw new IllegalStateException("Object " + relation.getObject() + " not in resources hash function!");
 		}
 		objects.add(objectId);
-		predicates.add(fieldName);
+		predicates.add(predicateId);
 		contexts.add(contextId);
 	    } else {
 		String object = relation.getObject().toString();
@@ -147,7 +150,7 @@ class HorizontalDocument extends RDFDocument {
 
 			    // Preserve casing for properties and
 			    // contexts
-			    predicates.add(fieldName);
+			    predicates.add(predicateId);
 			    contexts.add(contextId);
 			}
 

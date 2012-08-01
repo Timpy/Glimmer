@@ -25,21 +25,21 @@ import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import it.unimi.dsi.io.FileLinesCollection;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.document.DocumentCollection;
-import it.unimi.dsi.mg4j.index.BitStreamIndex;
-import it.unimi.dsi.mg4j.index.DiskBasedIndex;
-import it.unimi.dsi.mg4j.index.Index;
-import it.unimi.dsi.mg4j.index.Index.UriKeys;
-import it.unimi.dsi.mg4j.index.TermProcessor;
-import it.unimi.dsi.mg4j.query.QueryEngine;
-import it.unimi.dsi.mg4j.query.SelectedInterval;
-import it.unimi.dsi.mg4j.query.nodes.Query;
-import it.unimi.dsi.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.dsi.mg4j.search.DocumentIteratorBuilderVisitor;
-import it.unimi.dsi.mg4j.search.score.CountScorer;
-import it.unimi.dsi.mg4j.search.score.DocumentScoreInfo;
-import it.unimi.dsi.mg4j.search.score.Scorer;
+import it.unimi.di.mg4j.document.Document;
+import it.unimi.di.mg4j.document.DocumentCollection;
+import it.unimi.di.mg4j.index.BitStreamIndex;
+import it.unimi.di.mg4j.index.DiskBasedIndex;
+import it.unimi.di.mg4j.index.Index;
+import it.unimi.di.mg4j.index.Index.UriKeys;
+import it.unimi.di.mg4j.index.TermProcessor;
+import it.unimi.di.mg4j.query.QueryEngine;
+import it.unimi.di.mg4j.query.SelectedInterval;
+import it.unimi.di.mg4j.query.nodes.Query;
+import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.mg4j.search.DocumentIteratorBuilderVisitor;
+import it.unimi.di.mg4j.search.score.CountScorer;
+import it.unimi.di.mg4j.search.score.DocumentScoreInfo;
+import it.unimi.di.mg4j.search.score.Scorer;
 import it.unimi.dsi.sux4j.io.FileLinesList;
 import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 import it.unimi.dsi.util.SemiExternalGammaList;
@@ -120,7 +120,7 @@ public class RDFIndex {
 		// Check if collection is a file or directory
 		String collectionString = context.getCollection();
 		if (new File(collectionString).isFile()) {
-		    documentCollection = (it.unimi.dsi.mg4j.document.SimpleCompressedDocumentCollection) BinIO.loadObject(collectionString);
+		    documentCollection = (it.unimi.di.mg4j.document.SimpleCompressedDocumentCollection) BinIO.loadObject(collectionString);
 		    documentCollection.filename(collectionString);
 
 		} else {

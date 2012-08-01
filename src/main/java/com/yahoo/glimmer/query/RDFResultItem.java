@@ -12,9 +12,9 @@ package com.yahoo.glimmer.query;
  */
 
 import it.unimi.dsi.fastutil.objects.Object2LongFunction;
-import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.document.DocumentCollection;
-import it.unimi.dsi.mg4j.query.ResultItem;
+import it.unimi.di.mg4j.document.Document;
+import it.unimi.di.mg4j.document.DocumentCollection;
+import it.unimi.di.mg4j.query.ResultItem;
 
 import java.io.IOException;
 import java.util.ArrayList;

@@ -150,9 +150,9 @@ function groupBySubject () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
-		-Dmapred.reduce.tasks=${REDUCER_TASKS} \
+		-Dmapred.reduce.tasks=1 \
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
-		-Dmapred.output.compress=true \
+		-Dmapred.output.compress=false \
 		-Dmapred.job.queue.name=${QUEUE} \
 		${BY_SUBJECT_FILTERS} ${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${OUTPUT_DIR}"
 	echo ${CMD}
@@ -163,6 +163,10 @@ function groupBySubject () {
 		echo "BySubjectTool exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi
+	
+	local CMD="${HADOOP_CMD} fs -mv ${OUTPUT_DIR}/part-r-00000/* ${OUTPUT_DIR}"
+	echo ${CMD}
+	${CMD}
 		
 	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.util.MergeSortTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
@@ -170,8 +174,8 @@ function groupBySubject () {
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=true \
 		-i ${OUTPUT_DIR}/part-r-?????/all.bz2 -o ${OUTPUT_DIR}/all.bz2 -c all.count"
-	echo ${CMD}
-	${CMD}
+#	echo ${CMD}
+#	${CMD}
 	
 	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.util.MergeSortTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
@@ -179,8 +183,8 @@ function groupBySubject () {
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=true \
 		-i ${OUTPUT_DIR}/part-r-?????/predicate.bz2 -o ${OUTPUT_DIR}/predicate.bz2 -c predicate.count"
-	echo ${CMD}
-	${CMD}
+#	echo ${CMD}
+#	${CMD}
 }
 
 function computeHashes () {
@@ -191,7 +195,7 @@ function computeHashes () {
 	# Generate Hashes for subjects, predicates and objects and all
 	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.util.ComputeHashTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
-		-su ${FILES}"
+		-sui ${FILES}"
 	echo ${CMD}; ${CMD}
 		
 	EXIT_CODE=$?
@@ -208,7 +212,7 @@ function getDocCount () {
 	# MG4J expects that the docId be smaller that the number of docs.  Using the all resource count is simpler that using
 	# the subject count and hash to get the docIds.  The effect is that the index contains empty docs and that the
 	# Doc count it's accurate. Which may effect scoring in some cases.. 
-	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${BY_SUBJECT_DIR}/counts | grep all | cut -f 2`
+	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${BY_SUBJECT_DIR}/all.mapinfo | grep size | cut -f 2`
 	if [ -z "${NUMBER_OF_DOCS}" -o $? -ne "0" ] ; then
 		echo "Failed to get the number of subjects. exiting.."
 		exit 1
@@ -248,12 +252,12 @@ function generateIndex () {
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapred.map.tasks.speculative.execution=true \
 		-Dmapred.reduce.tasks=${SUBINDICES} \
-		-Dmapred.child.java.opts=-Xmx800m \
+		-Dmapred.child.java.opts=-Xmx900m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.job.queue.name=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
+		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${BY_SUBJECT_DIR}/predicate ${BY_SUBJECT_DIR}/bysubject $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 		
@@ -321,7 +325,7 @@ function mergeSubIndexes() {
 	echo ${PART_DIRS[@]}
 	echo
 	
-	INDEX_NAMES=`ls ${PART_DIRS[0]} | awk '/\.index/{sub("\.index$","") ; print $0}'`
+	INDEX_NAMES=`ls ${PART_DIRS[0]} | awk '/\.index/{sub(".index$","") ; print $0}'`
 	echo "Index names are:"
 	echo ${INDEX_NAMES[@]}
 	echo
@@ -338,20 +342,20 @@ function mergeSubIndexes() {
 			NO_COUNTS_OPTIONS="-cCOUNTS:NONE -cPOSITIONS:NONE"
 		fi
 		
-		CMD="java -Xmx2G -cp ${PROJECT_JAR} it.unimi.dsi.mg4j.tool.Merge ${NO_COUNTS_OPTIONS} ${INDEX_DIR}/${INDEX_NAME} ${SUB_INDEXES}"
+		CMD="java -Xmx2G -cp ${PROJECT_JAR} it.unimi.di.mg4j.tool.Merge --interleaved ${NO_COUNTS_OPTIONS} ${INDEX_DIR}/${INDEX_NAME} ${SUB_INDEXES}"
 		echo ${CMD}
 		${CMD}
-		
-		echo "Removing part files for index ${INDEX_NAME}"
-		for PART_DIR in ${PART_DIRS[@]}; do
-			rm ${PART_DIR}/${INDEX_NAME}.*
-		done
 		
 		EXIT_CODE=$?
 		if [ $EXIT_CODE -ne 0 ] ; then
 			echo "Merge of ${METHOD} returned and exit value of $EXIT_CODE. exiting.."
 			exit $EXIT_CODE
 		fi
+		
+		echo "Removing part files for index ${INDEX_NAME}"
+		for PART_DIR in ${PART_DIRS[@]}; do
+			rm ${PART_DIR}/${INDEX_NAME}.*
+		done
 		
 		CMD="java -cp ${PROJECT_JAR} it.unimi.dsi.util.ImmutableExternalPrefixMap ${INDEX_DIR}/${INDEX_NAME}.termmap -o ${INDEX_DIR}/${INDEX_NAME}.terms"
 		echo ${CMD}
@@ -371,12 +375,13 @@ function generateDocSizes () {
 	BY_SUBJECT_DIR=${1}
 	METHOD=${2}
 	NUMBER_OF_DOCS=${3}
-	DFS_SIZES_DIR="${DFS_BUILD_DIR}/${METHOD}.sizes"
-	REDUCE_TASKS=$(( 1 + ${NUMBER_OF_DOCS} / 1000000 ))
 	
 	echo
 	echo GENERATING DOC SIZES..
 	echo
+	
+	DFS_SIZES_DIR="${DFS_BUILD_DIR}/${METHOD}.sizes"
+	REDUCE_TASKS=$(( 1 + ${NUMBER_OF_DOCS} / 1000000 ))
 	
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.DocSizesGenerator \
 		-Dmapred.max.map.failures.percent=1 \
@@ -387,7 +392,7 @@ function generateDocSizes () {
 		-D=mapred.job.reduce.memory.mb=2000 \
 		-Dmapred.job.queue.name=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} -p ${BY_SUBJECT_DIR}/predicate.bz2 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${BY_SUBJECT_DIR}/all.map"
+		-m ${METHOD} -p ${BY_SUBJECT_DIR}/predicate ${BY_SUBJECT_DIR}/bysubject $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${BY_SUBJECT_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
@@ -404,9 +409,25 @@ function generateDocSizes () {
 
 function buildCollection () {
 	BY_SUBJECT_DIR=${1}
+	COLLECTION_DIR="${DFS_BUILD_DIR}/collection"
+	
 	echo
-	echo BUILDING COLLECTION..
+	echo BUILDING COLLECTION in ${COLLECTION_DIR}
 	echo
+	
+	${HADOOP_CMD} fs -test -e "${COLLECTION_DIR}"
+	if [ $? -eq 0 ] ; then
+		read -p "${COLLECTION_DIR} exists. Delete it or otherwise quit? (D)" -n 1 -r
+		echo
+		if [[ ! $REPLY =~ ^[Dd]$ ]] ; then
+			echo Exiting..
+			exit 1
+		fi
+		echo Deleting ${COLLECTION_DIR}...
+		${HADOOP_CMD} fs -rmr -skipTrash ${COLLECTION_DIR}
+	fi
+	
+	
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.BySubjectCollectionBuilder \
 		-Dmapred.map.max.attempts=20 \
 		-Dmapred.map.tasks.speculative.execution=false \
@@ -414,7 +435,7 @@ function buildCollection () {
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.job.queue.name=${QUEUE} \
-		-Dmapred.min.split.size=8500000000 ${BY_SUBJECT_DIR}/part-r-?????/bysubject.bz2 ${DFS_BUILD_DIR}/collection/"
+		-Dmapred.min.split.size=8500000000 ${BY_SUBJECT_DIR}/bysubject ${COLLECTION_DIR}"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
@@ -427,7 +448,7 @@ function buildCollection () {
 }
 
 groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/bysubject ${SUBINDICES}
-computeHashes ${DFS_BUILD_DIR}/bysubject/all.bz2
+computeHashes ${DFS_BUILD_DIR}/bysubject/all
 
 getDocCount ${DFS_BUILD_DIR}/bysubject
 
@@ -444,9 +465,11 @@ generateDocSizes ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS}
 
 buildCollection ${DFS_BUILD_DIR}/bysubject
 
-${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/bysubject/all.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/all.txt"
+#${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/bysubject/all.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/all.txt"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/bysubject/all" "${LOCAL_BUILD_DIR}/all.txt"
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/bysubject/all.smap" "${LOCAL_BUILD_DIR}"
-${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/bysubject/predicate.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/predicates.txt"
+#${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/bysubject/predicate.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/predicates.txt"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/bysubject/predicate" "${LOCAL_BUILD_DIR}/predicates.txt"
 
 echo Done. Index files are here ${LOCAL_BUILD_DIR}
 

@@ -68,6 +68,10 @@ public class AbstractDocumentFactoryTest {
 	resourcesHash.put("http://context/1", 55l);
 	resourcesHash.put("http://object/1", 45l);
 	resourcesHash.put("http://object/2", 46l);
+	resourcesHash.put("http://predicate/1",60l);
+	resourcesHash.put("http://predicate/2", 61l);
+	resourcesHash.put("http://predicate/3", 62l);
+	resourcesHash.put("http://predicate/4/FOUR", 63l);
 	resourcesHash.put("BNodeId123", 88l);
 	
 	rawContentInputStream = new ByteArrayInputStream(RAW_CONTENT_STRING.getBytes(RAW_CHARSET));

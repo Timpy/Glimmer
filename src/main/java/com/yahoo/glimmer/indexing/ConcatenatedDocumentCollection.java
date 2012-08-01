@@ -11,9 +11,9 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.mg4j.document.DocumentCollection;
+import it.unimi.di.mg4j.document.DocumentCollection;
 
-public class ConcatenatedDocumentCollection extends it.unimi.dsi.mg4j.document.ConcatenatedDocumentCollection {
+public class ConcatenatedDocumentCollection extends it.unimi.di.mg4j.document.ConcatenatedDocumentCollection {
     private static final long serialVersionUID = 2474118181169933929L;
 
     public ConcatenatedDocumentCollection(final String[] collectionName, final DocumentCollection[] collection) {

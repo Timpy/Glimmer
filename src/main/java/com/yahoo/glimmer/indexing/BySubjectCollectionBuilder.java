@@ -13,7 +13,7 @@ package com.yahoo.glimmer.indexing;
 
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.document.IdentityDocumentFactory;
+import it.unimi.di.mg4j.document.IdentityDocumentFactory;
 
 import java.io.IOException;
 import java.io.StringReader;
@@ -90,7 +90,11 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 		// String suffix = getTaskId(job);
 		// Use original file name as suffix
 		String input = ((FileSplit) context.getInputSplit()).getPath().getName();
-		String suffix = input.substring(input.lastIndexOf('-') + 1, input.lastIndexOf('.'));
+		int suffixEndIndex = input.lastIndexOf('.');
+		if (suffixEndIndex == -1) {
+		    suffixEndIndex = input.length();
+		}
+		String suffix = input.substring(input.lastIndexOf('-') + 1, suffixEndIndex);
 		builder.open(outputDir, suffix, fs);
 
 	    } catch (IOException e) {

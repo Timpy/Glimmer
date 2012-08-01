@@ -16,12 +16,14 @@ import java.io.IOException;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 
+import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.Counters;
+
 /**
- * Reducer(and Combiner)
+ * Reducer
  * 
  * For the given Subject resource key concatanates all <predicate> <object>
- * <context> . for that key + appends PREDICATE, OBJECT and/or CONTEXT keywords
- * if that keyword occurs once or more as a value.
+ * <context> . for that key It also appends PREDICATE, OBJECT and/or CONTEXT
+ * keywords if that keyword occurs once or more as a value.
  * 
  */
 public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
@@ -30,11 +32,6 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
     private boolean keyObject;
     private boolean keyContext;
     private StringBuilder relations = new StringBuilder();
-    private String[] singleSplit = new String[1];
-
-    public enum Counters {
-	TOO_MANY_RELATIONS, LONG_TUPLES;
-    }
 
     protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Text>.Context context) throws IOException, InterruptedException {
 	relations.setLength(0);
@@ -48,46 +45,35 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
 		return;
 	    }
 
-	    String[] split;
-	    if (valueString.contains(VALUE_DELIMITER)) {
-		split = valueString.split(VALUE_DELIMITER);
+	    if (valueString.length() > 100000) {
+		System.out.println("Long tuple. Length:" + valueString.length() + " starting with " + valueString.substring(0, 100));
+		context.getCounter(Counters.LONG_TUPLES).increment(1);
+	    } else if (TuplesToResourcesMapper.TUPLE_ELEMENTS.PREDICATE.name().equals(valueString)) {
+		keyPredicate = true;
+	    } else if (TuplesToResourcesMapper.TUPLE_ELEMENTS.OBJECT.name().equals(valueString)) {
+		keyObject = true;
+	    } else if (TuplesToResourcesMapper.TUPLE_ELEMENTS.CONTEXT.name().equals(valueString)) {
+		keyContext = true;
 	    } else {
-		singleSplit[0] = valueString;
-		split = singleSplit;
-	    }
-	    for (String s : split) {
-		if (TuplesToResourcesMapper.PREDICATE_VALUE.equals(s)) {
-		    keyPredicate = true;
-		} else if (TuplesToResourcesMapper.OBJECT_VALUE.equals(s)) {
-		    keyObject = true;
-		} else if (TuplesToResourcesMapper.CONTEXT_VALUE.equals(s)) {
-		    keyContext = true;
-		} else {
-		    if (s.length() > 100000) {
-			System.out.println("Long tuple. Length:" + s.length() + " starting with " + s.substring(0, 100));
-			context.getCounter(Counters.LONG_TUPLES).increment(1);
-		    } else {
-			try {
-			    prefixDelimiterAppender(s);
-			} catch (OutOfMemoryError e) {
-			    System.out.println("OOM l:" + relations.length() + " valueCount:" + valueCount + " when appending " + s.length() + " chars.");
-			    throw e;
-			}
-		    }
+		try {
+		    prefixDelimiterAppender(valueString);
+		} catch (OutOfMemoryError e) {
+		    System.out.println("OOM l:" + relations.length() + " valueCount:" + valueCount + " when appending " + valueString.length() + " chars.");
+		    throw e;
 		}
 	    }
 	}
 
 	if (keyPredicate) {
-	    prefixDelimiterAppender(TuplesToResourcesMapper.PREDICATE_VALUE);
+	    prefixDelimiterAppender(TuplesToResourcesMapper.TUPLE_ELEMENTS.PREDICATE.name());
 	    keyPredicate = false;
 	}
 	if (keyObject) {
-	    prefixDelimiterAppender(TuplesToResourcesMapper.OBJECT_VALUE);
+	    prefixDelimiterAppender(TuplesToResourcesMapper.TUPLE_ELEMENTS.OBJECT.name());
 	    keyObject = false;
 	}
 	if (keyContext) {
-	    prefixDelimiterAppender(TuplesToResourcesMapper.CONTEXT_VALUE);
+	    prefixDelimiterAppender(TuplesToResourcesMapper.TUPLE_ELEMENTS.CONTEXT.name());
 	    keyContext = false;
 	}
 

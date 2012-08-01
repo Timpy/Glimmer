@@ -28,6 +28,7 @@ import org.apache.hadoop.util.ReflectionUtils;
 
 /**
  * Writes to different output files depending on the contents of the value.
+ * 
  * @author tep
  * 
  */
@@ -37,8 +38,8 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
     private static final String BY_SUBJECT = "bySubject";
     private static final String SUBJECT = "subject";
 
-    private static final String[] OUTPUTS = { ALL, BY_SUBJECT, SUBJECT, TuplesToResourcesMapper.CONTEXT_VALUE, TuplesToResourcesMapper.OBJECT_VALUE,
-	    TuplesToResourcesMapper.PREDICATE_VALUE };
+    private static final String[] OUTPUTS = { ALL, BY_SUBJECT, SUBJECT, TuplesToResourcesMapper.TUPLE_ELEMENTS.CONTEXT.name(),
+	    TuplesToResourcesMapper.TUPLE_ELEMENTS.OBJECT.name(), TuplesToResourcesMapper.TUPLE_ELEMENTS.PREDICATE.name() };
 
     private HashMap<String, OutputStream> outputStreamsMap = new HashMap<String, OutputStream>();
 
@@ -62,45 +63,55 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 	}
     }
 
+    /**
+     * @param key
+     *            the subject resource as an unquoted string.
+     * @param VALUE_DELIMITER
+     *            seperated <predicate> <object> <context> . string with
+     *            optional 'PREDICATE' 'OBJECT' and 'CONTEXT' suffixes depending
+     *            on if the subject key also occurs as a predicate, object or
+     *            context.
+     */
     @Override
     public void write(Text key, Text value) throws IOException, InterruptedException {
-	OutputStream out = outputStreamsMap.get(ALL);
-	out.write(key.getBytes(), 0, key.getLength());
-	out.write('\n');
+	OutputStream allOs = outputStreamsMap.get(ALL);
+	allOs.write(key.getBytes(), 0, key.getLength());
+	allOs.write('\n');
 
 	byte[] valueBytes = value.getBytes();
 	int subjectsEndIdx = value.getLength();
-	subjectsEndIdx = writeIfType(key, valueBytes, subjectsEndIdx, TuplesToResourcesMapper.CONTEXT_VALUE);
+	subjectsEndIdx = writeIfType(key, valueBytes, subjectsEndIdx, TuplesToResourcesMapper.TUPLE_ELEMENTS.CONTEXT.name());
 	if (subjectsEndIdx <= 0) {
 	    return;
 	}
-	subjectsEndIdx = writeIfType(key, valueBytes, subjectsEndIdx, TuplesToResourcesMapper.OBJECT_VALUE);
+	subjectsEndIdx = writeIfType(key, valueBytes, subjectsEndIdx, TuplesToResourcesMapper.TUPLE_ELEMENTS.OBJECT.name());
 	if (subjectsEndIdx <= 0) {
 	    return;
 	}
-	subjectsEndIdx = writeIfType(key, valueBytes, subjectsEndIdx, TuplesToResourcesMapper.PREDICATE_VALUE);
+	subjectsEndIdx = writeIfType(key, valueBytes, subjectsEndIdx, TuplesToResourcesMapper.TUPLE_ELEMENTS.PREDICATE.name());
 	if (subjectsEndIdx <= 0) {
 	    return;
 	}
 
-	// Bytes left in value after cutting CONTEXT/OBJECT/PREDICATE off the end.. Write subject and bySubject.
-	out = outputStreamsMap.get(SUBJECT);
-	out.write(key.getBytes(), 0, key.getLength());
-	out.write('\n');
+	// Bytes left in value after cutting CONTEXT/OBJECT/PREDICATE off the
+	// end.. Write subject and bySubject.
+	OutputStream subjectOs = outputStreamsMap.get(SUBJECT);
+	subjectOs.write(key.getBytes(), 0, key.getLength());
+	subjectOs.write('\n');
 
-	out = outputStreamsMap.get(BY_SUBJECT);
-	out.write(key.getBytes(), 0, key.getLength());
-	out.write(BY_SUBJECT_DELIMITER);
-	out.write(valueBytes, 0, subjectsEndIdx);
-	out.write('\n');
+	OutputStream bySubjectOs = outputStreamsMap.get(BY_SUBJECT);
+	bySubjectOs.write(key.getBytes(), 0, key.getLength());
+	bySubjectOs.write(BY_SUBJECT_DELIMITER);
+	bySubjectOs.write(valueBytes, 0, subjectsEndIdx);
+	bySubjectOs.write('\n');
     }
 
     private int writeIfType(Text key, byte[] valueBytes, int subjectsEndIdx, String type) throws IOException {
 	byte[] typeBytes = type.getBytes();
 	if (byteArrayRegionMatches(valueBytes, subjectsEndIdx - typeBytes.length, typeBytes, typeBytes.length)) {
-	    OutputStream out = outputStreamsMap.get(type);
-	    out.write(key.getBytes(), 0, key.getLength());
-	    out.write('\n');
+	    OutputStream osForType = outputStreamsMap.get(type);
+	    osForType.write(key.getBytes(), 0, key.getLength());
+	    osForType.write('\n');
 	    return subjectsEndIdx - typeBytes.length - ResourcesReducer.VALUE_DELIMITER.length();
 	}
 	return subjectsEndIdx;

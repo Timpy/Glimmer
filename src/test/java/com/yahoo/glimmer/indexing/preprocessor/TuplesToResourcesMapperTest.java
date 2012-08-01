@@ -13,14 +13,18 @@ package com.yahoo.glimmer.indexing.preprocessor;
 
 import java.io.IOException;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Counter;
+import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.jmock.Expectations;
 import org.jmock.Mockery;
 import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper;
@@ -29,6 +33,7 @@ public class TuplesToResourcesMapperTest {
     private Mockery context;
     private Mapper<LongWritable,Text,Text,Text>.Context mrContext;
     private Counter nxParserExceptionCounter;
+    private InputSplit inputSplit;
     
     @SuppressWarnings("unchecked")
     @Before
@@ -37,12 +42,16 @@ public class TuplesToResourcesMapperTest {
 	context.setImposteriser(ClassImposteriser.INSTANCE);
 	mrContext = context.mock(Mapper.Context.class, "mrContext");
 	nxParserExceptionCounter = context.mock(Counter.class, "nxParserExceptionCounter");
+	inputSplit = new FileSplit(new Path("split1"), 5, 1000, new String[]{"host1"});
     }
     
     @Test
     public void literalObjectText() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
-	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/name")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
+	    allowing(mrContext).getInputSplit();
+	    will(returnValue(inputSplit));
+	    
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/name")), with(new TextMatcher("PREDICATE")));
 	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher("<http://www.example.org/terms/name> \"Smith\" .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
@@ -55,9 +64,12 @@ public class TuplesToResourcesMapperTest {
     @Test
     public void resourceObjectTest() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
-	    one(mrContext).write(with(new TextMatcher("http://purl.org/dc/elements/1.1/creator")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    allowing(mrContext).getInputSplit();
+	    will(returnValue(inputSplit));
+	    
+	    one(mrContext).write(with(new TextMatcher("http://purl.org/dc/elements/1.1/creator")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher("OBJECT")));
+	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher("CONTEXT")));
 	    one(mrContext).write(with(new TextMatcher("http://www.example.org/index.html")), with(new TextMatcher("<http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> <http://context/> .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
@@ -70,8 +82,11 @@ public class TuplesToResourcesMapperTest {
     @Test
     public void noContextsObjectTest() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
-	    one(mrContext).write(with(new TextMatcher("http://purl.org/dc/elements/1.1/creator")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
+	    allowing(mrContext).getInputSplit();
+	    will(returnValue(inputSplit));
+	    
+	    one(mrContext).write(with(new TextMatcher("http://purl.org/dc/elements/1.1/creator")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher("OBJECT")));
 	    one(mrContext).write(with(new TextMatcher("http://www.example.org/index.html")), with(new TextMatcher("<http://purl.org/dc/elements/1.1/creator> <http://www.example.org/staffid/85740> .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
@@ -85,14 +100,33 @@ public class TuplesToResourcesMapperTest {
     /*
      * NxParser 1.2.2 fails with typed literals. The map method should remove the type and try again. 
      */
+    @Ignore
     @Test
-    public void qualifiedIntTest() throws IOException, InterruptedException {
+    public void qualifiedIntNxp122Test() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
+	    allowing(mrContext).getInputSplit();
+	    will(returnValue(inputSplit));
+	    
 	    one(mrContext).getCounter(TuplesToResourcesMapper.MapCounters.NX_PARSER_EXCEPTION);
 	    will(returnValue(nxParserExceptionCounter));
 	    one(nxParserExceptionCounter).increment(1l);
-	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/age")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/age")), with(new TextMatcher("PREDICATE")));
 	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher("<http://www.example.org/terms/age> \"27\" .")));
+	}});
+	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
+	mapper.map(new LongWritable(5l), new Text(
+		"<http://www.example.org/staffid/85740>  <http://www.example.org/terms/age> \"27\"^^<http://www.w3.org/2001/XMLSchema#integer> ."), mrContext);
+	context.assertIsSatisfied();
+    }
+    
+    @Test
+    public void qualifiedIntNxp123Test() throws IOException, InterruptedException {
+	context.checking(new Expectations(){{
+	    allowing(mrContext).getInputSplit();
+	    will(returnValue(inputSplit));
+	    
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/age")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher("<http://www.example.org/terms/age> \"27\"^^<http://www.w3.org/2001/XMLSchema#integer> .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
 	mapper.map(new LongWritable(5l), new Text(
@@ -103,18 +137,21 @@ public class TuplesToResourcesMapperTest {
     @Test
     public void filterSubjectOrObjectTest() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
-	    one(mrContext).write(with(new TextMatcher("http://p2")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://s3")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    allowing(mrContext).getInputSplit();
+	    will(returnValue(inputSplit));
+	    
+	    one(mrContext).write(with(new TextMatcher("http://p2")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://s3")), with(new TextMatcher("OBJECT")));
+	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher("CONTEXT")));
 	    one(mrContext).write(with(new TextMatcher("http://s1")), with(new TextMatcher("<http://p2> <http://s3> <http://context/> .")));
 	    
-	    one(mrContext).write(with(new TextMatcher("http://p3")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://s3")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://p3")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://s3")), with(new TextMatcher("OBJECT")));
+	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher("CONTEXT")));
 	    one(mrContext).write(with(new TextMatcher("http://s2")), with(new TextMatcher("<http://p3> <http://s3> <http://context/> .")));
 	    
-	    one(mrContext).write(with(new TextMatcher("http://p5")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://p5")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher("CONTEXT")));
 	    one(mrContext).write(with(new TextMatcher("http://s3")), with(new TextMatcher("<http://p5> \"o5\" <http://context/> .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
@@ -142,13 +179,16 @@ public class TuplesToResourcesMapperTest {
     @Test
     public void filterSubjectAndObjectTest() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
-	    one(mrContext).write(with(new TextMatcher("http://p2")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://s3")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    allowing(mrContext).getInputSplit();
+	    will(returnValue(inputSplit));
+	    
+	    one(mrContext).write(with(new TextMatcher("http://p2")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://s3")), with(new TextMatcher("OBJECT")));
+	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher("CONTEXT")));
 	    one(mrContext).write(with(new TextMatcher("http://s1")), with(new TextMatcher("<http://p2> <http://s3> <http://context/> .")));
 	    
-	    one(mrContext).write(with(new TextMatcher("http://p5")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://p5")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://context/")), with(new TextMatcher("CONTEXT")));
 	    one(mrContext).write(with(new TextMatcher("http://s3")), with(new TextMatcher("<http://p5> \"o5\" <http://context/> .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
@@ -176,15 +216,18 @@ public class TuplesToResourcesMapperTest {
     @Test
     public void filterPredicateTest() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
-	    one(mrContext).write(with(new TextMatcher("http://schema.org/p1")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://context/1")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    allowing(mrContext).getInputSplit();
+	    will(returnValue(inputSplit));
+	    
+	    one(mrContext).write(with(new TextMatcher("http://schema.org/p1")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://context/1")), with(new TextMatcher("CONTEXT")));
 	    one(mrContext).write(with(new TextMatcher("http://s1")), with(new TextMatcher("<http://schema.org/p1> \"o1\" <http://context/1> .")));
-	    one(mrContext).write(with(new TextMatcher("http://schema.org/p2")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://context/1")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://schema.org/p2")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://context/1")), with(new TextMatcher("CONTEXT")));
 	    one(mrContext).write(with(new TextMatcher("http://s2")), with(new TextMatcher("<http://schema.org/p2> \"o2\" <http://context/1> .")));
-	    one(mrContext).write(with(new TextMatcher("http://schema.org/p4")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://o4")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
-	    one(mrContext).write(with(new TextMatcher("http://context/2")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+	    one(mrContext).write(with(new TextMatcher("http://schema.org/p4")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://o4")), with(new TextMatcher("OBJECT")));
+	    one(mrContext).write(with(new TextMatcher("http://context/2")), with(new TextMatcher("CONTEXT")));
 	    one(mrContext).write(with(new TextMatcher("http://s3")), with(new TextMatcher("<http://schema.org/p4> <http://o4> <http://context/2> .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();

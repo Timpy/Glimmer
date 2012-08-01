@@ -13,7 +13,7 @@ package com.yahoo.glimmer.indexing;
 
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
-import it.unimi.dsi.mg4j.document.DocumentFactory.FieldType;
+import it.unimi.di.mg4j.document.DocumentFactory.FieldType;
 
 import java.io.InputStream;
 import java.lang.reflect.Constructor;

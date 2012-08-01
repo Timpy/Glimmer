@@ -12,7 +12,7 @@ package com.yahoo.glimmer.indexing.generator;
  */
 
 import it.unimi.dsi.io.OutputBitStream;
-import it.unimi.dsi.mg4j.index.IndexWriter;
+import it.unimi.di.mg4j.index.IndexWriter;
 
 import java.io.IOException;
 import java.util.HashMap;

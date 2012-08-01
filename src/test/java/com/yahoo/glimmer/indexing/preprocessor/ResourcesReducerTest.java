@@ -24,9 +24,6 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.yahoo.glimmer.indexing.preprocessor.ResourcesReducer;
-import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper;
-
 
 public class ResourcesReducerTest {
     private Mockery context;
@@ -65,12 +62,12 @@ public class ResourcesReducerTest {
     public void predicateText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
-		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher(TuplesToResourcesMapper.PREDICATE_VALUE)));
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("PREDICATE")));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
 
-	Iterable<Text> values = new TextReuseIterable(TuplesToResourcesMapper.PREDICATE_VALUE);
+	Iterable<Text> values = new TextReuseIterable("PREDICATE");
 
 	reducer.reduce(new Text("http://some/resource/uri"), values, mrContext);
     }
@@ -79,14 +76,14 @@ public class ResourcesReducerTest {
     public void objectText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
-		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher(TuplesToResourcesMapper.OBJECT_VALUE)));
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("OBJECT")));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
 
 	Iterable<Text> values = new TextReuseIterable(
-		TuplesToResourcesMapper.OBJECT_VALUE,
-		TuplesToResourcesMapper.OBJECT_VALUE);
+		"OBJECT",
+		"OBJECT");
 
 	reducer.reduce(new Text("http://some/resource/uri"), values, mrContext);
     }
@@ -95,16 +92,16 @@ public class ResourcesReducerTest {
     public void contextText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
-		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher(TuplesToResourcesMapper.CONTEXT_VALUE)));
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("CONTEXT")));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
 
 	Iterable<Text> values = new TextReuseIterable(
-		TuplesToResourcesMapper.CONTEXT_VALUE,
-		TuplesToResourcesMapper.CONTEXT_VALUE,
-		TuplesToResourcesMapper.CONTEXT_VALUE,
-		TuplesToResourcesMapper.CONTEXT_VALUE);
+		"CONTEXT",
+		"CONTEXT",
+		"CONTEXT",
+		"CONTEXT");
 
 	reducer.reduce(new Text("http://some/resource/uri"), values, mrContext);
     }
@@ -124,9 +121,9 @@ public class ResourcesReducerTest {
 
 	Iterable<Text> values = new TextReuseIterable(
 		"<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .",
-		TuplesToResourcesMapper.OBJECT_VALUE,
+		"OBJECT",
 		"<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .",
-		TuplesToResourcesMapper.OBJECT_VALUE
+		"OBJECT"
 		);
 
 	reducer.reduce(new Text("http://some/resource/uri"), values, mrContext);

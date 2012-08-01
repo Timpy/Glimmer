@@ -50,4 +50,4 @@ do
   fi
 done
 echo $BASENAMES
-${RLWRAP} java -Xmx4G -cp $PROJECT_JAR it.unimi.dsi.mg4j.query.Query -n -v -T ${LOCAL_BUILD_DIR}/all.txt $BASENAMES
+${RLWRAP} java -Xmx3500m -cp $PROJECT_JAR it.unimi.di.mg4j.query.Query -n -v -T ${LOCAL_BUILD_DIR}/all.txt $BASENAMES

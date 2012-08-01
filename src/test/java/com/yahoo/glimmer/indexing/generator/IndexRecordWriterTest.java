@@ -3,8 +3,8 @@ package com.yahoo.glimmer.indexing.generator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import it.unimi.dsi.mg4j.index.FileIndex;
-import it.unimi.dsi.mg4j.index.IndexIterator;
+import it.unimi.di.mg4j.index.FileIndex;
+import it.unimi.di.mg4j.index.IndexIterator;
 
 import java.io.IOException;
 import java.net.URI;
@@ -184,21 +184,23 @@ public class IndexRecordWriterTest {
     private void checkOccurrences(IndexIterator documents, int frequencey, String expected) throws IOException {
 	assertEquals(frequencey, documents.frequency());
 	StringBuilder actual = new StringBuilder();
-	while (documents.hasNext()) {
+	while (documents.mayHaveNext()) {
 	    if (actual.length() > 0) {
 		actual.append(' ');
 	    }
-	    Integer next = documents.next();
+	    Integer next = documents.nextDocument();
 	    actual.append('(');
 	    actual.append(next);
 	    actual.append(':');
-	    int[] positions = new int[10];
-	    int noPositions = documents.positions(positions);
-	    for (int i = 0; i < noPositions; i++) {
-		if (i != 0) {
+	    int position;
+	    boolean first = true;
+	    while ((position = documents.nextPosition()) != IndexIterator.END_OF_POSITIONS) {
+		if (first) {
+		    first = false;
+		} else {
 		    actual.append(',');
 		}
-		actual.append(positions[i]);
+		actual.append(position);
 	    }
 	    actual.append(")");
 	}

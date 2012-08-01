@@ -12,8 +12,8 @@ package com.yahoo.glimmer.query;
  */
 
 import it.unimi.dsi.fastutil.io.BinIO;
-import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.index.BitStreamIndex;
+import it.unimi.di.mg4j.document.Document;
+import it.unimi.di.mg4j.index.BitStreamIndex;
 
 import java.io.BufferedReader;
 import java.io.DataInputStream;

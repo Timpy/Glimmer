@@ -12,10 +12,10 @@ package com.yahoo.glimmer.web;
  */
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.mg4j.query.nodes.Query;
-import it.unimi.dsi.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.dsi.mg4j.query.parser.QueryParserException;
-import it.unimi.dsi.mg4j.query.parser.SimpleParser;
+import it.unimi.di.mg4j.query.nodes.Query;
+import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.mg4j.query.parser.QueryParserException;
+import it.unimi.di.mg4j.query.parser.SimpleParser;
 
 import java.io.IOException;
 import java.util.Collections;

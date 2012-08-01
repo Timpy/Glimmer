@@ -103,7 +103,6 @@ public class BySubjectTool extends Configured implements Tool {
 	job.setMapOutputKeyClass(Text.class);
 	job.setMapOutputValueClass(Text.class);
 
-	job.setCombinerClass(ResourcesReducer.class);
 	job.setReducerClass(ResourcesReducer.class);
 	job.setOutputKeyClass(Text.class);
 	job.setOutputValueClass(Text.class);
