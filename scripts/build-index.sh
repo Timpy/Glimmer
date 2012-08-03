@@ -28,8 +28,8 @@ fi
 
 # Set to "-C" to exclude context from processing. 
 EXCLUDE_CONTEXTS=""
-# Set BySubjectTool's -s -p -o -c -a options here to exclude tuples not matching the given regexes.
-BY_SUBJECT_FILTERS=""
+# Set PrepTool's -s -p -o -c -a options here to exclude tuples not matching the given regexes.
+PREP_FILTERS=""
 
 # To allow the use of commons-configuration version 1.8 over Hadoop's version 1.6 we export HADOOP_USER_CLASSPATH_FIRST=true
 # See https://issues.apache.org/jira/browse/MAPREDUCE-1938 and hadoop.apache.org/common/docs/r0.20.204.0/releasenotes.html
@@ -140,11 +140,11 @@ fi
 
 function groupBySubject () {
 	local INPUT_FILE=${1}
-	local OUTPUT_DIR=${2}
+	local PREP_DIR=${2}
 	local REDUCER_TASKS=${3}
 	echo Processing tuples from file ${INPUT_FILE}...
 	echo
-	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.BySubjectTool \
+	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.PrepTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapred.map.tasks.speculative.execution=true \
 		-Dmapred.child.java.opts=-Xmx800m \
@@ -154,17 +154,17 @@ function groupBySubject () {
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=false \
 		-Dmapred.job.queue.name=${QUEUE} \
-		${BY_SUBJECT_FILTERS} ${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${OUTPUT_DIR}"
+		${PREP_FILTERS} ${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${PREP_DIR}"
 	echo ${CMD}
 	${CMD}
 		
 	local EXIT_CODE=$?
 	if [ $EXIT_CODE -ne "0" ] ; then
-		echo "BySubjectTool exited with code $EXIT_CODE. exiting.."
+		echo "PrepTool exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi
 	
-	local CMD="${HADOOP_CMD} fs -mv ${OUTPUT_DIR}/part-r-00000/* ${OUTPUT_DIR}"
+	local CMD="${HADOOP_CMD} fs -mv ${PREP_DIR}/part-r-00000/* ${PREP_DIR}"
 	echo ${CMD}
 	${CMD}
 		
@@ -173,7 +173,7 @@ function groupBySubject () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=true \
-		-i ${OUTPUT_DIR}/part-r-?????/all.bz2 -o ${OUTPUT_DIR}/all.bz2 -c all.count"
+		-i ${PREP_DIR}/part-r-?????/all.bz2 -o ${PREP_DIR}/all.bz2 -c all.count"
 #	echo ${CMD}
 #	${CMD}
 	
@@ -182,7 +182,7 @@ function groupBySubject () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=true \
-		-i ${OUTPUT_DIR}/part-r-?????/predicate.bz2 -o ${OUTPUT_DIR}/predicate.bz2 -c predicate.count"
+		-i ${PREP_DIR}/part-r-?????/predicates.bz2 -o ${PREP_DIR}/predicates.bz2 -c predicates.count"
 #	echo ${CMD}
 #	${CMD}
 }
@@ -206,13 +206,13 @@ function computeHashes () {
 }
 
 function getDocCount () {
-    local BY_SUBJECT_DIR=${1}
+    local PREP_DIR=${1}
 	# The number of docs is the number of 'all' resources..
 	# Note: It's really the number of subjects but as the MG4J docId is taken from the position in the all resources hash
 	# MG4J expects that the docId be smaller that the number of docs.  Using the all resource count is simpler that using
 	# the subject count and hash to get the docIds.  The effect is that the index contains empty docs and that the
 	# Doc count it's accurate. Which may effect scoring in some cases.. 
-	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${BY_SUBJECT_DIR}/all.mapinfo | grep size | cut -f 2`
+	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${PREP_DIR}/all.mapinfo | grep size | cut -f 2`
 	if [ -z "${NUMBER_OF_DOCS}" -o $? -ne "0" ] ; then
 		echo "Failed to get the number of subjects. exiting.."
 		exit 1
@@ -221,30 +221,30 @@ function getDocCount () {
 }
 
 function generateIndex () {
-	BY_SUBJECT_DIR=${1}
+	PREP_DIR=${1}
 	METHOD=${2}
 	NUMBER_OF_DOCS=${3}
 	SUBINDICES=${4}
-	OUTPUT_DIR="${DFS_BUILD_DIR}/${METHOD}"
+	METHOD_DIR="${DFS_BUILD_DIR}/${METHOD}"
 	
 	echo
 	echo "RUNING HADOOP INDEX BUILD FOR METHOD:" ${METHOD}
 	echo
 	
-	${HADOOP_CMD} fs -test -e "${OUTPUT_DIR}"
+	${HADOOP_CMD} fs -test -e "${METHOD_DIR}"
 	if [ $? -eq 0 ] ; then
-		read -p "${OUTPUT_DIR} exists already! Delete and regenerate index, Continue using existing index or otherwise quit? (D/C)" -n 1 -r
+		read -p "${METHOD_DIR} exists already! Delete and regenerate indexes, Continue using existing indexes or otherwise quit? (D/C)" -n 1 -r
 		echo
 		if [[ $REPLY =~ ^[Cc]$ ]] ; then
-			echo Continuing with existing sub indexes in ${OUTPUT_DIR}
+			echo Continuing with existing indexes in ${METHOD_DIR}
 			return 0
 		elif [[ ! $REPLY =~ ^[Dd]$ ]] ; then
 			echo Exiting.
 			exit 1
 		fi
 	
-		echo "Deleting DFS index directory ${OUTPUT_DIR}.."
-		${HADOOP_CMD} fs -rmr -skipTrash ${OUTPUT_DIR}
+		echo "Deleting DFS indexes in directory ${METHOD_DIR}.."
+		${HADOOP_CMD} fs -rmr -skipTrash ${METHOD_DIR}
 	fi
 	 
 	echo Generating index..
@@ -257,7 +257,7 @@ function generateIndex () {
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.job.queue.name=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${BY_SUBJECT_DIR}/predicate ${BY_SUBJECT_DIR}/bysubject $NUMBER_OF_DOCS ${OUTPUT_DIR} ${BY_SUBJECT_DIR}/all.map"
+		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/predicates ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 		
@@ -372,7 +372,7 @@ function mergeSubIndexes() {
 
 	
 function generateDocSizes () {
-	BY_SUBJECT_DIR=${1}
+	PREP_DIR=${1}
 	METHOD=${2}
 	NUMBER_OF_DOCS=${3}
 	
@@ -392,7 +392,7 @@ function generateDocSizes () {
 		-D=mapred.job.reduce.memory.mb=2000 \
 		-Dmapred.job.queue.name=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} -p ${BY_SUBJECT_DIR}/predicate ${BY_SUBJECT_DIR}/bysubject $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${BY_SUBJECT_DIR}/all.map"
+		-m ${METHOD} -p ${PREP_DIR}/predicate ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
@@ -408,7 +408,7 @@ function generateDocSizes () {
 }	
 
 function buildCollection () {
-	BY_SUBJECT_DIR=${1}
+	PREP_DIR=${1}
 	COLLECTION_DIR="${DFS_BUILD_DIR}/collection"
 	
 	echo
@@ -435,7 +435,7 @@ function buildCollection () {
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.job.queue.name=${QUEUE} \
-		-Dmapred.min.split.size=8500000000 ${BY_SUBJECT_DIR}/bysubject ${COLLECTION_DIR}"
+		-Dmapred.min.split.size=8500000000 ${PREP_DIR}/bySubject ${COLLECTION_DIR}"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
@@ -447,29 +447,29 @@ function buildCollection () {
 	${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/collection" "${LOCAL_BUILD_DIR}"
 }
 
-groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/bysubject ${SUBINDICES}
-computeHashes ${DFS_BUILD_DIR}/bysubject/all
+groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep ${SUBINDICES}
+computeHashes ${DFS_BUILD_DIR}/prep/all
 
-getDocCount ${DFS_BUILD_DIR}/bysubject
+getDocCount ${DFS_BUILD_DIR}/prep
 
-generateIndex ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
+generateIndex ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
 getSubIndexes horizontal
 mergeSubIndexes horizontal
 
-generateIndex ${DFS_BUILD_DIR}/bysubject vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
+generateIndex ${DFS_BUILD_DIR}/prep vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
 getSubIndexes vertical
 mergeSubIndexes vertical
 
 # These could be run in parallel with index generation.
-generateDocSizes ${DFS_BUILD_DIR}/bysubject horizontal ${NUMBER_OF_DOCS}
+generateDocSizes ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS}
 
-buildCollection ${DFS_BUILD_DIR}/bysubject
+buildCollection ${DFS_BUILD_DIR}/prep
 
-#${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/bysubject/all.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/all.txt"
-${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/bysubject/all" "${LOCAL_BUILD_DIR}/all.txt"
-${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/bysubject/all.smap" "${LOCAL_BUILD_DIR}"
-#${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/bysubject/predicate.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/predicates.txt"
-${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/bysubject/predicate" "${LOCAL_BUILD_DIR}/predicates.txt"
+#${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/prep/all.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/all.txt"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.smap" "${LOCAL_BUILD_DIR}"
+#${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/prep/predicates.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/predicates.txt"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/predicates" "${LOCAL_BUILD_DIR}/predicates.txt"
 
 echo Done. Index files are here ${LOCAL_BUILD_DIR}
 

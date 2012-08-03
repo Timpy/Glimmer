@@ -13,6 +13,9 @@ package com.yahoo.glimmer.indexing.preprocessor;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 
 import org.apache.hadoop.conf.Configuration;
@@ -34,14 +37,18 @@ import org.apache.hadoop.util.ReflectionUtils;
  */
 public class ResourceRecordWriter extends RecordWriter<Text, Text> {
     private static final char BY_SUBJECT_DELIMITER = '\t';
-    private static final String ALL = "all";
-    private static final String BY_SUBJECT = "bySubject";
-    private static final String SUBJECT = "subject";
 
-    private static final String[] OUTPUTS = { ALL, BY_SUBJECT, SUBJECT, TuplesToResourcesMapper.TUPLE_ELEMENTS.CONTEXT.name(),
-	    TuplesToResourcesMapper.TUPLE_ELEMENTS.OBJECT.name(), TuplesToResourcesMapper.TUPLE_ELEMENTS.PREDICATE.name() };
+    public static enum OUTPUT {
+	ALL("all"), BY_SUBJECT("bySubject"), CONTEXT("contexts"), OBJECT("objects"), PREDICATE("predicates"), SUBJECT("subjects");
 
-    private HashMap<String, OutputStream> outputStreamsMap = new HashMap<String, OutputStream>();
+	final String filename;
+
+	private OUTPUT(String filename) {
+	    this.filename = filename;
+	}
+    }
+
+    private HashMap<OUTPUT, Writer> writersMap = new HashMap<OUTPUT, Writer>();
 
     public ResourceRecordWriter(FileSystem fs, Path taskWorkPath, CompressionCodec codecIfAny) throws IOException {
 	if (fs.exists(taskWorkPath)) {
@@ -49,89 +56,66 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 	}
 	fs.mkdirs(taskWorkPath);
 
-	for (String key : OUTPUTS) {
+	for (OUTPUT output : OUTPUT.values()) {
 	    OutputStream out;
 	    if (codecIfAny != null) {
-		Path file = new Path(taskWorkPath, key.toLowerCase() + codecIfAny.getDefaultExtension());
+		Path file = new Path(taskWorkPath, output.filename + codecIfAny.getDefaultExtension());
 		out = fs.create(file, false);
 		out = codecIfAny.createOutputStream(out);
 	    } else {
-		Path file = new Path(taskWorkPath, key.toLowerCase());
+		Path file = new Path(taskWorkPath, output.filename);
 		out = fs.create(file, false);
 	    }
-	    outputStreamsMap.put(key, out);
+	    writersMap.put(output, new OutputStreamWriter(out, Charset.forName("UTF-8")));
 	}
     }
 
     /**
      * @param key
-     *            the subject resource as an unquoted string.
-     * @param VALUE_DELIMITER
-     *            seperated <predicate> <object> <context> . string with
-     *            optional 'PREDICATE' 'OBJECT' and 'CONTEXT' suffixes depending
-     *            on if the subject key also occurs as a predicate, object or
-     *            context.
+     *            A resource as an unquoted string.
+     * @param value
+     *            VALUE_DELIMITER separated <predicate> <object> <context> .
+     *            string or one of 'ALL' 'PREDICATE' 'OBJECT' or 'CONTEXT' depending
+     *            on where the key should be written.
      */
     @Override
     public void write(Text key, Text value) throws IOException, InterruptedException {
-	OutputStream allOs = outputStreamsMap.get(ALL);
-	allOs.write(key.getBytes(), 0, key.getLength());
-	allOs.write('\n');
+	String keyString = key.toString();
+	String valueString = value.toString();
 
-	byte[] valueBytes = value.getBytes();
-	int subjectsEndIdx = value.getLength();
-	subjectsEndIdx = writeIfType(key, valueBytes, subjectsEndIdx, TuplesToResourcesMapper.TUPLE_ELEMENTS.CONTEXT.name());
-	if (subjectsEndIdx <= 0) {
-	    return;
+	if (OUTPUT.ALL.name().equals(valueString)) {
+	    Writer allWriter = writersMap.get(OUTPUT.ALL);
+	    allWriter.write(keyString);
+	    allWriter.write('\n');
+	} else if (OUTPUT.PREDICATE.name().equals(valueString)) {
+	    Writer predicateWriter = writersMap.get(OUTPUT.PREDICATE);
+	    predicateWriter.write(keyString);
+	    predicateWriter.write('\n');
+	} else if (OUTPUT.OBJECT.name().equals(valueString)) {
+	    Writer objectWriter = writersMap.get(OUTPUT.OBJECT);
+	    objectWriter.write(keyString);
+	    objectWriter.write('\n');
+	} else if (OUTPUT.CONTEXT.name().equals(valueString)) {
+	    Writer contextWriter = writersMap.get(OUTPUT.CONTEXT);
+	    contextWriter.write(keyString);
+	    contextWriter.write('\n');
+	} else {
+	    // SUBJECT
+	    Writer subjectWriter = writersMap.get(OUTPUT.SUBJECT);
+	    subjectWriter.write(keyString);
+	    subjectWriter.write('\n');
+	    Writer bySubjectWriter = writersMap.get(OUTPUT.BY_SUBJECT);
+	    bySubjectWriter.write(keyString);
+	    bySubjectWriter.write(BY_SUBJECT_DELIMITER);
+	    bySubjectWriter.write(valueString);
+	    bySubjectWriter.write('\n');
 	}
-	subjectsEndIdx = writeIfType(key, valueBytes, subjectsEndIdx, TuplesToResourcesMapper.TUPLE_ELEMENTS.OBJECT.name());
-	if (subjectsEndIdx <= 0) {
-	    return;
-	}
-	subjectsEndIdx = writeIfType(key, valueBytes, subjectsEndIdx, TuplesToResourcesMapper.TUPLE_ELEMENTS.PREDICATE.name());
-	if (subjectsEndIdx <= 0) {
-	    return;
-	}
-
-	// Bytes left in value after cutting CONTEXT/OBJECT/PREDICATE off the
-	// end.. Write subject and bySubject.
-	OutputStream subjectOs = outputStreamsMap.get(SUBJECT);
-	subjectOs.write(key.getBytes(), 0, key.getLength());
-	subjectOs.write('\n');
-
-	OutputStream bySubjectOs = outputStreamsMap.get(BY_SUBJECT);
-	bySubjectOs.write(key.getBytes(), 0, key.getLength());
-	bySubjectOs.write(BY_SUBJECT_DELIMITER);
-	bySubjectOs.write(valueBytes, 0, subjectsEndIdx);
-	bySubjectOs.write('\n');
-    }
-
-    private int writeIfType(Text key, byte[] valueBytes, int subjectsEndIdx, String type) throws IOException {
-	byte[] typeBytes = type.getBytes();
-	if (byteArrayRegionMatches(valueBytes, subjectsEndIdx - typeBytes.length, typeBytes, typeBytes.length)) {
-	    OutputStream osForType = outputStreamsMap.get(type);
-	    osForType.write(key.getBytes(), 0, key.getLength());
-	    osForType.write('\n');
-	    return subjectsEndIdx - typeBytes.length - ResourcesReducer.VALUE_DELIMITER.length();
-	}
-	return subjectsEndIdx;
-    }
-
-    static boolean byteArrayRegionMatches(byte[] big, int bigStart, byte[] small, int len) {
-	if (bigStart < 0) {
-	    return false;
-	}
-	int bi = bigStart;
-	int si = 0;
-	while (big[bi++] == small[si++] && len > si) {
-	}
-	return si == len;
     }
 
     @Override
     public void close(TaskAttemptContext context) throws IOException, InterruptedException {
-	for (OutputStream out : outputStreamsMap.values()) {
-	    out.close();
+	for (Writer writer : writersMap.values()) {
+	    writer.close();
 	}
     }
 

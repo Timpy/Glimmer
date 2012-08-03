@@ -16,7 +16,9 @@ import java.io.IOException;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 
+import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
 import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.Counters;
+import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.TUPLE_ELEMENTS;
 
 /**
  * Reducer
@@ -27,6 +29,7 @@ import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.Counters;
  * 
  */
 public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
+    private static final int MAX_RELATIONS = 10000;
     public static final String VALUE_DELIMITER = "  ";
     private boolean keyPredicate;
     private boolean keyObject;
@@ -35,49 +38,56 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
 
     protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Text>.Context context) throws IOException, InterruptedException {
 	relations.setLength(0);
-	int valueCount = 0;
+	int relationsCount = 0;
 	for (Text value : values) {
 	    String valueString = value.toString();
-	    valueCount++;
-	    if (valueCount > 10000) {
-		System.out.println("Too many relations for subject:" + key.toString());
-		context.getCounter(Counters.TOO_MANY_RELATIONS).increment(1);
-		return;
-	    }
 
 	    if (valueString.length() > 100000) {
 		System.out.println("Long tuple. Length:" + valueString.length() + " starting with " + valueString.substring(0, 100));
 		context.getCounter(Counters.LONG_TUPLES).increment(1);
-	    } else if (TuplesToResourcesMapper.TUPLE_ELEMENTS.PREDICATE.name().equals(valueString)) {
+	    } else if (TUPLE_ELEMENTS.PREDICATE.name().equals(valueString)) {
 		keyPredicate = true;
-	    } else if (TuplesToResourcesMapper.TUPLE_ELEMENTS.OBJECT.name().equals(valueString)) {
+	    } else if (TUPLE_ELEMENTS.OBJECT.name().equals(valueString)) {
 		keyObject = true;
-	    } else if (TuplesToResourcesMapper.TUPLE_ELEMENTS.CONTEXT.name().equals(valueString)) {
+	    } else if (TUPLE_ELEMENTS.CONTEXT.name().equals(valueString)) {
 		keyContext = true;
 	    } else {
-		try {
-		    prefixDelimiterAppender(valueString);
-		} catch (OutOfMemoryError e) {
-		    System.out.println("OOM l:" + relations.length() + " valueCount:" + valueCount + " when appending " + valueString.length() + " chars.");
-		    throw e;
+		relationsCount++;
+		if (relationsCount <= MAX_RELATIONS) {
+		    try {
+			prefixDelimiterAppender(valueString);
+		    } catch (OutOfMemoryError e) { // TODO 
+			System.out.println("OOM l:" + relations.length() + " relationsCount:" + relationsCount + " when appending " + valueString.length()
+				+ " chars.");
+			throw e;
+		    }
 		}
 	    }
 	}
+	
+	if (relationsCount > MAX_RELATIONS) {
+	    System.out.println("Too many relations. Only indexing " + relationsCount + " of " + MAX_RELATIONS + ". Subject is:" + key.toString());
+	    context.getCounter(Counters.TOO_MANY_RELATIONS).increment(1);
+	}
 
+	context.write(key,  new Text(OUTPUT.ALL.name()));
+	
 	if (keyPredicate) {
-	    prefixDelimiterAppender(TuplesToResourcesMapper.TUPLE_ELEMENTS.PREDICATE.name());
+	    context.write(key, new Text(OUTPUT.PREDICATE.name()));
 	    keyPredicate = false;
 	}
 	if (keyObject) {
-	    prefixDelimiterAppender(TuplesToResourcesMapper.TUPLE_ELEMENTS.OBJECT.name());
+	    context.write(key, new Text(OUTPUT.OBJECT.name()));
 	    keyObject = false;
 	}
 	if (keyContext) {
-	    prefixDelimiterAppender(TuplesToResourcesMapper.TUPLE_ELEMENTS.CONTEXT.name());
+	    context.write(key, new Text(OUTPUT.CONTEXT.name()));
 	    keyContext = false;
 	}
 
-	context.write(key, new Text(relations.toString()));
+	if (relationsCount > 0) {
+	    context.write(key, new Text(relations.toString()));
+	}
     };
 
     private void prefixDelimiterAppender(String s) {

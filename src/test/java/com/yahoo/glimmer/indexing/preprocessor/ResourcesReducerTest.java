@@ -43,6 +43,9 @@ public class ResourcesReducerTest {
 	    {
 		one(mrContext).write(
 			with(new TextMatcher("http://some/subject/uri")),
+			with(new TextMatcher("ALL")));
+		one(mrContext).write(
+			with(new TextMatcher("http://some/subject/uri")),
 			with(new TextMatcher("<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .  "
 				+ "<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .  "
 				+ "<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .")));
@@ -62,6 +65,7 @@ public class ResourcesReducerTest {
     public void predicateText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("ALL")));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("PREDICATE")));
 	    }
 	});
@@ -76,6 +80,7 @@ public class ResourcesReducerTest {
     public void objectText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("ALL")));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("OBJECT")));
 	    }
 	});
@@ -92,6 +97,7 @@ public class ResourcesReducerTest {
     public void contextText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("ALL")));
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("CONTEXT")));
 	    }
 	});
@@ -107,14 +113,41 @@ public class ResourcesReducerTest {
     }
     
     @Test
+    public void predicateObectContextText() throws IOException, InterruptedException {
+	context.checking(new Expectations() {
+	    {
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("ALL")));
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("PREDICATE")));
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("OBJECT")));
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("CONTEXT")));
+		one(mrContext).write(
+			with(new TextMatcher("http://some/resource/uri")), 
+			with(new TextMatcher("<http://predicate1> <http://object1> <context> ." +
+					"  <http://predicate2> <http://object2> <context> .")));
+	    }
+	});
+	ResourcesReducer reducer = new ResourcesReducer();
+	
+	Iterable<Text> values = new TextReuseIterable(
+		"<http://predicate1> <http://object1> <context> .",
+		"<http://predicate2> <http://object2> <context> .",
+		"PREDICATE",
+		"OBJECT",
+		"CONTEXT");
+	
+	reducer.reduce(new Text("http://some/resource/uri"), values, mrContext);
+    }
+    
+    @Test
     public void subjectAndObjectText() throws IOException, InterruptedException {
 	context.checking(new Expectations() {
 	    {
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("ALL")));
+		one(mrContext).write(with(new TextMatcher("http://some/resource/uri")), with(new TextMatcher("OBJECT")));
 		one(mrContext).write(
 			with(new TextMatcher("http://some/resource/uri")),
 			with(new TextMatcher("<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .  "
-				+ "<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .  "
-				+ "OBJECT")));
+				+ "<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .")));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();

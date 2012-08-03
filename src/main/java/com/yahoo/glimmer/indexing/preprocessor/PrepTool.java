@@ -30,7 +30,7 @@ import com.martiansoftware.jsap.SimpleJSAP;
 import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
 
-public class BySubjectTool extends Configured implements Tool {
+public class PrepTool extends Configured implements Tool {
     public static final String SUBJECT_FILTER_ARG = "subjectFilter";
     public static final String PREDICATE_FILTER_ARG = "predicateFilter";
     public static final String OBJECT_FILTER_ARG = "objectFilter";
@@ -41,14 +41,14 @@ public class BySubjectTool extends Configured implements Tool {
     private static final String INPUT_ARG = "input";
 
     public static void main(String[] args) throws Exception {
-	int ret = ToolRunner.run(new BySubjectTool(), args);
+	int ret = ToolRunner.run(new PrepTool(), args);
 	System.exit(ret);
     }
 
     @Override
     public int run(String[] args) throws Exception {
 
-	SimpleJSAP jsap = new SimpleJSAP(BySubjectTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
+	SimpleJSAP jsap = new SimpleJSAP(PrepTool.class.getName(), "RDF tuples pre-processor for Glimmer", new Parameter[] {
 	    	new FlaggedOption(SUBJECT_FILTER_ARG, JSAP.STRING_PARSER, null, JSAP.NOT_REQUIRED, 's', SUBJECT_FILTER_ARG, "Only process tuples with their subject matching this regex."),
 	    	new FlaggedOption(PREDICATE_FILTER_ARG, JSAP.STRING_PARSER, null, JSAP.NOT_REQUIRED, 'p', PREDICATE_FILTER_ARG, "Only process tuples with their predicate matching this regex."),
 	    	new FlaggedOption(OBJECT_FILTER_ARG, JSAP.STRING_PARSER, null, JSAP.NOT_REQUIRED, 'o', OBJECT_FILTER_ARG, "Only process tuples with their object matching this regex."),
@@ -94,9 +94,9 @@ public class BySubjectTool extends Configured implements Tool {
 	config.setBoolean(TuplesToResourcesMapper.INCLUDE_CONTEXTS_KEY, withContexts);
 
 	Job job = new Job(config);
-	job.setJarByClass(BySubjectTool.class);
+	job.setJarByClass(PrepTool.class);
 
-	job.setJobName(BySubjectTool.class.getName() + "-part1-" + System.currentTimeMillis());
+	job.setJobName(PrepTool.class.getName() + "-part1-" + System.currentTimeMillis());
 	job.setInputFormatClass(TextInputFormat.class);
 
 	job.setMapperClass(TuplesToResourcesMapper.class);

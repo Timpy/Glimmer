@@ -11,9 +11,6 @@ package com.yahoo.glimmer.indexing.preprocessor;
  *  See accompanying LICENSE file.
  */
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -28,8 +25,6 @@ import org.jmock.Mockery;
 import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 import org.junit.Test;
-
-import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter;
 
 public class ResourceRecordWriterTest {
     private Mockery context;
@@ -62,54 +57,49 @@ public class ResourceRecordWriterTest {
 		one(fs).mkdirs(with(new Path("/somepath")));
 		one(fs).create(with(new Path("/somepath/all")), with(false));
 		will(returnValue(allOs));
-		one(fs).create(with(new Path("/somepath/bysubject")), with(false));
+		one(fs).create(with(new Path("/somepath/bySubject")), with(false));
 		will(returnValue(bySubjectOs));
-		one(fs).create(with(new Path("/somepath/subject")), with(false));
+		one(fs).create(with(new Path("/somepath/subjects")), with(false));
 		will(returnValue(subjectOs));
-		one(fs).create(with(new Path("/somepath/predicate")), with(false));
+		one(fs).create(with(new Path("/somepath/predicates")), with(false));
 		will(returnValue(predicateOs));
-		one(fs).create(with(new Path("/somepath/object")), with(false));
+		one(fs).create(with(new Path("/somepath/objects")), with(false));
 		will(returnValue(objectOs));
-		one(fs).create(with(new Path("/somepath/context")), with(false));
+		one(fs).create(with(new Path("/somepath/contexts")), with(false));
 		will(returnValue(contextOs));
+		one(allOs).close();
+		one(bySubjectOs).close();
+		one(subjectOs).close();
+		one(predicateOs).close();
+		one(objectOs).close();
+		one(contextOs).close();
 	    }
 	};
     }
 
     @Test
     public void writeSubjectAndObjectTest() throws IOException, InterruptedException {
-	e.one(allOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
-	e.one(allOs).write('\n');
-	e.one(subjectOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
-	e.one(subjectOs).write('\n');
-	e.one(objectOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
-	e.one(objectOs).write('\n');
-	e.one(bySubjectOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
-	e.one(bySubjectOs).write('\t');
-	e.one(bySubjectOs).write(e.with(new ByteMatcher("<http://a/key> <http://predicate/> <http://Object> .", true)), e.with(0), e.with(52));
-	e.one(bySubjectOs).write('\n');
+	e.one(allOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
+	e.one(contextOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
+	e.one(objectOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
+	e.one(predicateOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
+	e.one(subjectOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
+	e.one(bySubjectOs).write(e.with(new ByteMatcher("http://a/key\t<http://predicate/> <http://Object> .\n", true)), e.with(0), e.with(51));
 	
 	context.checking(e);
 	
 	ResourceRecordWriter writer = new ResourceRecordWriter(fs, new Path("/somepath"), null);
 	
-	writer.write(new Text("http://a/key"), new Text("<http://a/key> <http://predicate/> <http://Object> .  OBJECT"));
+	writer.write(new Text("http://a/key"), new Text("PREDICATE"));
+	writer.write(new Text("http://a/key"), new Text("OBJECT"));
+	writer.write(new Text("http://a/key"), new Text("CONTEXT"));
+	writer.write(new Text("http://a/key"), new Text("ALL"));
+	writer.write(new Text("http://a/key"), new Text("<http://predicate/> <http://Object> ."));
+	writer.close(null);
+	
+	context.assertIsSatisfied();
     }
     
-    @Test
-    public void writeContextTest() throws IOException, InterruptedException {
-	e.one(allOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
-	e.one(allOs).write('\n');
-	e.one(contextOs).write(e.with(new ByteMatcher("http://a/key", true)), e.with(0), e.with(12));
-	e.one(contextOs).write('\n');
-
-	context.checking(e);
-
-	ResourceRecordWriter writer = new ResourceRecordWriter(fs, new Path("/somepath"), null);
-
-	writer.write(new Text("http://a/key"), new Text("CONTEXT"));
-    }
-
     private static class ByteMatcher extends BaseMatcher<byte[]> {
 	private byte[] bytes;
 	private boolean ignoreTrailingBytes;
@@ -126,35 +116,16 @@ public class ResourceRecordWriterTest {
 	    if (ignoreTrailingBytes) {
 		other = Arrays.copyOf(other, bytes.length);
 	    }
-	    return Arrays.equals(bytes, Arrays.copyOf(other, bytes.length));
+	    return Arrays.equals(bytes, other);
 	}
 
 	@Override
 	public void describeTo(Description description) {
 	    if (ignoreTrailingBytes) {
-		description.appendText(Arrays.toString(bytes) + "...");
+		description.appendText(new String(bytes) + "...");
 	    } else {
-		description.appendText(Arrays.toString(bytes));
+		description.appendText(new String(bytes));
 	    }
 	}
-    }
-
-    @Test
-    public void byteArrayRegionMatchesTest() {
-	byte[] big = "Hello World!".getBytes();
-	assertTrue(ResourceRecordWriter.byteArrayRegionMatches(big, 6, "World".getBytes(), 5));
-	assertFalse(ResourceRecordWriter.byteArrayRegionMatches(big, 5, "World".getBytes(), 5));
-	assertFalse(ResourceRecordWriter.byteArrayRegionMatches(big, 7, "World".getBytes(), 5));
-	assertFalse(ResourceRecordWriter.byteArrayRegionMatches(big, 10, "World".getBytes(), 5));
-
-	assertTrue(ResourceRecordWriter.byteArrayRegionMatches(big, 0, "Hell".getBytes(), 4));
-	assertFalse(ResourceRecordWriter.byteArrayRegionMatches(big, -1, "Hell".getBytes(), 4));
-	assertFalse(ResourceRecordWriter.byteArrayRegionMatches(big, 0, "ell".getBytes(), 4));
-	assertTrue(ResourceRecordWriter.byteArrayRegionMatches(big, 1, "ell".getBytes(), 3));
-
-	assertTrue(ResourceRecordWriter.byteArrayRegionMatches(big, 10, "!".getBytes(), 1));
-	
-	assertTrue(ResourceRecordWriter.byteArrayRegionMatches(big, 0, "Hello World!".getBytes(), 11));
-	assertTrue(ResourceRecordWriter.byteArrayRegionMatches(big, 0, "Hello World!".getBytes(), 12));
     }
 }

@@ -137,17 +137,23 @@ public class ComputeHashTool extends Configured implements Tool {
 
 	LcpMonotoneMinimalPerfectHashFunction<CharSequence> unsignedHash;
 	if (generateUnsigned) {
+	    LOGGER.info("\tBuilding unsigned hash...");
 	    unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, TransformationStrategies.prefixFreeUtf16());
 	    if (signatureWidth <= 0 || keepUnsigned) {
+		LOGGER.info("\tSaving unsigned hash as " + unsigendPath.toString());
 		writeMapToFile(unsignedHash, fs, unsigendPath);
 	    }
 	} else {
+	    LOGGER.info("\tLoading unsigned hash from " + unsigendPath.toString());
 	    unsignedHash = readMpHashFromFile(fs, unsigendPath);
 	}
 
 	if (signatureWidth > 0) {
+	    LOGGER.info("\tBuilding signed hash...");
 	    ShiftAddXorSignedStringMap signedHash = new ShiftAddXorSignedStringMap(inCollection.iterator(), unsignedHash, signatureWidth);
-	    writeMapToFile(signedHash, fs, new Path(destFilename + DOT_SIGNED));
+	    Path signedPath = new Path(destFilename + DOT_SIGNED);
+	    LOGGER.info("\tSaving signed hash as " + signedPath.toString());
+	    writeMapToFile(signedHash, fs, signedPath);
 	}
 
 	if (writeInfoFile) {

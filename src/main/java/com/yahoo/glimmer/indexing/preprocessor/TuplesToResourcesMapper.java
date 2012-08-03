@@ -47,10 +47,6 @@ import org.semanticweb.yars.nx.parser.ParseException;
  */
 public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Text> {
     private static final Log LOG = LogFactory.getLog(TuplesToResourcesMapper.class);
-    private static final int SUBJECT_IDX = 0;
-    private static final int PREDICATE_IDX = 1;
-    private static final int OBJECT_IDX = 2;
-    private static final int CONTEXT_IDX = 3;
     private static final int MAX_NODES = 5; // Our Any23 extractions include a 5
 					    // Literal which is the extractor
 					    // used.
@@ -95,19 +91,19 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
     }
 
     public void setSubjectRegex(String regex) {
-	patterns[SUBJECT_IDX] = checkRegex(regex);
+	patterns[TUPLE_ELEMENTS.SUBJECT.ordinal()] = checkRegex(regex);
     }
 
     public void setPredicateRegex(String regex) {
-	patterns[PREDICATE_IDX] = checkRegex(regex);
+	patterns[TUPLE_ELEMENTS.PREDICATE.ordinal()] = checkRegex(regex);
     }
 
     public void setObjectRegex(String regex) {
-	patterns[OBJECT_IDX] = checkRegex(regex);
+	patterns[TUPLE_ELEMENTS.OBJECT.ordinal()] = checkRegex(regex);
     }
 
     public void setContextRegex(String regex) {
-	patterns[CONTEXT_IDX] = checkRegex(regex);
+	patterns[TUPLE_ELEMENTS.CONTEXT.ordinal()] = checkRegex(regex);
     }
 
     private static Pattern checkRegex(String regex) {
@@ -225,28 +221,28 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 
 	predicateObjectContextDot.setLength(0);
 
-	Node node = nodes[SUBJECT_IDX];
+	Node node = nodes[TUPLE_ELEMENTS.SUBJECT.ordinal()];
 	assert node instanceof org.semanticweb.yars.nx.Resource;
 	Text subject = new Text(node.toString());
 
-	node = nodes[PREDICATE_IDX];
+	node = nodes[TUPLE_ELEMENTS.PREDICATE.ordinal()];
 	assert node instanceof org.semanticweb.yars.nx.Resource;
 	context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.PREDICATE.name()));
-	predicateObjectContextDot.append(nodesAsN3[PREDICATE_IDX]);
+	predicateObjectContextDot.append(nodesAsN3[TUPLE_ELEMENTS.PREDICATE.ordinal()]);
 
-	node = nodes[OBJECT_IDX];
+	node = nodes[TUPLE_ELEMENTS.OBJECT.ordinal()];
 	if (node instanceof org.semanticweb.yars.nx.Resource) {
 	    context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.OBJECT.name()));
 	}
 	predicateObjectContextDot.append(' ');
-	predicateObjectContextDot.append(nodesAsN3[OBJECT_IDX]);
+	predicateObjectContextDot.append(nodesAsN3[TUPLE_ELEMENTS.OBJECT.ordinal()]);
 
-	if (includeContexts && nodeCount > CONTEXT_IDX) {
-	    node = nodes[CONTEXT_IDX];
+	if (includeContexts && nodeCount > TUPLE_ELEMENTS.CONTEXT.ordinal()) {
+	    node = nodes[TUPLE_ELEMENTS.CONTEXT.ordinal()];
 	    assert node instanceof org.semanticweb.yars.nx.Resource;
 	    context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.CONTEXT.name()));
 	    predicateObjectContextDot.append(' ');
-	    predicateObjectContextDot.append(nodesAsN3[CONTEXT_IDX]);
+	    predicateObjectContextDot.append(nodesAsN3[TUPLE_ELEMENTS.CONTEXT.ordinal()]);
 	}
 	predicateObjectContextDot.append(" .");
 
