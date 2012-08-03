@@ -17,7 +17,6 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
-import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.Counters;
 import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.TUPLE_ELEMENTS;
 
 /**
@@ -35,6 +34,10 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
     private boolean keyObject;
     private boolean keyContext;
     private StringBuilder relations = new StringBuilder();
+    
+    static enum Counters {
+	TOO_MANY_RELATIONS;
+    }
 
     protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Text>.Context context) throws IOException, InterruptedException {
 	relations.setLength(0);
@@ -42,10 +45,7 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
 	for (Text value : values) {
 	    String valueString = value.toString();
 
-	    if (valueString.length() > 100000) {
-		System.out.println("Long tuple. Length:" + valueString.length() + " starting with " + valueString.substring(0, 100));
-		context.getCounter(Counters.LONG_TUPLES).increment(1);
-	    } else if (TUPLE_ELEMENTS.PREDICATE.name().equals(valueString)) {
+	    if (TUPLE_ELEMENTS.PREDICATE.name().equals(valueString)) {
 		keyPredicate = true;
 	    } else if (TUPLE_ELEMENTS.OBJECT.name().equals(valueString)) {
 		keyObject = true;

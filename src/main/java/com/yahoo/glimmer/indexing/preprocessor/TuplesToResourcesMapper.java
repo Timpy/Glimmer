@@ -62,8 +62,8 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	SUBJECT, PREDICATE, OBJECT, CONTEXT;
     }
     
-    public enum Counters {
-	TOO_MANY_RELATIONS, LONG_TUPLES, LONG_TUPLE_ELEMENT;
+    static enum Counters {
+	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE
     }
 
     private boolean includeContexts = true;
@@ -142,25 +142,25 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	} catch (ParseException e) {
 	    // NxParser 1.2.2 has problems with typed literals like:
 	    // "27"^^<int uri>. This is fixed in 1.2.3
-	    context.getCounter(MapCounters.NX_PARSER_EXCEPTION).increment(1l);
+	    context.getCounter(Counters.NX_PARSER_EXCEPTION).increment(1l);
 	    String s = value.replaceAll("\\^\\^<[^>]+>", "");
 	    try {
 		nodes = NxParser.parseNodes(s);
 		LOG.info("Only parsed after remove of literal types:" + value);
 	    } catch (ParseException e1) {
-		context.getCounter(MapCounters.NX_PARSER_RETRY_EXCEPTION).increment(1l);
+		context.getCounter(Counters.NX_PARSER_RETRY_EXCEPTION).increment(1l);
 		LOG.info("Failed parsing even after remove of literal types:" + value);
 		return;
 	    }
 	}
 
 	if (nodes.length < 3) {
-	    context.getCounter(MapCounters.SHORT_TUPLE).increment(1l);
+	    context.getCounter(Counters.SHORT_TUPLE).increment(1l);
 	    LOG.info("Line parsed with less than 3 nodes at position" + key.toString());
 	    return;
 	}
 	if (nodes.length > MAX_NODES) {
-	    context.getCounter(MapCounters.LONG_TUPLE).increment(1l);
+	    context.getCounter(Counters.LONG_TUPLE).increment(1l);
 	    LOG.info("Line parsed with more than " + MAX_NODES + " nodes at position" + key.toString());
 	    return;
 	}
@@ -212,7 +212,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 		try {
 		    new URI(node.toString());
 		} catch (URISyntaxException e) {
-		    context.getCounter(MapCounters.INVALID_RESOURCE).increment(1l);
+		    context.getCounter(Counters.INVALID_RESOURCE).increment(1l);
 		    LOG.info("Bad resource near position " + key.toString());
 		    return;
 		}
@@ -254,8 +254,4 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	    context.write(subject, new Text(predicateObjectContextDot.toString()));
 	}
     };
-
-    static enum MapCounters {
-	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, SHORT_TUPLE, INVALID_RESOURCE
-    }
 }

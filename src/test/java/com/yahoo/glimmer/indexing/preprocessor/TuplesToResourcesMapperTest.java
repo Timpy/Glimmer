@@ -107,7 +107,7 @@ public class TuplesToResourcesMapperTest {
 	    allowing(mrContext).getInputSplit();
 	    will(returnValue(inputSplit));
 	    
-	    one(mrContext).getCounter(TuplesToResourcesMapper.MapCounters.NX_PARSER_EXCEPTION);
+	    one(mrContext).getCounter(TuplesToResourcesMapper.Counters.NX_PARSER_EXCEPTION);
 	    will(returnValue(nxParserExceptionCounter));
 	    one(nxParserExceptionCounter).increment(1l);
 	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/age")), with(new TextMatcher("PREDICATE")));
