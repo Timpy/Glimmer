@@ -81,8 +81,8 @@ public class ResourceRecordWriterTest {
     public void writeSubjectAndObjectTest() throws IOException, InterruptedException {
 	e.one(allOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
 	e.one(contextOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
-	e.one(objectOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
-	e.one(predicateOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
+	e.one(objectOs).write(e.with(new ByteMatcher("http://a/key\nbNode123\n", true)), e.with(0), e.with(22));
+	e.one(predicateOs).write(e.with(new ByteMatcher("3\thttp://a/key\n", true)), e.with(0), e.with(15));
 	e.one(subjectOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
 	e.one(bySubjectOs).write(e.with(new ByteMatcher("http://a/key\t<http://predicate/> <http://Object> .\n", true)), e.with(0), e.with(51));
 	
@@ -90,11 +90,12 @@ public class ResourceRecordWriterTest {
 	
 	ResourceRecordWriter writer = new ResourceRecordWriter(fs, new Path("/somepath"), null);
 	
-	writer.write(new Text("http://a/key"), new Text("PREDICATE"));
+	writer.write(new Text("http://a/key"), new Text("PREDICATE:3"));
 	writer.write(new Text("http://a/key"), new Text("OBJECT"));
 	writer.write(new Text("http://a/key"), new Text("CONTEXT"));
 	writer.write(new Text("http://a/key"), new Text("ALL"));
 	writer.write(new Text("http://a/key"), new Text("<http://predicate/> <http://Object> ."));
+	writer.write(new Text("bNode123"), new Text("OBJECT"));
 	writer.close(null);
 	
 	context.assertIsSatisfied();

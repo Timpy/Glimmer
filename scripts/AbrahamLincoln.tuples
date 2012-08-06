@@ -15,6 +15,8 @@
 <http://dbpedia.org/resource/Abraham_Lincoln> <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Hodgenville,_Kentucky> <http://en.wikipedia.org/wiki/Abraham_Lincoln#absolute-line=21> .
 <http://dbpedia.org/resource/Abraham_Lincoln> <http://dbpedia.org/ontology/birthDate> "1809-02-12"^^<http://www.w3.org/2001/XMLSchema#date> <http://en.wikipedia.org/wiki/Abraham_Lincoln#absolute-line=20> .
 <http://dbpedia.org/resource/Abraham_Lincoln> <http://xmlns.com/foaf/0.1/name> "Abraham Lincoln"@en <http://en.wikipedia.org/wiki/Abraham_Lincoln#absolute-line=5> .
+<http://dbpedia.org/resource/Abraham_Lincoln> <http://dbpedia.org/ontology/bitOnTheSide> _:123bnode <http://en.wikipedia.org/wiki/Abraham_Lincoln#absolute-line=2> .
+_:123bnode <http://xmlns.com/foaf/0.1/name> "Joshua Fry Speed"@en <http://en.wikipedia.org/wiki/Abraham_Lincoln#absolute-line=2> .
 <http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://dbpedia.org/ontology/orderInOffice> "First Lady of the United States"@en <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=8> .
 <http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://dbpedia.org/ontology/spouse> <http://dbpedia.org/resource/Abraham_Lincoln> <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=14> .
 <http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://dbpedia.org/ontology/deathPlace> <http://dbpedia.org/resource/Illinois> <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=7> .

@@ -22,47 +22,47 @@ import java.util.Properties;
 public class Context extends Properties {
     private static final long serialVersionUID = 8416864704849882837L;
     
-    public static final String ALIGNMENT_INDEX_KEY = "alignment.index";
-    public static final String B_TAG = "b";
-    public static final String BLACKLIST_FILENAME_KEY = "blacklist.filename";
-    public static final String COLLECTION_KEY = "collection";
-    public static final String DL_CUTOFF_TAG = "dl.cutoff";
-    public static final String DOCUMENT_PRIORS_KEY = "document.priors";
-    public static final String FIELD_LIST_KEY = "field.list";
-    public static final String INDEX_PATH_KEY = "index.path";
-    public static final String K1_TAG = "k1";
-    public static final String LOAD_MEMORY_TAG = "load.memory";
-    public static final String LOAD_SIZES_TAG = "load.sizes";
-    public static final String MAX_NORM_TAG = "max.norm";
-    public static final String MIN_RESULTS_TAG = "min.results";
-    public static final String MPH_KEY = "mph";
-    public static final String MULTIINDEX_PATH_KEY = "multiindex.path";
+    private static final String B_TAG = "b";
+    private static final String BLACKLIST_FILENAME_KEY = "blacklist.filename";
+    private static final String COLLECTION_KEY = "collection";
+    private static final String DL_CUTOFF_TAG = "dl.cutoff";
+    private static final String DOCUMENT_PRIORS_KEY = "document.priors";
+    private static final String FIELD_LIST_KEY = "field.list";
+    private static final String INDEX_PATH_KEY = "index.path";
+    private static final String K1_TAG = "k1";
+    private static final String LOAD_MEMORY_TAG = "load.memory";
+    private static final String LOAD_SIZES_TAG = "load.sizes";
+    private static final String MAX_NORM_TAG = "max.norm";
+    private static final String MIN_RESULTS_TAG = "min.results";
+    private static final String ALL_RESOURCES_MAP_KEY = "allResorcesMap";
+    private static final String MULTIINDEX_PATH_KEY = "multiindex.path";
     public static final String MULTIINDEX_DIR_PREFIX_KEY = "multiindex.dirprefix";
-    public static final String ONTOLOGY_PATH_KEY = "ontology.path";
-    public static final String PRIOR_RULES_KEY = "prior.rules";
-    public static final String PROPERTY_INDEX_KEY = "property.index";
-    public static final String QRELS_KEY = "qrels";
-    public static final String QUERY_FILE_KEY = "query.file";
-    public static final String REMOVE_STOPWORDS_TAG = "remove.stopwords";
-    public static final String RUN_NAME_TAG = "run.name";
-    public static final String RUNS_FILE_KEY = "runs.file";
-    public static final String SEGMENTATION_CACHE_KEY = "segmentation.cache";
-    public static final String STORE_CACHE_TAG = "store.cache";
-    public static final String SW_LIST_KEY = "sw.list";
-    public static final String TITLE_LIST_KEY = "title.list";
-    public static final String TOKEN_INDEX_KEY = "token.index";
-    public static final String TOP_K_KEY = "top.k";
-    public static final String USE_SEGMENTS_KEY = "use.segments";
-    public static final String USE_TIES_KEY = "use.ties";
-    public static final String W_MATCHES_TAG = "w.matches";
-    public static final String WF_IMPORTANT_TAG = "wf.important";
-    public static final String WF_NEUTRAL_TAG = "wf.neutral";
-    public static final String WF_UNIMPORTANT_TAG = "wf.unimportant";
-    public static final String WS_IMPORTANT_TAG = "ws.important";
-    public static final String WS_NEUTRAL_TAG = "ws.neutral";
-    public static final String WS_UNIMPORTANT_TAG = "ws.unimportant";
-    public static final String WURI_INDEX_KEY = "wuri.index";
-    public static final String WURI_TAG = "wuri";
+    private static final String ONTOLOGY_PATH_KEY = "ontology.path";
+    private static final String PRIOR_RULES_KEY = "prior.rules";
+    private static final String QRELS_KEY = "qrels";
+    private static final String QUERY_FILE_KEY = "query.file";
+    private static final String REMOVE_STOPWORDS_TAG = "remove.stopwords";
+    private static final String RUN_NAME_TAG = "run.name";
+    private static final String RUNS_FILE_KEY = "runs.file";
+    private static final String SEGMENTATION_CACHE_KEY = "segmentation.cache";
+    private static final String STORE_CACHE_TAG = "store.cache";
+    private static final String SW_LIST_KEY = "sw.list";
+    private static final String TITLE_LIST_KEY = "title.list";
+    private static final String ALIGNMENT_INDEX_KEY = "alignment.index";
+    private static final String PREDICATE_INDEX_KEY = "predicate.index";
+    private static final String SUBJECT_INDEX_KEY = "subject.index";
+    private static final String WURI_INDEX_KEY = "wuri.index";
+    private static final String TOP_K_KEY = "top.k";
+    private static final String USE_SEGMENTS_KEY = "use.segments";
+    private static final String USE_TIES_KEY = "use.ties";
+    private static final String W_MATCHES_TAG = "w.matches";
+    private static final String WF_IMPORTANT_TAG = "wf.important";
+    private static final String WF_NEUTRAL_TAG = "wf.neutral";
+    private static final String WF_UNIMPORTANT_TAG = "wf.unimportant";
+    private static final String WS_IMPORTANT_TAG = "ws.important";
+    private static final String WS_NEUTRAL_TAG = "ws.neutral";
+    private static final String WS_UNIMPORTANT_TAG = "ws.unimportant";
+    private static final String WURI_TAG = "wuri";
 
     public Context(Context that) {
 	super(that);
@@ -119,8 +119,8 @@ public class Context extends Properties {
 	return getInt(MAX_NORM_TAG, 5);
     }
 
-    public String getMph() {
-	return getProperty(MPH_KEY);
+    public String getAllResourcesMap() {
+	return getProperty(ALL_RESOURCES_MAP_KEY);
     }
 
     public String getMultiIndexPath() {
@@ -147,8 +147,8 @@ public class Context extends Properties {
 	return getProperty(PRIOR_RULES_KEY);
     }
 
-    public String getPropertyIndex() {
-	return getProperty(PROPERTY_INDEX_KEY);
+    public String getPredicateIndex() {
+	return getProperty(PREDICATE_INDEX_KEY);
     }
 
     public String getQRels() {
@@ -195,8 +195,8 @@ public class Context extends Properties {
 	return getProperty(TITLE_LIST_KEY);
     }
 
-    public String getTokenIndex() {
-	return getProperty(TOKEN_INDEX_KEY);
+    public String getSubjectIndex() {
+	return getProperty(SUBJECT_INDEX_KEY);
     }
 
     public boolean getUseSegements() {
@@ -240,7 +240,7 @@ public class Context extends Properties {
     }
 
     public String getWuriIndex() {
-	return getProperty(WURI_INDEX_KEY);
+	return null;  // getProperty(WURI_INDEX_KEY);
     }
 
     @Deprecated
@@ -310,12 +310,12 @@ public class Context extends Properties {
     
     public void setIndexPath(String indexPath) {
 	setProperty(INDEX_PATH_KEY, indexPath + File.separator + "vertical" + File.separator);
-	setProperty(TOKEN_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "token");
-	setProperty(PROPERTY_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "property");
+	setProperty(SUBJECT_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "subject");
+	setProperty(PREDICATE_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "predicate");
 	setProperty(WURI_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "uri");
 	setProperty(TITLE_LIST_KEY, indexPath + File.separator + "subjects.txt");
 	setProperty(FIELD_LIST_KEY, indexPath + File.separator + "predicates.txt");
-	setProperty(MPH_KEY, indexPath + File.separator + "subjects.mph");
+	setProperty(ALL_RESOURCES_MAP_KEY, indexPath + File.separator + "all.smap");
 	setProperty(COLLECTION_KEY, indexPath + File.separator + COLLECTION_KEY + File.separator);
 	setProperty(ALIGNMENT_INDEX_KEY, indexPath + File.separator + "vertical" + File.separator + "alignment");
     }

@@ -11,20 +11,6 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.fastutil.Hash;
-import it.unimi.dsi.fastutil.io.BinIO;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.Reference2DoubleMap;
-import it.unimi.dsi.fastutil.objects.Reference2DoubleOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import it.unimi.dsi.io.FileLinesCollection;
-import it.unimi.dsi.io.InputBitStream;
-import it.unimi.dsi.lang.MutableString;
 import it.unimi.di.mg4j.document.Document;
 import it.unimi.di.mg4j.document.DocumentCollection;
 import it.unimi.di.mg4j.index.BitStreamIndex;
@@ -40,8 +26,22 @@ import it.unimi.di.mg4j.search.DocumentIteratorBuilderVisitor;
 import it.unimi.di.mg4j.search.score.CountScorer;
 import it.unimi.di.mg4j.search.score.DocumentScoreInfo;
 import it.unimi.di.mg4j.search.score.Scorer;
+import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.io.BinIO;
+import it.unimi.dsi.fastutil.objects.Object2LongFunction;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ReferenceLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.Reference2DoubleMap;
+import it.unimi.dsi.fastutil.objects.Reference2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
+import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
+import it.unimi.dsi.io.FileLinesCollection;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.sux4j.io.FileLinesList;
-import it.unimi.dsi.sux4j.mph.LcpMonotoneMinimalPerfectHashFunction;
 import it.unimi.dsi.util.SemiExternalGammaList;
 
 import java.io.File;
@@ -85,15 +85,15 @@ public class RDFIndex {
     protected SemiExternalGammaList frequencies = null;
     /** Document priors */
     protected HashMap<Integer, Integer> documentPriors = null;
-    /** MPH used to encode URIs for retrieving from the collection */
-    protected LcpMonotoneMinimalPerfectHashFunction<CharSequence> subjectsMPH;
+    /** Map used to encode URIs for retrieving from the collection */
+    protected Object2LongFunction<CharSequence> allResourcesMap;
     /** The alignment index **/
     protected Index precompIndex;
     /** The predicate index **/
     protected Index predicateIndex;
     /** Query logger for performance measurement */
     private QueryLogger queryLogger;
-    protected String tokenField = "token";
+    protected String subjectField = "subject";
     protected String uriField;
     /**
      * All fields (includes non-indexed fields) This is a list because it's used
@@ -185,12 +185,12 @@ public class RDFIndex {
 	}
 
 	// Load MPH
-	if (context.getMph() == null || context.getMph().equals("")) {
-	    LOGGER.warn("Warning, no mph specified!");
+	if (context.getAllResourcesMap() == null || context.getAllResourcesMap().equals("")) {
+	    LOGGER.warn("Warning, no resources map specified!");
 	} else {
-	    LOGGER.info("Loading Minimal Perfect Hash (MPH)...");
+	    LOGGER.info("Loading resourses map " + context.getAllResourcesMap());
 	    try {
-		subjectsMPH = (LcpMonotoneMinimalPerfectHashFunction<CharSequence>) BinIO.loadObject(context.getMph());
+		allResourcesMap = (Object2LongFunction<CharSequence>) BinIO.loadObject(context.getAllResourcesMap());
 	    } catch (IOException e) {
 		e.printStackTrace();
 	    } catch (ClassNotFoundException e) {
@@ -245,18 +245,18 @@ public class RDFIndex {
 
 	LOGGER.info("Loaded " + basenameWeight.length + " indices.");
 
-	if (context != null && context.getTokenIndex() != null) {
-	    indexIdfs = (BitStreamIndex) indexMap.get(context.getTokenIndex());
+	if (context != null && context.getSubjectIndex() != null) {
+	    indexIdfs = (BitStreamIndex) indexMap.get(context.getSubjectIndex());
 	    if (indexIdfs == null) {
 		// could always load sizes!
 		try {
 		    LOGGER.info("Loading token index.");
-		    indexIdfs = (BitStreamIndex) DiskBasedIndex.getInstance(context.getTokenIndex(), true, true, true, map);
+		    indexIdfs = (BitStreamIndex) DiskBasedIndex.getInstance(context.getSubjectIndex(), true, true, true, map);
 		} catch (Exception e) {
 		    throw new RuntimeException(e);
 
 		}
-		indexMap.put(tokenField, indexIdfs);
+		indexMap.put(subjectField, indexIdfs);
 	    }
 	}
 
@@ -279,8 +279,8 @@ public class RDFIndex {
 
 	// Load the predicate index
 	try {
-	    LOGGER.info("Loading predicate index from " + context.getPropertyIndex());
-	    predicateIndex = Index.getInstance(context.getPropertyIndex() + "?mapped=1");
+	    LOGGER.info("Loading predicate index from " + context.getPredicateIndex());
+	    predicateIndex = Index.getInstance(context.getPredicateIndex() + "?mapped=1");
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(e);
 	}
@@ -299,16 +299,16 @@ public class RDFIndex {
 	}
 
 	// Loading frequencies
-	if (context != null && context.getTokenIndex() != null) {
+	if (context != null && context.getSubjectIndex() != null) {
 	    try {
-		LOGGER.info("Loading frequencies from " + context.getTokenIndex() + DiskBasedIndex.FREQUENCIES_EXTENSION);
-		frequencies = new SemiExternalGammaList(new InputBitStream(context.getTokenIndex() + DiskBasedIndex.FREQUENCIES_EXTENSION), 1,
+		LOGGER.info("Loading frequencies from " + context.getSubjectIndex() + DiskBasedIndex.FREQUENCIES_EXTENSION);
+		frequencies = new SemiExternalGammaList(new InputBitStream(context.getSubjectIndex() + DiskBasedIndex.FREQUENCIES_EXTENSION), 1,
 			indexIdfs.termMap.size());
 		if (frequencies.size() != indexIdfs.numberOfDocuments) {
 		    LOGGER.warn("Loaded " + frequencies.size() + " frequency values but index_idfs.numberOfDocuments is " + indexIdfs.numberOfDocuments);
 		}
 	    } catch (Exception e) {
-		LOGGER.error("Failed to load token index: " + context.getTokenIndex());
+		LOGGER.error("Failed to load token index: " + context.getSubjectIndex());
 		throw new IllegalArgumentException(e);
 	    }
 	} else {
@@ -352,7 +352,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), "token", context.getWuriIndex(), termProcessors, getSubjectsMPH());
+	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), "subject", context.getWuriIndex(), termProcessors, getAllResourcesMap());
 
 	// Compute stats
 	try {
@@ -572,7 +572,7 @@ public class RDFIndex {
     }
 
     public long getDocID(String uri) {
-	return subjectsMPH.get(uri);
+	return allResourcesMap.get(uri);
     }
 
     public DocumentCollection getCollection() {
@@ -586,13 +586,13 @@ public class RDFIndex {
     public BitStreamIndex getAlignmentIndex() {
 	return (BitStreamIndex) precompIndex;
     }
-
-    public LcpMonotoneMinimalPerfectHashFunction<CharSequence> getSubjectsMPH() {
-	return subjectsMPH;
+    
+    public Object2LongFunction<CharSequence> getAllResourcesMap() {
+	return allResourcesMap;
     }
 
     public String getDefaultField() {
-	return tokenField;
+	return subjectField;
     }
 
     public String getURIField() {

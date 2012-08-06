@@ -30,34 +30,35 @@ import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.TUPLE_ELE
 public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
     private static final int MAX_RELATIONS = 10000;
     public static final String VALUE_DELIMITER = "  ";
-    private boolean keyPredicate;
-    private boolean keyObject;
-    private boolean keyContext;
-    private StringBuilder relations = new StringBuilder();
+    private StringBuilder sb = new StringBuilder();
     
     static enum Counters {
 	TOO_MANY_RELATIONS;
     }
 
     protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Text>.Context context) throws IOException, InterruptedException {
-	relations.setLength(0);
+	int keyPredicateCount = 0;
+	int keyObjectCount = 0;
+	int keyContextCount = 0;
 	int relationsCount = 0;
+	sb.setLength(0);
+	
 	for (Text value : values) {
 	    String valueString = value.toString();
 
 	    if (TUPLE_ELEMENTS.PREDICATE.name().equals(valueString)) {
-		keyPredicate = true;
+		keyPredicateCount++;
 	    } else if (TUPLE_ELEMENTS.OBJECT.name().equals(valueString)) {
-		keyObject = true;
+		keyObjectCount++;
 	    } else if (TUPLE_ELEMENTS.CONTEXT.name().equals(valueString)) {
-		keyContext = true;
+		keyContextCount++;
 	    } else {
 		relationsCount++;
 		if (relationsCount <= MAX_RELATIONS) {
 		    try {
 			prefixDelimiterAppender(valueString);
 		    } catch (OutOfMemoryError e) { // TODO 
-			System.out.println("OOM l:" + relations.length() + " relationsCount:" + relationsCount + " when appending " + valueString.length()
+			System.out.println("OOM l:" + sb.length() + " relationsCount:" + relationsCount + " when appending " + valueString.length()
 				+ " chars.");
 			throw e;
 		    }
@@ -72,28 +73,29 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
 
 	context.write(key,  new Text(OUTPUT.ALL.name()));
 	
-	if (keyPredicate) {
-	    context.write(key, new Text(OUTPUT.PREDICATE.name()));
-	    keyPredicate = false;
-	}
-	if (keyObject) {
-	    context.write(key, new Text(OUTPUT.OBJECT.name()));
-	    keyObject = false;
-	}
-	if (keyContext) {
-	    context.write(key, new Text(OUTPUT.CONTEXT.name()));
-	    keyContext = false;
-	}
-
 	if (relationsCount > 0) {
-	    context.write(key, new Text(relations.toString()));
+	    context.write(key, new Text(sb.toString()));
+	}
+	
+	if (keyPredicateCount > 0) {
+	    sb.setLength(0);
+	    sb.append(OUTPUT.PREDICATE.name());
+	    sb.append(':');
+	    sb.append(keyPredicateCount);
+	    context.write(key, new Text(sb.toString()));
+	}
+	if (keyObjectCount > 0) {
+	    context.write(key, new Text(OUTPUT.OBJECT.name()));
+	}
+	if (keyContextCount > 0) {
+	    context.write(key, new Text(OUTPUT.CONTEXT.name()));
 	}
     };
 
     private void prefixDelimiterAppender(String s) {
-	if (relations.length() > 0) {
-	    relations.append(ResourcesReducer.VALUE_DELIMITER);
+	if (sb.length() > 0) {
+	    sb.append(ResourcesReducer.VALUE_DELIMITER);
 	}
-	relations.append(s);
+	sb.append(s);
     }
 }

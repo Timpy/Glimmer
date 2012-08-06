@@ -85,7 +85,7 @@ public class Querier {
 	// Dereferencing
 	if (deref) {
 	    time = System.currentTimeMillis();
-	    result.dereference(index.getSubjectsMPH());
+	    result.dereference(index.getAllResourcesMap());
 	    LOGGER.info("Dereferencing took " + (System.currentTimeMillis() - time) + " ms");
 	}
 	return result;

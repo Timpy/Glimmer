@@ -24,6 +24,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+import org.semanticweb.yars.nx.BNode;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.parser.NxParser;
@@ -61,9 +62,9 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
     public static enum TUPLE_ELEMENTS {
 	SUBJECT, PREDICATE, OBJECT, CONTEXT;
     }
-    
+
     static enum Counters {
-	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE
+	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE, UNEXPECTED_SUBJECT_TYPE, UNEXPECTED_PREDICATE_TYPE, UNEXPECTED_CONTEXT_TYPE
     }
 
     private boolean includeContexts = true;
@@ -167,12 +168,13 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 
 	int nodeCount = 0;
 
-	// Skip relations that have long elements or don't match the given patterns
+	// Skip relations that have long elements or don't match the given
+	// patterns
 	int patternsTried = 0;
 	int patternsMatched = 0;
 	for (Node node : nodes) {
 	    String n3 = node.toN3();
-	    
+
 	    if (n3.length() > 5000) {
 		String elementName;
 		if (nodeCount < TUPLE_ELEMENTS.values().length) {
@@ -222,16 +224,22 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 	predicateObjectContextDot.setLength(0);
 
 	Node node = nodes[TUPLE_ELEMENTS.SUBJECT.ordinal()];
-	assert node instanceof org.semanticweb.yars.nx.Resource;
+	if (!(node instanceof Resource || node instanceof BNode)) {
+	    context.getCounter(Counters.UNEXPECTED_SUBJECT_TYPE).increment(1l);
+	    return;
+	}
 	Text subject = new Text(node.toString());
 
 	node = nodes[TUPLE_ELEMENTS.PREDICATE.ordinal()];
-	assert node instanceof org.semanticweb.yars.nx.Resource;
+	if (!(node instanceof Resource)) {
+	    context.getCounter(Counters.UNEXPECTED_PREDICATE_TYPE).increment(1l);
+	    return;
+	}
 	context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.PREDICATE.name()));
 	predicateObjectContextDot.append(nodesAsN3[TUPLE_ELEMENTS.PREDICATE.ordinal()]);
 
 	node = nodes[TUPLE_ELEMENTS.OBJECT.ordinal()];
-	if (node instanceof org.semanticweb.yars.nx.Resource) {
+	if (node instanceof Resource || node instanceof BNode) {
 	    context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.OBJECT.name()));
 	}
 	predicateObjectContextDot.append(' ');
@@ -239,10 +247,13 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 
 	if (includeContexts && nodeCount > TUPLE_ELEMENTS.CONTEXT.ordinal()) {
 	    node = nodes[TUPLE_ELEMENTS.CONTEXT.ordinal()];
-	    assert node instanceof org.semanticweb.yars.nx.Resource;
-	    context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.CONTEXT.name()));
-	    predicateObjectContextDot.append(' ');
-	    predicateObjectContextDot.append(nodesAsN3[TUPLE_ELEMENTS.CONTEXT.ordinal()]);
+	    if (node instanceof Resource) {
+		context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.CONTEXT.name()));
+		predicateObjectContextDot.append(' ');
+		predicateObjectContextDot.append(nodesAsN3[TUPLE_ELEMENTS.CONTEXT.ordinal()]);
+	    } else {
+		context.getCounter(Counters.UNEXPECTED_CONTEXT_TYPE).increment(1l);
+	    }
 	}
 	predicateObjectContextDot.append(" .");
 

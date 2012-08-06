@@ -31,6 +31,11 @@ EXCLUDE_CONTEXTS=""
 # Set PrepTool's -s -p -o -c -a options here to exclude tuples not matching the given regexes.
 PREP_FILTERS=""
 
+# Number of predicates to use when building vertical indexes.  
+# The occurrences of predicates found in the source tuples are counted and then sorted by occurrence count.
+# This limits the resulting list to the top N predicates.
+N_VERTICAL_PREDICATES=200
+
 # To allow the use of commons-configuration version 1.8 over Hadoop's version 1.6 we export HADOOP_USER_CLASSPATH_FIRST=true
 # See https://issues.apache.org/jira/browse/MAPREDUCE-1938 and hadoop.apache.org/common/docs/r0.20.204.0/releasenotes.html
 export HADOOP_USER_CLASSPATH_FIRST=true
@@ -167,7 +172,10 @@ function groupBySubject () {
 	local CMD="${HADOOP_CMD} fs -mv ${PREP_DIR}/part-r-00000/* ${PREP_DIR}"
 	echo ${CMD}
 	${CMD}
-		
+	
+	${HADOOP_CMD} fs -cat ${PREP_DIR}/predicates | sort -nr | cut -f 2 | head -${N_VERTICAL_PREDICATES} > ${LOCAL_BUILD_DIR}/topPredicates
+	${HADOOP_CMD} fs -put ${LOCAL_BUILD_DIR}/topPredicates ${PREP_DIR}
+	
 	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.util.MergeSortTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapred.child.java.opts=-Xmx800m \
@@ -191,6 +199,8 @@ function computeHashes () {
 	FILES=$@
 	echo
 	echo Generating Hashes..
+	echo "		If you get out of disk space errors you need more space in /tmp for ChunkedHashStore... files"
+	echo "		If you get out of heap errors try setting hadoop's HADOOP_HEAPSIZE or HADOOP_CLIENT_OPTS=\"-Xmx..."
 	echo
 	# Generate Hashes for subjects, predicates and objects and all
 	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.util.ComputeHashTool \
@@ -246,7 +256,7 @@ function generateIndex () {
 		echo "Deleting DFS indexes in directory ${METHOD_DIR}.."
 		${HADOOP_CMD} fs -rmr -skipTrash ${METHOD_DIR}
 	fi
-	 
+	
 	echo Generating index..
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.generator.TripleIndexGenerator \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
@@ -255,12 +265,13 @@ function generateIndex () {
 		-Dmapred.child.java.opts=-Xmx900m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
+		-Dio.sort.mb=128 \
 		-Dmapred.job.queue.name=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/predicates ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
+		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
-		
+	
 	EXIT_CODE=$?
 	if [ $EXIT_CODE -ne "0" ] ; then
 		echo "TripleIndexGenerator MR job exited with code $EXIT_CODE. exiting.."
@@ -469,7 +480,7 @@ buildCollection ${DFS_BUILD_DIR}/prep
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.smap" "${LOCAL_BUILD_DIR}"
 #${HADOOP_CMD} fs -cat "${DFS_BUILD_DIR}/prep/predicates.bz2" | ${BZCAT_CMD} > "${LOCAL_BUILD_DIR}/predicates.txt"
-${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/predicates" "${LOCAL_BUILD_DIR}/predicates.txt"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/topPredicates" "${LOCAL_BUILD_DIR}/predicates.txt"
 
 echo Done. Index files are here ${LOCAL_BUILD_DIR}
 

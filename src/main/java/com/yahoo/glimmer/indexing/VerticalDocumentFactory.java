@@ -39,7 +39,7 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 
     public static void setupConf(Configuration conf, boolean withContexts, String resourcesHash, String hashValuePrefix, String predicates) throws IOException {
 	InputStream predicatesInputStream = CompressionCodecHelper.openInputStream(conf, new Path(predicates));
-	ArrayList<String> arrayList = new ArrayList<String>();
+	ArrayList<String> predicatesToUseAsFields = new ArrayList<String>();
 
 	BufferedReader reader = new BufferedReader(new InputStreamReader(predicatesInputStream));
 	String nextLine = "";
@@ -54,15 +54,15 @@ public class VerticalDocumentFactory extends RDFDocumentFactory {
 		// Only include if it's in the namespaces table and not
 		// blacklisted
 		if (predicate != null && !isOnPredicateBlacklist(predicate)) {
-		    arrayList.add(predicate);
+		    predicatesToUseAsFields.add(predicate);
 		    LOG.info("Indexing predicate:" + predicate);
 		}
 	    }
 	}
 	reader.close();
 
-	LOG.info("Loaded " + arrayList.size() + " fields.");
-	setupConf(conf, IndexType.VERTICAL, withContexts, resourcesHash, hashValuePrefix, arrayList.toArray(new String[0]));
+	LOG.info("Loaded " + predicatesToUseAsFields.size() + " fields.");
+	setupConf(conf, IndexType.VERTICAL, withContexts, resourcesHash, hashValuePrefix, predicatesToUseAsFields.toArray(new String[0]));
     }
 
     private void readObject(final ObjectInputStream s) throws IOException, ClassNotFoundException {

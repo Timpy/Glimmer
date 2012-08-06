@@ -87,8 +87,10 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 	    Writer allWriter = writersMap.get(OUTPUT.ALL);
 	    allWriter.write(keyString);
 	    allWriter.write('\n');
-	} else if (OUTPUT.PREDICATE.name().equals(valueString)) {
+	} else if (valueString.startsWith(OUTPUT.PREDICATE.name())) {
 	    Writer predicateWriter = writersMap.get(OUTPUT.PREDICATE);
+	    predicateWriter.write(valueString.substring(OUTPUT.PREDICATE.name().length() + 1));
+	    predicateWriter.write('\t');
 	    predicateWriter.write(keyString);
 	    predicateWriter.write('\n');
 	} else if (OUTPUT.OBJECT.name().equals(valueString)) {

@@ -48,16 +48,25 @@ public class QueryController {
     private IndexMap indexMap;
     private Querier querier;
     
-    /// For every request populate the index model attribute from the request parameter.
+    /// For every request populate the dataset model attribute from the request parameter.
     @ModelAttribute(INDEX_KEY)
-    public RDFIndex getIndex(@RequestParam(INDEX_KEY) String indexName) {
-        RDFIndex index = indexMap.get(indexName);
-        if (index == null) {
-            throw new RuntimeException("No index found with name:" + indexName);
-        }
-        return index;
+    public RDFIndex getIndex(@RequestParam(required=false) String index) {
+	if (index != null) {
+            RDFIndex rdfIndex = indexMap.get(index);
+            if (rdfIndex == null) {
+                throw new RuntimeException("No index found with name:" + index);
+            }
+            return rdfIndex;
+	} else {
+	    return null;
+	}
     }
 
+    @RequestMapping(value = "/dataSetList", method = RequestMethod.GET)
+    public Map<String, ?> getDataSetList(@RequestParam(required = false) String callback) {
+	return Collections.singletonMap(OBJECT_KEY, indexMap.keySet());
+    }
+    
     @RequestMapping(value = "/indexStatistics", method = RequestMethod.GET)
     public Map<String, ?> getIndextStatistics(@ModelAttribute(INDEX_KEY) RDFIndex index, @RequestParam(required = false) String callback) {
 	IndexStatistics statistics = index.getStatistics();
@@ -73,7 +82,7 @@ public class QueryController {
 	    if (subject == null) {
 
 	    } else {
-		if (index.getSubjectsMPH() == null) {
+		if (index.getAllResourcesMap() == null) {
 		    throw new HttpMessageNotReadableException("mph needs to be loaded for subject to work.");
 		} else {
 		    id = index.getDocID(subject);
@@ -81,7 +90,7 @@ public class QueryController {
 	    }
 	}
 
-	if (id == -1 || id >= index.getSubjectsMPH().size64()) {
+	if (id == -1 || id >= index.getAllResourcesMap().size()) {
 	    throw new HttpMessageNotReadableException("subject not in collection.");
 	}
 

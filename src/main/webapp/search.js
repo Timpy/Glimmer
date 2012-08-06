@@ -656,22 +656,41 @@ YUI({
 							map.objects.add(marker);
 						}
 					}
+					
+					function initDataSetList(selectedDataSetName) {
+						dataSource
+						.sendRequest({
+							request : 'dataSetList?',
+							callback : {
+								success : function(e) {
+									dataSetNames = e.response.results;
+									
+									for (var i in dataSetNames) {
+										var dataSetName = dataSetNames[i];
+										Y.one("#dataset").append(
+												'<option value=\"' + dataSetName + '\">'
+												+ dataSetName + '</option>');
+										if ((selectedDataSetName == null && i == 0) || dataSetName == selectedDataSetName) {
+											Y.one("#dataset").set('value', dataSetName);
+											// Load the fields for the dataset
+											initDataSet();
+										}
+									}
+									Y.one('#dataset').on('change', initDataSet);
+								},
+								failure : function(e) {
+									alert("Failed to load data set list : "	+ e.error.message);
+									addMoreField();
+								}
+							}
+						});
+					}
 
 					// Everything below is run automatically upon loading the
 					// page
 
-					// See if the dataset (KB name) was provided as a query
-					// parameter
-					if (args['kb'] != undefined && args['kb'] != null) {
-						Y.one("#dataset").append(
-								'<option value=\"' + args['kb'] + '\">'
-										+ args['kb'] + '</option>');
-						Y.one("#dataset").set('value', args['kb']);
-					}
+					initDataSetList(args['kb']);
 
-					// Load the fields for the dataset
-					initDataSet();
-					Y.one('#dataset').on('change', initDataSet);
 
 					// Add handlers
 

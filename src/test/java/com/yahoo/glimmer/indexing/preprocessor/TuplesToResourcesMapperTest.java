@@ -135,6 +135,22 @@ public class TuplesToResourcesMapperTest {
     }
     
     @Test
+    public void bNodeTest() throws IOException, InterruptedException {
+	context.checking(new Expectations(){{
+	    allowing(mrContext).getInputSplit();
+	    will(returnValue(inputSplit));
+	    
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/place")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("NodeABC")), with(new TextMatcher("OBJECT")));
+	    one(mrContext).write(with(new TextMatcher("nodeXYZ")), with(new TextMatcher("<http://www.example.org/terms/place> _:NodeABC .")));
+	}});
+	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
+	mapper.map(new LongWritable(5l), new Text(
+		"_:nodeXYZ  <http://www.example.org/terms/place> _:NodeABC ."), mrContext);
+	context.assertIsSatisfied();
+    }
+    
+    @Test
     public void filterSubjectOrObjectTest() throws IOException, InterruptedException {
 	context.checking(new Expectations(){{
 	    allowing(mrContext).getInputSplit();

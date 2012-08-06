@@ -65,7 +65,6 @@ class VerticalDocument extends RDFDocument {
 	    // Determine whether we need to index, and the field
 	    int fieldIndex = factory.getFieldIndex(predicate);
 	    if (fieldIndex == -1) {
-		System.err.println("Field not indexed: " + predicate);
 		factory.incrementCounter(RdfCounters.UNINDEXED_PREDICATE_TRIPLES, 1);
 		continue;
 	    }

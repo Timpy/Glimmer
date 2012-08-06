@@ -11,10 +11,6 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.fastutil.objects.Object2LongFunction;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.lang.MutableString;
 import it.unimi.di.mg4j.index.Index;
 import it.unimi.di.mg4j.index.IndexIterator;
 import it.unimi.di.mg4j.index.TermProcessor;
@@ -42,6 +38,10 @@ import it.unimi.di.mg4j.query.nodes.Weight;
 import it.unimi.di.mg4j.query.parser.QueryParser;
 import it.unimi.di.mg4j.query.parser.QueryParserException;
 import it.unimi.di.mg4j.query.parser.SimpleParser;
+import it.unimi.dsi.fastutil.objects.Object2LongFunction;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
 import java.util.List;
@@ -63,7 +63,7 @@ public class RDFQueryParser implements QueryParser {
     private String defaultField;
     private String uriField;
     private Map<String, ? extends TermProcessor> termProcessors;
-    private Object2LongFunction<CharSequence> mph;
+    private Object2LongFunction<CharSequence> resourcesMap;
     private final static Pattern RESOURCE_PATTERN = Pattern.compile("\\((http://.*)\\)");
 
     public RDFQueryParser(RDFIndex index) {
@@ -74,23 +74,23 @@ public class RDFQueryParser implements QueryParser {
 	    termProcessors.put(alias, index.getField(alias).termProcessor);
 
 	init(index.getAlignmentIndex(), index.getAllFields(), index.getIndexedFields(), index.getDefaultField(), index.getURIField(), termProcessors,
-		index.getSubjectsMPH());
+		index.getAllResourcesMap());
     }
 
     public RDFQueryParser(Index precompIndex, List<String> properties, Set<String> fields, String defaultField, String uriField,
-	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> mph) {
-	init(precompIndex, properties, fields, defaultField, uriField, termProcessors, mph);
+	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> resourcesMap) {
+	init(precompIndex, properties, fields, defaultField, uriField, termProcessors, resourcesMap);
     }
 
     protected void init(Index precompIndex, List<String> properties, Set<String> fields, String defaultField, String uriField,
-	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> mph) {
+	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> resourcesMap) {
 	this.precompIndex = precompIndex;
 	this.properties = properties;
 	this.fields = fields;
 	this.defaultField = defaultField;
 	this.uriField = uriField;
 	this.termProcessors = termProcessors;
-	this.mph = mph;
+	this.resourcesMap = resourcesMap;
 	parser = new SimpleParser(fields, defaultField, termProcessors);
     }
 
@@ -143,7 +143,7 @@ public class RDFQueryParser implements QueryParser {
 	    if (result) {
 		StringBuffer sb = new StringBuffer();
 		do {
-		    m.appendReplacement(sb, Long.toString(mph.get(m.group(1))));
+		    m.appendReplacement(sb, Long.toString(resourcesMap.get(m.group(1))));
 		    result = m.find();
 		} while (result);
 		m.appendTail(sb);
@@ -179,7 +179,7 @@ public class RDFQueryParser implements QueryParser {
 
     @Override
     public QueryParser copy() {
-	return new RDFQueryParser(precompIndex, properties, fields, defaultField, uriField, termProcessors, mph);
+	return new RDFQueryParser(precompIndex, properties, fields, defaultField, uriField, termProcessors, resourcesMap);
     }
 
     public class MyVisitor extends AbstractQueryBuilderVisitor<Query> {
