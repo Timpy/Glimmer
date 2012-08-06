@@ -24,16 +24,6 @@ import com.yahoo.glimmer.query.RDFIndex;
 public class IndexMap extends HashMap<String, RDFIndex> {
     private static final long serialVersionUID = -2657141430471199765L;
 
-    private static IndexMap instance;
-
-    @Deprecated
-    public static IndexMap getInstance() {
-	if (instance == null) {
-	    throw new IllegalStateException("IndexMap not initialised!");
-	}
-	return instance;
-    }
-
     private String configFilename;
 
     public String getConfigFilename() {
@@ -81,7 +71,6 @@ public class IndexMap extends HashMap<String, RDFIndex> {
 		throw new RuntimeException("No indexed directories found in " + indexedDir.getAbsoluteFile() + " with prefixes of " + multiIndexDirPrefix);
 	    }
 	}
-	instance = this;
     }
 
     @PreDestroy
