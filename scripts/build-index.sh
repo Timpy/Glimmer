@@ -239,6 +239,9 @@ function generateIndex () {
 	
 	echo
 	echo "RUNING HADOOP INDEX BUILD FOR METHOD:" ${METHOD}
+	echo "		When building the vertical indexes a lot of files are created and could possibly exceed your HDFS file count quota."
+	echo "		The number of files for the vertical index is roughly equal to:"
+	echo "			number of predicates * 11 * number of sub indicies" 
 	echo
 	
 	${HADOOP_CMD} fs -test -e "${METHOD_DIR}"
@@ -258,7 +261,7 @@ function generateIndex () {
 	fi
 	
 	echo Generating index..
-	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.generator.TripleIndexGenerator \
+	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.generator.TripleIndexGenerator \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapred.map.tasks.speculative.execution=true \
 		-Dmapred.reduce.tasks=${SUBINDICES} \
