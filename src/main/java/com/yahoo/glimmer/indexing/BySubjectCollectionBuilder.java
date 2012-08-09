@@ -13,7 +13,7 @@ package com.yahoo.glimmer.indexing;
 
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.di.mg4j.document.IdentityDocumentFactory;
+import it.unimi.dsi.mg4j.document.IdentityDocumentFactory;
 
 import java.io.IOException;
 import java.io.StringReader;

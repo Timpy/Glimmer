@@ -13,7 +13,7 @@ package com.yahoo.glimmer.query;
 
 import it.unimi.dsi.fastutil.objects.Object2LongFunction;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.di.mg4j.query.nodes.Query;
+import it.unimi.dsi.mg4j.query.nodes.Query;
 
 public class RDFQueryResult {
     private final ObjectArrayList<RDFResultItem> resultItems;

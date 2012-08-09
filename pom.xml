@@ -84,9 +84,9 @@
 			<version>1.2.3-SNAPSHOT</version>
 		</dependency>
 		<dependency>
-			<groupId>it.unimi.di</groupId>
+			<groupId>it.unimi.dsi</groupId>
 			<artifactId>mg4j</artifactId>
-			<version>5.0.x</version>
+			<version>4.0.3</version>
 			<exclusions>
 				<exclusion>
 					<artifactId>jetty</artifactId>

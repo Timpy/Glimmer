@@ -11,7 +11,7 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.query.nodes.Query;
+import it.unimi.dsi.mg4j.query.nodes.Query;
 
 import org.apache.log4j.Logger;
 

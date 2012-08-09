@@ -13,9 +13,9 @@ package com.yahoo.glimmer.query;
 
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.di.mg4j.document.Document;
-import it.unimi.di.mg4j.index.BitStreamIndex;
-import it.unimi.di.mg4j.index.IndexIterator;
+import it.unimi.dsi.mg4j.document.Document;
+import it.unimi.dsi.mg4j.index.BitStreamIndex;
+import it.unimi.dsi.mg4j.index.IndexIterator;
 import it.unimi.dsi.util.StringMap;
 
 import java.io.IOException;

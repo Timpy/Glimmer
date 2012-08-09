@@ -11,8 +11,8 @@ package com.yahoo.glimmer.web;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.document.Document;
-import it.unimi.di.mg4j.query.ResultItem;
+import it.unimi.dsi.mg4j.document.Document;
+import it.unimi.dsi.mg4j.query.ResultItem;
 
 import java.io.PrintWriter;
 import java.util.Map;

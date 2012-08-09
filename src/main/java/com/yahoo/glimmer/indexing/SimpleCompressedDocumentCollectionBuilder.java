@@ -30,16 +30,16 @@ import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.di.mg4j.document.Document;
-import it.unimi.di.mg4j.document.DocumentCollection;
-import it.unimi.di.mg4j.document.DocumentCollectionBuilder;
-import it.unimi.di.mg4j.document.DocumentFactory;
-import it.unimi.di.mg4j.document.DocumentIterator;
-import it.unimi.di.mg4j.document.DocumentSequence;
-import it.unimi.di.mg4j.document.ZipDocumentCollection;
-import it.unimi.di.mg4j.document.DocumentFactory.FieldType;
-import it.unimi.di.mg4j.tool.Scan;
-import it.unimi.di.mg4j.tool.Scan.VirtualDocumentFragment;
+import it.unimi.dsi.mg4j.document.Document;
+import it.unimi.dsi.mg4j.document.DocumentCollection;
+import it.unimi.dsi.mg4j.document.DocumentCollectionBuilder;
+import it.unimi.dsi.mg4j.document.DocumentFactory;
+import it.unimi.dsi.mg4j.document.DocumentIterator;
+import it.unimi.dsi.mg4j.document.DocumentSequence;
+import it.unimi.dsi.mg4j.document.ZipDocumentCollection;
+import it.unimi.dsi.mg4j.document.DocumentFactory.FieldType;
+import it.unimi.dsi.mg4j.tool.Scan;
+import it.unimi.dsi.mg4j.tool.Scan.VirtualDocumentFragment;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 
