@@ -1,4 +1,4 @@
-package com.yahoo.glimmer.indexing;
+package it.unimi.dsi.mg4j.document;
 
 /*		 
  * MG4J: Managing Gigabytes for Java
@@ -371,15 +371,6 @@ public class HdfsSimpleCompressedDocumentCollectionBuilder implements DocumentCo
 	}
     }
 
-    public static class InstantiatableSimpleCompressedDocumentCollection extends SimpleCompressedDocumentCollection {
-	private static final long serialVersionUID = 7405536728183221997L;
-
-	// Publicly expose the constructor.
-	public InstantiatableSimpleCompressedDocumentCollection(String basename, long documents, long terms, long nonTerms, boolean exact, DocumentFactory factory) {
-	    super(basename, documents, terms, nonTerms, exact, factory);
-	}
-    }
-
     public void close() throws IOException {
 	documentsOutputBitStream.close();
 	termsOutputStream.close();
@@ -394,13 +385,10 @@ public class HdfsSimpleCompressedDocumentCollectionBuilder implements DocumentCo
 	    nonTextZipDataOutputStream.close();
 	}
 
-	Path path = new Path(hdfsPath, basenameSuffix);
-
-	final SimpleCompressedDocumentCollection simpleCompressedDocumentCollection = new InstantiatableSimpleCompressedDocumentCollection(path.toString(),
+	// This class is in the same package as MG4J's SimpleCompressedDocumentCollection to get access to it's protected constructor.
+	final SimpleCompressedDocumentCollection simpleCompressedDocumentCollection = new SimpleCompressedDocumentCollection(basenameSuffix,
 		documents, terms.size(), nonTerms != null ? nonTerms.size() : -1, exact, factory);
 	Path objectPath = new Path(hdfsPath, basenameSuffix + DocumentCollection.DEFAULT_EXTENSION);
-	// TODO. This is not good.  We are storing a InstantiatableSimpleCompressedDocumentCollection not a SimpleCompressedDocumentCollection
-	// So to load it again the load must have access to the InstantiatableSimpleCompressedDocumentCollection class.
 	FSDataOutputStream collectionOutputStream = fs.create(objectPath, true);
 	BinIO.storeObject(simpleCompressedDocumentCollection, collectionOutputStream);
 	collectionOutputStream.flush();
