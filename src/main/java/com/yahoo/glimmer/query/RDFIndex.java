@@ -11,21 +11,6 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.document.DocumentCollection;
-import it.unimi.dsi.mg4j.index.BitStreamIndex;
-import it.unimi.dsi.mg4j.index.DiskBasedIndex;
-import it.unimi.dsi.mg4j.index.Index;
-import it.unimi.dsi.mg4j.index.Index.UriKeys;
-import it.unimi.dsi.mg4j.index.TermProcessor;
-import it.unimi.dsi.mg4j.query.QueryEngine;
-import it.unimi.dsi.mg4j.query.SelectedInterval;
-import it.unimi.dsi.mg4j.query.nodes.Query;
-import it.unimi.dsi.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.dsi.mg4j.search.DocumentIteratorBuilderVisitor;
-import it.unimi.dsi.mg4j.search.score.CountScorer;
-import it.unimi.dsi.mg4j.search.score.DocumentScoreInfo;
-import it.unimi.dsi.mg4j.search.score.Scorer;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.fastutil.objects.Object2LongFunction;
@@ -41,6 +26,22 @@ import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import it.unimi.dsi.io.FileLinesCollection;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.lang.MutableString;
+import it.unimi.dsi.mg4j.document.Document;
+import it.unimi.dsi.mg4j.document.DocumentCollection;
+import it.unimi.dsi.mg4j.document.SimpleCompressedDocumentCollection;
+import it.unimi.dsi.mg4j.index.BitStreamIndex;
+import it.unimi.dsi.mg4j.index.DiskBasedIndex;
+import it.unimi.dsi.mg4j.index.Index;
+import it.unimi.dsi.mg4j.index.Index.UriKeys;
+import it.unimi.dsi.mg4j.index.TermProcessor;
+import it.unimi.dsi.mg4j.query.QueryEngine;
+import it.unimi.dsi.mg4j.query.SelectedInterval;
+import it.unimi.dsi.mg4j.query.nodes.Query;
+import it.unimi.dsi.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.dsi.mg4j.search.DocumentIteratorBuilderVisitor;
+import it.unimi.dsi.mg4j.search.score.CountScorer;
+import it.unimi.dsi.mg4j.search.score.DocumentScoreInfo;
+import it.unimi.dsi.mg4j.search.score.Scorer;
 import it.unimi.dsi.sux4j.io.FileLinesList;
 import it.unimi.dsi.util.SemiExternalGammaList;
 
@@ -66,7 +67,6 @@ import org.semanticweb.owlapi.model.OWLOntologyCreationException;
 import org.semanticweb.owlapi.model.OWLOntologyManager;
 
 import com.yahoo.glimmer.indexing.ConcatenatedDocumentCollection;
-import com.yahoo.glimmer.indexing.SimpleCompressedDocumentCollection;
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
 import com.yahoo.glimmer.util.Util;
 
@@ -152,9 +152,7 @@ public class RDFIndex {
 		    for (String file : fileNames) {
 
 			SimpleCompressedDocumentCollection collection = (SimpleCompressedDocumentCollection) BinIO.loadObject(collectionString + file);
-			// TODO: disable this line next time I regenerate the
-			// collection
-			collection.basename = file.substring(0, file.lastIndexOf('.'));
+			
 			collection.filename(collectionString + file);
 			names.add(collectionString + file);
 			collections.add(collection);

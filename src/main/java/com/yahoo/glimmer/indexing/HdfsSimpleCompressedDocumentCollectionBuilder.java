@@ -22,6 +22,7 @@ package com.yahoo.glimmer.indexing;
  */
 
 import it.unimi.dsi.Util;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.fastutil.io.FastBufferedOutputStream;
@@ -34,18 +35,15 @@ import it.unimi.dsi.mg4j.document.Document;
 import it.unimi.dsi.mg4j.document.DocumentCollection;
 import it.unimi.dsi.mg4j.document.DocumentCollectionBuilder;
 import it.unimi.dsi.mg4j.document.DocumentFactory;
+import it.unimi.dsi.mg4j.document.DocumentFactory.FieldType;
 import it.unimi.dsi.mg4j.document.DocumentIterator;
 import it.unimi.dsi.mg4j.document.DocumentSequence;
+import it.unimi.dsi.mg4j.document.SimpleCompressedDocumentCollection;
 import it.unimi.dsi.mg4j.document.ZipDocumentCollection;
-import it.unimi.dsi.mg4j.document.DocumentFactory.FieldType;
 import it.unimi.dsi.mg4j.tool.Scan;
 import it.unimi.dsi.mg4j.tool.Scan.VirtualDocumentFragment;
 
-import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
-
-
 import java.io.DataOutputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
@@ -62,13 +60,15 @@ import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.fs.permission.FsPermission;
 
 /**
- * A builder for {@linkplain SimpleCompressedDocumentCollection simple
- * compressed document collections}.
+ * A builder for {@linkplain InstantiatableSimpleCompressedDocumentCollection
+ * simple compressed document collections}.
  * 
  * @author Sebastiano Vigna
  */
 
-public class SimpleCompressedDocumentCollectionBuilder implements DocumentCollectionBuilder {
+public class HdfsSimpleCompressedDocumentCollectionBuilder implements DocumentCollectionBuilder {
+    private static final FsPermission ALL_PERMISSIONS = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
+
     /** The factory of the base document sequence. */
     private final DocumentFactory factory;
     /**
@@ -83,6 +83,11 @@ public class SimpleCompressedDocumentCollectionBuilder implements DocumentCollec
      * <code>null</code> if {@link #exact} is false.
      */
     private final FrequencyCodec nonTermsFrequencyKeeper;
+
+    private final FileSystem fs;
+
+    private final Path hdfsPath;
+
     /** The basename of the builder. */
     private String basename;
     /** The basename of current collection. */
@@ -259,10 +264,12 @@ public class SimpleCompressedDocumentCollectionBuilder implements DocumentCollec
 	}
     }
 
-    public SimpleCompressedDocumentCollectionBuilder(final String basename, final DocumentFactory factory, final boolean exact) {
+    public HdfsSimpleCompressedDocumentCollectionBuilder(final String basename, final DocumentFactory factory, final boolean exact, FileSystem fs, Path hdfsPath) {
 	this.basename = basename;
 	this.factory = factory;
 	this.exact = exact;
+	this.fs = fs;
+	this.hdfsPath = hdfsPath;
 	this.termsFrequencyKeeper = new FrequencyCodec();
 	this.nonTermsFrequencyKeeper = exact ? new FrequencyCodec() : null;
 
@@ -285,80 +292,45 @@ public class SimpleCompressedDocumentCollectionBuilder implements DocumentCollec
     }
 
     public void open(final CharSequence suffix) throws IOException {
-	basenameSuffix = basename + suffix;
-	documentsOutputBitStream = new OutputBitStream(basenameSuffix + SimpleCompressedDocumentCollection.DOCUMENTS_EXTENSION);
-	termsOutputStream = new CountingOutputStream(new FastBufferedOutputStream(new FileOutputStream(basenameSuffix
-		+ SimpleCompressedDocumentCollection.TERMS_EXTENSION)));
-	nonTermsOutputStream = exact ? new CountingOutputStream(new FastBufferedOutputStream(new FileOutputStream(basenameSuffix
-		+ SimpleCompressedDocumentCollection.NONTERMS_EXTENSION))) : null;
-	documentOffsetsObs = new OutputBitStream(basenameSuffix + SimpleCompressedDocumentCollection.DOCUMENT_OFFSETS_EXTENSION);
-	termOffsetsObs = new OutputBitStream(basenameSuffix + SimpleCompressedDocumentCollection.TERM_OFFSETS_EXTENSION);
-	nonTermOffsetsObs = exact ? new OutputBitStream(basenameSuffix + SimpleCompressedDocumentCollection.NONTERM_OFFSETS_EXTENSION) : null;
-	fieldContent = new IntArrayList();
-
-	if (hasNonText)
-	    nonTextZipDataOutputStream = new DataOutputStream(nonTextZipOutputStream = new ZipOutputStream(new FastBufferedOutputStream(new FileOutputStream(
-		    basenameSuffix + ZipDocumentCollection.ZIP_EXTENSION))));
-
-	terms.clear();
-	terms.trim(Scan.INITIAL_TERM_MAP_SIZE);
-	if (exact) {
-	    nonTerms.clear();
-	    nonTerms.trim(Scan.INITIAL_TERM_MAP_SIZE);
-	}
-	words = fields = bitsForWords = bitsForNonWords = bitsForFieldLengths = bitsForUris = bitsForTitles = documents = 0;
-
-	// First offset
-	documentOffsetsObs.writeDelta(0);
-	termOffsetsObs.writeDelta(0);
-	if (exact)
-	    nonTermOffsetsObs.writeDelta(0);
-
-    }
-
-    public void open(final CharSequence root, final CharSequence suffix, FileSystem fs) throws IOException {
-
-	FsPermission allPermissions = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
-
+	// Set the basename + suffix.
 	basenameSuffix = basename + suffix;
 
-	Path documentsOutputBitStreamPath = new Path(root + basenameSuffix + SimpleCompressedDocumentCollection.DOCUMENTS_EXTENSION);
+	Path documentsOutputBitStreamPath = new Path(hdfsPath, basenameSuffix + SimpleCompressedDocumentCollection.DOCUMENTS_EXTENSION);
 	OutputStream os = fs.create(documentsOutputBitStreamPath, true);
 	documentsOutputBitStream = new OutputBitStream(os);
+	fs.setPermission(documentsOutputBitStreamPath, ALL_PERMISSIONS);
 
-	fs.setPermission(documentsOutputBitStreamPath, allPermissions);
-
-	Path termsOutputStreamPath = new Path(root + basenameSuffix + SimpleCompressedDocumentCollection.TERMS_EXTENSION);
+	Path termsOutputStreamPath = new Path(hdfsPath, basenameSuffix + SimpleCompressedDocumentCollection.TERMS_EXTENSION);
 	termsOutputStream = new CountingOutputStream(new FastBufferedOutputStream(fs.create(termsOutputStreamPath, true)));
-	fs.setPermission(termsOutputStreamPath, allPermissions);
+	fs.setPermission(termsOutputStreamPath, ALL_PERMISSIONS);
 
 	if (exact) {
-	    Path nonTermsOutputStreamPath = new Path(root + basenameSuffix + SimpleCompressedDocumentCollection.NONTERMS_EXTENSION);
+	    Path nonTermsOutputStreamPath = new Path(hdfsPath, basenameSuffix + SimpleCompressedDocumentCollection.NONTERMS_EXTENSION);
 	    nonTermsOutputStream = new CountingOutputStream(new FastBufferedOutputStream(fs.create(nonTermsOutputStreamPath, true)));
-	    fs.setPermission(nonTermsOutputStreamPath, allPermissions);
+	    fs.setPermission(nonTermsOutputStreamPath, ALL_PERMISSIONS);
 	}
 
-	Path documentOffsetsObsPath = new Path(root + basenameSuffix + SimpleCompressedDocumentCollection.DOCUMENT_OFFSETS_EXTENSION);
+	Path documentOffsetsObsPath = new Path(hdfsPath, basenameSuffix + SimpleCompressedDocumentCollection.DOCUMENT_OFFSETS_EXTENSION);
 	documentOffsetsObs = new OutputBitStream(fs.create(documentOffsetsObsPath, true));
-	fs.setPermission(documentOffsetsObsPath, allPermissions);
+	fs.setPermission(documentOffsetsObsPath, ALL_PERMISSIONS);
 
-	Path termOffsetsObsPath = new Path(root + basenameSuffix + SimpleCompressedDocumentCollection.TERM_OFFSETS_EXTENSION);
+	Path termOffsetsObsPath = new Path(hdfsPath, basenameSuffix + SimpleCompressedDocumentCollection.TERM_OFFSETS_EXTENSION);
 	termOffsetsObs = new OutputBitStream(fs.create(termOffsetsObsPath, true));
-	fs.setPermission(termOffsetsObsPath, allPermissions);
+	fs.setPermission(termOffsetsObsPath, ALL_PERMISSIONS);
 
 	if (exact) {
-	    Path nonTermOffsetsObsPath = new Path(root + basenameSuffix + SimpleCompressedDocumentCollection.NONTERM_OFFSETS_EXTENSION);
+	    Path nonTermOffsetsObsPath = new Path(hdfsPath, basenameSuffix + SimpleCompressedDocumentCollection.NONTERM_OFFSETS_EXTENSION);
 	    nonTermOffsetsObs = new OutputBitStream(fs.create(nonTermOffsetsObsPath, true));
-	    fs.setPermission(nonTermOffsetsObsPath, allPermissions);
+	    fs.setPermission(nonTermOffsetsObsPath, ALL_PERMISSIONS);
 	}
 
 	fieldContent = new IntArrayList();
 
 	if (hasNonText) {
-	    Path nonTextZipOutputStreamPath = new Path(root + basenameSuffix + ZipDocumentCollection.ZIP_EXTENSION);
+	    Path nonTextZipOutputStreamPath = new Path(hdfsPath, basenameSuffix + ZipDocumentCollection.ZIP_EXTENSION);
 	    nonTextZipOutputStream = new ZipOutputStream(new FastBufferedOutputStream(fs.create(nonTextZipOutputStreamPath, true)));
 	    nonTextZipDataOutputStream = new DataOutputStream(nonTextZipOutputStream);
-	    fs.setPermission(nonTextZipOutputStreamPath, allPermissions);
+	    fs.setPermission(nonTextZipOutputStreamPath, ALL_PERMISSIONS);
 	}
 
 	terms.clear();
@@ -398,6 +370,15 @@ public class SimpleCompressedDocumentCollectionBuilder implements DocumentCollec
 	}
     }
 
+    public class InstantiatableSimpleCompressedDocumentCollection extends SimpleCompressedDocumentCollection {
+	private static final long serialVersionUID = 7405536728183221997L;
+
+	// Publicly expose the constructor.
+	public InstantiatableSimpleCompressedDocumentCollection(String basename, long documents, long terms, long nonTerms, boolean exact, DocumentFactory factory) {
+	    super(basename, documents, terms, nonTerms, exact, factory);
+	}
+    }
+
     public void close() throws IOException {
 	documentsOutputBitStream.close();
 	termsOutputStream.close();
@@ -412,51 +393,17 @@ public class SimpleCompressedDocumentCollectionBuilder implements DocumentCollec
 	    nonTextZipDataOutputStream.close();
 	}
 
-	final SimpleCompressedDocumentCollection simpleCompressedDocumentCollection = new SimpleCompressedDocumentCollection(basenameSuffix, documents,
-		terms.size(), nonTerms != null ? nonTerms.size() : -1, exact, factory);
-	BinIO.storeObject(simpleCompressedDocumentCollection, basenameSuffix + DocumentCollection.DEFAULT_EXTENSION);
-	simpleCompressedDocumentCollection.close();
+	Path path = new Path(hdfsPath, basenameSuffix);
 
-	final PrintStream stats = new PrintStream(new FileOutputStream(basenameSuffix + SimpleCompressedDocumentCollection.STATS_EXTENSION));
-	final long overallBits = bitsForTitles + bitsForUris + bitsForFieldLengths + bitsForWords + bitsForNonWords;
-	stats.println("Documents: " + Util.format(documents) + " (" + Util.format(overallBits) + ", " + Util.format(overallBits / (double) documents)
-		+ " bits per document)");
-	stats.println("Terms: " + Util.format(terms.size()) + " (" + Util.format(words) + " words, " + Util.format(bitsForWords) + " bits, "
-		+ Util.format(bitsForWords / (double) words) + " bits per word)");
-	if (exact)
-	    stats.println("Nonterms: " + Util.format(nonTerms.size()) + " (" + Util.format(words) + " nonwords, " + Util.format(bitsForNonWords) + " bits, "
-		    + Util.format(bitsForNonWords / (double) words) + " bits per nonword)");
-	stats.println("Bits for field lengths: " + Util.format(bitsForFieldLengths) + " (" + Util.format(bitsForFieldLengths / (double) fields)
-		+ " bits per field)");
-	stats.println("Bits for URIs: " + Util.format(bitsForUris) + " (" + Util.format(bitsForUris / (double) documents) + " bits per URI)");
-	stats.println("Bits for titles: " + Util.format(bitsForTitles) + " (" + Util.format(bitsForTitles / (double) documents) + " bits per title)");
-	stats.close();
-
-    }
-
-    public void close(CharSequence root, FileSystem fs) throws IOException {
-	documentsOutputBitStream.close();
-	termsOutputStream.close();
-	IOUtils.closeQuietly(nonTermsOutputStream);
-	documentOffsetsObs.close();
-	termOffsetsObs.close();
-	if (nonTermOffsetsObs != null)
-	    nonTermOffsetsObs.close();
-	if (hasNonText) {
-	    if (documents == 0)
-		nonTextZipOutputStream.putNextEntry(new ZipEntry("dummy"));
-	    nonTextZipDataOutputStream.close();
-	}
-
-	final SimpleCompressedDocumentCollection simpleCompressedDocumentCollection = new SimpleCompressedDocumentCollection(basenameSuffix, documents,
-		terms.size(), nonTerms != null ? nonTerms.size() : -1, exact, factory);
-	Path objectPath = new Path(root + basenameSuffix + DocumentCollection.DEFAULT_EXTENSION);
+	final SimpleCompressedDocumentCollection simpleCompressedDocumentCollection = new InstantiatableSimpleCompressedDocumentCollection(path.toString(),
+		documents, terms.size(), nonTerms != null ? nonTerms.size() : -1, exact, factory);
+	Path objectPath = new Path(hdfsPath, basenameSuffix + DocumentCollection.DEFAULT_EXTENSION);
 	BinIO.storeObject(simpleCompressedDocumentCollection, fs.create(objectPath, true));
 	FsPermission allPermissions = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
 	fs.setPermission(objectPath, allPermissions);
 	simpleCompressedDocumentCollection.close();
 
-	Path statsPath = new Path(root + basenameSuffix + SimpleCompressedDocumentCollection.STATS_EXTENSION);
+	Path statsPath = new Path(hdfsPath, basenameSuffix + SimpleCompressedDocumentCollection.STATS_EXTENSION);
 	final PrintStream stats = new PrintStream(fs.create(statsPath, true));
 	fs.setPermission(statsPath, allPermissions);
 

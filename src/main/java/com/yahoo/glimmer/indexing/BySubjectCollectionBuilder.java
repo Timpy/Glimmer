@@ -18,91 +18,27 @@ import it.unimi.dsi.mg4j.document.IdentityDocumentFactory;
 import java.io.IOException;
 import java.io.StringReader;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.RecordWriter;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.FileSplit;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 public class BySubjectCollectionBuilder extends Configured implements Tool {
-
-    public static String getTaskId(Configuration conf) throws IllegalArgumentException {
-	if (conf == null) {
-	    throw new NullPointerException("conf is null");
-	}
-
-	String taskId = conf.get("mapred.task.id");
-	if (taskId == null) {
-	    throw new IllegalArgumentException("Configuration does not contain the property mapred.task.id");
-	}
-
-	String[] parts = taskId.split("_");
-	if (parts.length != 6 || !parts[0].equals("attempt") || (!"m".equals(parts[3]) && !"r".equals(parts[3]))) {
-	    throw new IllegalArgumentException("TaskAttemptId string : " + taskId + " is not properly formed");
-	}
-
-	return parts[4];
-    }
-
-    public static class MapClass extends Mapper<LongWritable, Text, Text, Text> {
-
-	private FileSystem fs;
-
-	private SimpleCompressedDocumentCollectionBuilder builder;
-
-	private String outputDir;
-
+    public static class MapClass extends Mapper<LongWritable, Text, MutableString, MutableString> {
+	private final MutableString word = new MutableString();
+	private final MutableString nonWord = new MutableString();
 	private static int count;
-
-	@Override
-	public void setup(Context context) {
-	    Configuration job = context.getConfiguration();
-
-	    outputDir = job.get(OUTPUT_DIR);
-	    if (!outputDir.endsWith("/"))
-		outputDir = outputDir + "/";
-
-	    try {
-
-		fs = FileSystem.get(job);
-		Path path = new Path(outputDir);
-		if (!fs.exists(path)) {
-		    fs.mkdirs(path);
-		    FsPermission allPermissions = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
-		    fs.setPermission(path, allPermissions);
-
-		}
-
-		// basename is actually the complete path
-		builder = new SimpleCompressedDocumentCollectionBuilder("collection-", new IdentityDocumentFactory(), true);
-		// Use a map task name as suffix
-		// String suffix = getTaskId(job);
-		// Use original file name as suffix
-		String input = ((FileSplit) context.getInputSplit()).getPath().getName();
-		int suffixEndIndex = input.lastIndexOf('.');
-		if (suffixEndIndex == -1) {
-		    suffixEndIndex = input.length();
-		}
-		String suffix = input.substring(input.lastIndexOf('-') + 1, suffixEndIndex);
-		builder.open(outputDir, suffix, fs);
-
-	    } catch (IOException e) {
-
-		throw new RuntimeException(e);
-	    }
-
-	}
 
 	@Override
 	public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
@@ -129,38 +65,72 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 		System.out.println("Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
 
 	    }
-	    String url = nextLine.substring(0, nextLine.indexOf('\t'));
-	    String doc = nextLine.substring(nextLine.indexOf('\t') + 1, nextLine.length());
-	    builder.startDocument(url, url); // both title and uri are url
-	    builder.startTextField();
-	    // Parse using FastBufferedReader
+
+	    int indexOfFirstTab = nextLine.indexOf('\t');
+	    String url = nextLine.substring(0, indexOfFirstTab);
+	    String doc = nextLine.substring(indexOfFirstTab + 1);
+	    
+	    word.append(url);
+	    context.write(word, word);
+
 	    FastBufferedReader fbr = new FastBufferedReader(new StringReader(doc));
-	    MutableString word = new MutableString(""), nonWord = new MutableString("");
-
 	    while (fbr.next(word, nonWord)) {
-		builder.add(word, nonWord);
+		context.write(word, nonWord);
 	    }
-	    builder.endTextField();
-	    builder.endDocument();
 
+	    word.setLength(0);
+	    context.write(word, word);
+	}
+    }
+
+    private static class BuilderOutputWriter extends RecordWriter<MutableString, MutableString> {
+	private final HdfsSimpleCompressedDocumentCollectionBuilder builder;
+	private boolean newDoc = true;
+
+	public BuilderOutputWriter(TaskAttemptContext job, Path taskWorkPath) throws IllegalArgumentException, IOException {
+	    FileSystem fs = FileSystem.get(job.getConfiguration());
+	    builder = new HdfsSimpleCompressedDocumentCollectionBuilder("collection-", new IdentityDocumentFactory(), true, fs, taskWorkPath);
+	    // Use the id for this task.  It's the same for all attempts of this task.
+	    builder.open(Integer.toString(job.getTaskAttemptID().getTaskID().getId()));
 	}
 
 	@Override
-	public void cleanup(Context context) {
+	public void write(MutableString key, MutableString value) throws IOException, InterruptedException {
+	    if (key.length() == 0 && value.length() == 0) {
+		// Start next doc.
+		builder.endTextField();
+		builder.endDocument();
+		newDoc = true;
+	    } else if (newDoc) {
+		newDoc = false;
+		builder.startDocument(key.toString(), value.toString());
+		builder.startTextField();
+	    } else {
+		builder.add(key, value);
+	    }
+	}
+
+	@Override
+	public void close(TaskAttemptContext context) throws IOException, InterruptedException {
 	    try {
-		builder.close(outputDir, fs);
+		builder.close();
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
 	}
+    }
 
+    private static class BuilderOutputFormat extends FileOutputFormat<MutableString, MutableString> {
+	@Override
+	public RecordWriter<MutableString, MutableString> getRecordWriter(TaskAttemptContext task) throws IOException, InterruptedException {
+	    FileOutputCommitter committer = (FileOutputCommitter)getOutputCommitter(task);
+	    return new BuilderOutputWriter(task, committer.getWorkPath());
+	}
     }
 
     private void printUsage() {
 	System.out.println("Usage : BySubjectCollectionBuilder <input_dir> <output_dir>");
     }
-
-    private static final String OUTPUT_DIR = "OUTPUT_DIR";
 
     public int run(String[] args) throws Exception {
 
@@ -180,12 +150,11 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 
 	job.setMapperClass(MapClass.class);
 	job.setNumReduceTasks(0);
+	job.setOutputFormatClass(BuilderOutputFormat.class);
 
 	FileInputFormat.addInputPath(job, new Path(args[0]));
 
-	FileOutputFormat.setOutputPath(job, new Path(args[1] + "/temp/"));
-
-	job.getConfiguration().set(OUTPUT_DIR, args[1]);
+	FileOutputFormat.setOutputPath(job, new Path(args[1]));
 
 	boolean success = job.waitForCompletion(true);
 	return success ? 0 : 1;
@@ -195,5 +164,4 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	int ret = ToolRunner.run(new BySubjectCollectionBuilder(), args);
 	System.exit(ret);
     }
-
 }

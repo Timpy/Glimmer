@@ -395,7 +395,7 @@ function generateDocSizes () {
 	echo
 	
 	DFS_SIZES_DIR="${DFS_BUILD_DIR}/${METHOD}.sizes"
-	REDUCE_TASKS=$(( 1 + ${NUMBER_OF_DOCS} / 1000000 ))
+	REDUCE_TASKS=$(( 1 + ${NUMBER_OF_DOCS} / 10000000 ))
 	
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.DocSizesGenerator \
 		-Dmapred.max.map.failures.percent=1 \
@@ -404,6 +404,7 @@ function generateDocSizes () {
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-D=mapred.job.reduce.memory.mb=2000 \
+		-Dio.sort.mb=128 \
 		-Dmapred.job.queue.name=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} -p ${PREP_DIR}/predicate ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${PREP_DIR}/all.map"
@@ -443,13 +444,14 @@ function buildCollection () {
 	
 	
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.BySubjectCollectionBuilder \
-		-Dmapred.map.max.attempts=20 \
+		-Dmapred.map.max.attempts=2 \
 		-Dmapred.map.tasks.speculative.execution=false \
 		-Dmapred.child.java.opts=-Xmx800m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.job.queue.name=${QUEUE} \
-		-Dmapred.min.split.size=8500000000 ${PREP_DIR}/bySubject ${COLLECTION_DIR}"
+		-Dmapred.min.split.size=1000000000 \
+		${PREP_DIR}/bySubject ${COLLECTION_DIR}"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
