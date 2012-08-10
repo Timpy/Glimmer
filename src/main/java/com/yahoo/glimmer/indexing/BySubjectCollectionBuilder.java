@@ -13,6 +13,7 @@ package com.yahoo.glimmer.indexing;
 
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.lang.MutableString;
+import it.unimi.dsi.mg4j.document.HdfsSimpleCompressedDocumentCollectionBuilder;
 import it.unimi.dsi.mg4j.document.IdentityDocumentFactory;
 
 import java.io.IOException;
