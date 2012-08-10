@@ -26,6 +26,7 @@ import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import it.unimi.dsi.io.FileLinesCollection;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.lang.MutableString;
+import it.unimi.dsi.mg4j.document.ConcatenatedDocumentCollection;
 import it.unimi.dsi.mg4j.document.Document;
 import it.unimi.dsi.mg4j.document.DocumentCollection;
 import it.unimi.dsi.mg4j.document.SimpleCompressedDocumentCollection;
@@ -66,7 +67,6 @@ import org.semanticweb.owlapi.model.OWLOntology;
 import org.semanticweb.owlapi.model.OWLOntologyCreationException;
 import org.semanticweb.owlapi.model.OWLOntologyManager;
 
-import com.yahoo.glimmer.indexing.ConcatenatedDocumentCollection;
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
 import com.yahoo.glimmer.util.Util;
 
@@ -109,9 +109,17 @@ public class RDFIndex {
 	init(context);
     }
 
+    private static class InstantiatableConcatenatedDocumentCollection extends ConcatenatedDocumentCollection {
+	private static final long serialVersionUID = -8965500093785084788L;
+
+	public InstantiatableConcatenatedDocumentCollection(final String[] collectionName, final DocumentCollection[] collection) {
+	    super(collectionName, collection);
+	}
+    }
+
     @SuppressWarnings("unchecked")
-    private void init(Context context){
-	
+    private void init(Context context) {
+
 	// Load the collection or titlelist
 	try {
 	    if (context.getCollection() != null) {
@@ -152,14 +160,14 @@ public class RDFIndex {
 		    for (String file : fileNames) {
 
 			SimpleCompressedDocumentCollection collection = (SimpleCompressedDocumentCollection) BinIO.loadObject(collectionString + file);
-			
+
 			collection.filename(collectionString + file);
 			names.add(collectionString + file);
 			collections.add(collection);
 
 		    }
 		    ;
-		    documentCollection = new ConcatenatedDocumentCollection(names.toArray(new String[] {}), collections.toArray(new DocumentCollection[] {}));
+		    documentCollection = new InstantiatableConcatenatedDocumentCollection(names.toArray(new String[] {}), collections.toArray(new DocumentCollection[] {}));
 		}
 	    }
 	} catch (Exception e) {
@@ -236,7 +244,8 @@ public class RDFIndex {
 	    // This method also loads weights from the index URI
 	    // We ignore these weights
 	    Reference2DoubleOpenHashMap<Index> index2Weight = new Reference2DoubleOpenHashMap<Index>();
-	    indexMap = loadIndicesFromSpec(basenameWeight, context.getLOAD_DOCUMENT_SIZES(), documentCollection, index2Weight, context.getLOAD_DOCUMENT_SIZES(), map);
+	    indexMap = loadIndicesFromSpec(basenameWeight, context.getLOAD_DOCUMENT_SIZES(), documentCollection, index2Weight,
+		    context.getLOAD_DOCUMENT_SIZES(), map);
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(e);
 	}
@@ -350,7 +359,8 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), "subject", context.getWuriIndex(), termProcessors, getAllResourcesMap());
+	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), "subject", context.getWuriIndex(), termProcessors,
+		getAllResourcesMap());
 
 	// Compute stats
 	try {
@@ -584,7 +594,7 @@ public class RDFIndex {
     public BitStreamIndex getAlignmentIndex() {
 	return (BitStreamIndex) precompIndex;
     }
-    
+
     public Object2LongFunction<CharSequence> getAllResourcesMap() {
 	return allResourcesMap;
     }
@@ -635,7 +645,7 @@ public class RDFIndex {
     public QueryLogger getQueryLogger() {
 	return queryLogger;
     }
-    
+
     public BitStreamIndex getIndexIdfs() {
 	return indexIdfs;
     }
