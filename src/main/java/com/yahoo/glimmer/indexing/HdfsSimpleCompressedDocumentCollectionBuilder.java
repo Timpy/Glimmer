@@ -54,6 +54,7 @@ import java.util.zip.ZipOutputStream;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.output.CountingOutputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsAction;
@@ -400,7 +401,10 @@ public class HdfsSimpleCompressedDocumentCollectionBuilder implements DocumentCo
 	Path objectPath = new Path(hdfsPath, basenameSuffix + DocumentCollection.DEFAULT_EXTENSION);
 	// TODO. This is not good.  We are storing a InstantiatableSimpleCompressedDocumentCollection not a SimpleCompressedDocumentCollection
 	// So to load it again the load must have access to the InstantiatableSimpleCompressedDocumentCollection class.
-	BinIO.storeObject(simpleCompressedDocumentCollection, fs.create(objectPath, true));
+	FSDataOutputStream collectionOutputStream = fs.create(objectPath, true);
+	BinIO.storeObject(simpleCompressedDocumentCollection, collectionOutputStream);
+	collectionOutputStream.flush();
+	collectionOutputStream.close();
 	FsPermission allPermissions = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
 	fs.setPermission(objectPath, allPermissions);
 	simpleCompressedDocumentCollection.close();

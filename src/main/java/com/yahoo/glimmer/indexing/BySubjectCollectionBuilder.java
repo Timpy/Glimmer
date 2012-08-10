@@ -97,7 +97,7 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	@Override
 	public void write(MutableString key, MutableString value) throws IOException, InterruptedException {
 	    if (key.length() == 0 && value.length() == 0) {
-		// Start next doc.
+		// End last doc.
 		builder.endTextField();
 		builder.endDocument();
 		newDoc = true;
@@ -112,6 +112,7 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 
 	@Override
 	public void close(TaskAttemptContext context) throws IOException, InterruptedException {
+	    newDoc = true;
 	    try {
 		builder.close();
 	    } catch (IOException e) {
