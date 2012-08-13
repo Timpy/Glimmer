@@ -49,9 +49,10 @@ public class Context extends Properties {
     private static final String SW_LIST_KEY = "sw.list";
     private static final String TITLE_LIST_KEY = "title.list";
     private static final String ALIGNMENT_INDEX_KEY = "alignment.index";
-    private static final String PREDICATE_INDEX_KEY = "predicate.index";
     private static final String SUBJECT_INDEX_KEY = "subject.index";
-    private static final String WURI_INDEX_KEY = "wuri.index";
+    private static final String PREDICATE_INDEX_KEY = "predicate.index";
+    private static final String OBJECT_INDEX_KEY = "object.index";
+    private static final String CONTEXT_INDEX_KEY = "context.index";
     private static final String TOP_K_KEY = "top.k";
     private static final String USE_SEGMENTS_KEY = "use.segments";
     private static final String USE_TIES_KEY = "use.ties";
@@ -62,7 +63,7 @@ public class Context extends Properties {
     private static final String WS_IMPORTANT_TAG = "ws.important";
     private static final String WS_NEUTRAL_TAG = "ws.neutral";
     private static final String WS_UNIMPORTANT_TAG = "ws.unimportant";
-    private static final String WURI_TAG = "wuri";
+    private static final String SUBJECT_WEIGHT_TAG = "subject.weight";
 
     public Context(Context that) {
 	super(that);
@@ -107,11 +108,11 @@ public class Context extends Properties {
 	return getDouble(K1_TAG, 1.2);
     }
 
-    public boolean getLOAD_DOCUMENT_SIZES() {
+    public boolean getLoadDocumentSizes() {
 	return getBoolean(LOAD_SIZES_TAG, false);
     }
 
-    public boolean getLOAD_INDEXES_INTO_MEMORY() {
+    public boolean getLoadIndexesIntoMemory() {
 	return getBoolean(LOAD_MEMORY_TAG, false);
     }
 
@@ -235,13 +236,11 @@ public class Context extends Properties {
 	return getDouble(WS_UNIMPORTANT_TAG, 1);
     }
 
-    public double getwuri() {
-	return getDouble(WURI_TAG, 1);
+    public double getSubjectWeight() {
+	return getDouble(SUBJECT_WEIGHT_TAG, 1);
     }
 
-    public String getWuriIndex() {
-	return null;  // getProperty(WURI_INDEX_KEY);
-    }
+  
 
     @Deprecated
     public void reload() throws FileNotFoundException, IOException {
@@ -312,7 +311,8 @@ public class Context extends Properties {
 	setProperty(INDEX_PATH_KEY, indexPath + File.separator + "vertical" + File.separator);
 	setProperty(SUBJECT_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "subject");
 	setProperty(PREDICATE_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "predicate");
-	setProperty(WURI_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "uri");
+	setProperty(OBJECT_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "object");
+	setProperty(CONTEXT_INDEX_KEY, indexPath + File.separator + "horizontal" + File.separator + "context");
 	setProperty(TITLE_LIST_KEY, indexPath + File.separator + "subjects.txt");
 	setProperty(FIELD_LIST_KEY, indexPath + File.separator + "predicates.txt");
 	setProperty(ALL_RESOURCES_MAP_KEY, indexPath + File.separator + "all.smap");

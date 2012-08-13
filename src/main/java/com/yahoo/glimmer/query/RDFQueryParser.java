@@ -61,7 +61,6 @@ public class RDFQueryParser implements QueryParser {
     private List<String> properties;
     private Set<String> fields;
     private String defaultField;
-    private String uriField;
     private Map<String, ? extends TermProcessor> termProcessors;
     private Object2LongFunction<CharSequence> resourcesMap;
     private final static Pattern RESOURCE_PATTERN = Pattern.compile("\\((http://.*)\\)");
@@ -73,22 +72,21 @@ public class RDFQueryParser implements QueryParser {
 	for (String alias : index.getIndexedFields())
 	    termProcessors.put(alias, index.getField(alias).termProcessor);
 
-	init(index.getAlignmentIndex(), index.getAllFields(), index.getIndexedFields(), index.getDefaultField(), index.getURIField(), termProcessors,
+	init(index.getAlignmentIndex(), index.getAllFields(), index.getIndexedFields(), index.getDefaultField(), termProcessors,
 		index.getAllResourcesMap());
     }
 
-    public RDFQueryParser(Index precompIndex, List<String> properties, Set<String> fields, String defaultField, String uriField,
+    public RDFQueryParser(Index precompIndex, List<String> properties, Set<String> fields, String defaultField,
 	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> resourcesMap) {
-	init(precompIndex, properties, fields, defaultField, uriField, termProcessors, resourcesMap);
+	init(precompIndex, properties, fields, defaultField, termProcessors, resourcesMap);
     }
 
-    protected void init(Index precompIndex, List<String> properties, Set<String> fields, String defaultField, String uriField,
+    protected void init(Index precompIndex, List<String> properties, Set<String> fields, String defaultField,
 	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> resourcesMap) {
 	this.precompIndex = precompIndex;
 	this.properties = properties;
 	this.fields = fields;
 	this.defaultField = defaultField;
-	this.uriField = uriField;
 	this.termProcessors = termProcessors;
 	this.resourcesMap = resourcesMap;
 	parser = new SimpleParser(fields, defaultField, termProcessors);
@@ -122,7 +120,7 @@ public class RDFQueryParser implements QueryParser {
 		result.append(yahooQuery.charAt(i));
 	    }
 	}
-	
+
 	// Normalize whitespace
 	return result.toString().trim().toLowerCase().replaceAll("[\\s]+", " ");
     }
@@ -179,7 +177,7 @@ public class RDFQueryParser implements QueryParser {
 
     @Override
     public QueryParser copy() {
-	return new RDFQueryParser(precompIndex, properties, fields, defaultField, uriField, termProcessors, resourcesMap);
+	return new RDFQueryParser(precompIndex, properties, fields, defaultField, termProcessors, resourcesMap);
     }
 
     public class MyVisitor extends AbstractQueryBuilderVisitor<Query> {
@@ -236,7 +234,6 @@ public class RDFQueryParser implements QueryParser {
 
 		}
 		disjuncts.add(new Select(defaultField, term));
-		disjuncts.add(new Select(uriField, term));
 	    } catch (IOException e) {
 		throw new QueryBuilderVisitorException(e);
 	    }
@@ -280,7 +277,7 @@ public class RDFQueryParser implements QueryParser {
 		    disjuncts.add(new Select(property, new Consecutive(subNode)));
 
 	    }
-	    disjuncts.add(new Select(uriField, new Consecutive(subNode)));
+	    disjuncts.add(new Select(defaultField, new Consecutive(subNode)));
 
 	    return new Or(disjuncts.toArray(new Query[disjuncts.size()]));
 

@@ -94,7 +94,6 @@ public class RDFIndex {
     /** Query logger for performance measurement */
     private QueryLogger queryLogger;
     protected String subjectField = "subject";
-    protected String uriField;
     /**
      * All fields (includes non-indexed fields) This is a list because it's used
      * to look up field names by position.
@@ -190,7 +189,7 @@ public class RDFIndex {
 	    }
 	}
 
-	// Load MPH
+	// Load Resources hash
 	if (context.getAllResourcesMap() == null || context.getAllResourcesMap().equals("")) {
 	    LOGGER.warn("Warning, no resources map specified!");
 	} else {
@@ -207,7 +206,7 @@ public class RDFIndex {
 
 	EnumMap<UriKeys, String> map = new EnumMap<UriKeys, String>(UriKeys.class);
 
-	if (context.getLOAD_INDEXES_INTO_MEMORY())
+	if (context.getLoadIndexesIntoMemory())
 	    map.put(UriKeys.INMEMORY, "true");
 	else
 	    map.put(UriKeys.MAPPED, "true");
@@ -217,7 +216,7 @@ public class RDFIndex {
 	    throw new IllegalArgumentException("<index> is a mandatory servlet init parameter");
 	}
 
-	final String[] basenameWeight;
+	final String[] indexBasenames;
 	if (context.getPathToIndex().endsWith(System.getProperty("file.separator"))) {
 	    // List .index files in directory
 	    File[] indexFiles = new File(context.getPathToIndex()).listFiles(new FilenameFilter() {
@@ -227,16 +226,16 @@ public class RDFIndex {
 		    return false;
 		}
 	    });
-	    basenameWeight = new String[indexFiles.length];
+	    indexBasenames = new String[indexFiles.length];
 
 	    for (int i = 0; i < indexFiles.length; i++) {
 		LOGGER.info("Loading index: '" + indexFiles[i] + "'");
 		String baseName = indexFiles[i].getName().substring(0, indexFiles[i].getName().lastIndexOf('.'));
-		basenameWeight[i] = indexFiles[i].getParent() + System.getProperty("file.separator") + baseName;
+		indexBasenames[i] = indexFiles[i].getParent() + System.getProperty("file.separator") + baseName;
 	    }
 	} else {
 	    // Single base name
-	    basenameWeight = new String[] { context.getPathToIndex() };
+	    indexBasenames = new String[] { context.getPathToIndex() };
 	}
 
 	Object2ReferenceMap<String, Index> indexMap;
@@ -244,13 +243,13 @@ public class RDFIndex {
 	    // This method also loads weights from the index URI
 	    // We ignore these weights
 	    Reference2DoubleOpenHashMap<Index> index2Weight = new Reference2DoubleOpenHashMap<Index>();
-	    indexMap = loadIndicesFromSpec(basenameWeight, context.getLOAD_DOCUMENT_SIZES(), documentCollection, index2Weight,
-		    context.getLOAD_DOCUMENT_SIZES(), map);
+	    indexMap = loadIndicesFromSpec(indexBasenames, context.getLoadDocumentSizes(), documentCollection, index2Weight,
+		    context.getLoadDocumentSizes(), map);
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(e);
 	}
 
-	LOGGER.info("Loaded " + basenameWeight.length + " indices.");
+	LOGGER.info("Loaded " + indexBasenames.length + " indices.");
 
 	if (context != null && context.getSubjectIndex() != null) {
 	    indexIdfs = (BitStreamIndex) indexMap.get(context.getSubjectIndex());
@@ -267,7 +266,7 @@ public class RDFIndex {
 	    }
 	}
 
-	// Load field list
+	// Load vertical field list (the encoded predicates)
 	if (context != null && context.getFieldList() != null) {
 	    fields = new ArrayList<String>();
 	    LOGGER.info("Loading field list from " + context.getFieldList());
@@ -290,19 +289,6 @@ public class RDFIndex {
 	    predicateIndex = Index.getInstance(context.getPredicateIndex() + "?mapped=1");
 	} catch (Exception e) {
 	    throw new IllegalArgumentException(e);
-	}
-
-	if (context != null && context.getWuriIndex() != null && indexMap.get(context.getWuriIndex()) == null) {
-	    try {
-		LOGGER.info("Loading uri index from " + context.getWuriIndex());
-		uriField = context.getWuriIndex();
-		Index index_wuri = (BitStreamIndex) DiskBasedIndex.getInstance(uriField, true, false, true, map);
-		indexMap.put(uriField, index_wuri);
-	    } catch (Exception e) {
-		e.printStackTrace();
-	    }
-	} else {
-	    LOGGER.warn("WURI Index is null, tried to load from " + context.getWuriIndex());
 	}
 
 	// Loading frequencies
@@ -359,7 +345,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), "subject", context.getWuriIndex(), termProcessors,
+	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), "subject", termProcessors,
 		getAllResourcesMap());
 
 	// Compute stats
@@ -393,7 +379,7 @@ public class RDFIndex {
      * Parses a given array of index URIs/weights, loading the correspoding
      * indices and writing the result of parsing in the given maps.
      * 
-     * @param basenameWeight
+     * @param indexBasenames
      *            an array of index URIs of the form
      *            <samp><var>uri</var>[:<var>weight</var>]</samp>, specifying
      *            the URI of an index and the weight for the index (1, if
@@ -410,44 +396,44 @@ public class RDFIndex {
      *            an empty, writable map that will be filled with a map from
      *            indices to respective weights.
      */
-    protected Object2ReferenceMap<String, Index> loadIndicesFromSpec(final String[] basenameWeight, boolean loadSizes,
+    protected Object2ReferenceMap<String, Index> loadIndicesFromSpec(final String[] indexBasenames, boolean loadSizes,
 	    final DocumentCollection documentCollection, final Reference2DoubleMap<Index> index2Weight, boolean sizes, EnumMap<UriKeys, String> map)
 	    throws IOException, ConfigurationException, URISyntaxException, ClassNotFoundException, SecurityException, InstantiationException,
 	    IllegalAccessException, InvocationTargetException, NoSuchMethodException {
 
 	Object2ReferenceLinkedOpenHashMap<String, Index> name2Index = new Object2ReferenceLinkedOpenHashMap<String, Index>(Hash.DEFAULT_INITIAL_SIZE, .5f);
 
-	for (int i = 0; i < basenameWeight.length; i++) {
+	for (int i = 0; i < indexBasenames.length; i++) {
 
 	    // We must be careful, as ":" is used by Windows to separate the
 	    // device from the path.
-	    final int split = basenameWeight[i].lastIndexOf(':');
+	    final int split = indexBasenames[i].lastIndexOf(':');
 	    double weight = 1;
 
 	    if (split != -1) {
 		try {
-		    weight = Double.parseDouble(basenameWeight[i].substring(split + 1));
+		    weight = Double.parseDouble(indexBasenames[i].substring(split + 1));
 		} catch (NumberFormatException e) {
 		}
 	    }
 
 	    final Index index;
 
-	    if (split == -1 || basenameWeight[i].startsWith("mg4j://")) {
+	    if (split == -1 || indexBasenames[i].startsWith("mg4j://")) {
 		// index = Index.getInstance(basenameWeight[i], true,
 		// loadSizes);
 
 		// System.out.println("BASENAME: " + basenameWeight[i]);
 		try {
-		    index = (BitStreamIndex) DiskBasedIndex.getInstance(basenameWeight[i], true, sizes, true, map);
+		    index = (BitStreamIndex) DiskBasedIndex.getInstance(indexBasenames[i], true, sizes, true, map);
 		    index2Weight.put(index, 1);
 		} catch (ArrayIndexOutOfBoundsException e) {
 		    // Empty index
-		    System.err.println("Failed to open index: " + basenameWeight[i]);
+		    System.err.println("Failed to open index: " + indexBasenames[i]);
 		    continue;
 		}
 	    } else {
-		index = (BitStreamIndex) DiskBasedIndex.getInstance(basenameWeight[i], true, sizes, true, map);
+		index = (BitStreamIndex) DiskBasedIndex.getInstance(indexBasenames[i], true, sizes, true, map);
 		// index = Index.getInstance(basenameWeight[i].substring(0,
 		// split));
 		index2Weight.put(index, weight);
@@ -460,7 +446,7 @@ public class RDFIndex {
 	     * " documents, but the document collection has size " +
 	     * documentCollection.size());
 	     */
-	    name2Index.put(index.field != null ? index.field : basenameWeight[i], index);
+	    name2Index.put(index.field != null ? index.field : indexBasenames[i], index);
 	}
 	return name2Index;
     }
@@ -503,9 +489,8 @@ public class RDFIndex {
 		    index2Weight.put((Index) indexMap.get(index), context.getwf_neutral() * indexMap.keySet().size());
 	    }
 	}
-	if (context.getWuriIndex() != null) {
-	    index2Weight.put((Index) indexMap.get(context.getWuriIndex()), context.getwuri() * indexMap.keySet().size());
-
+	if (context.getSubjectIndex() != null) {
+	    index2Weight.put((Index) indexMap.get(context.getSubjectIndex()), context.getSubjectWeight() * indexMap.keySet().size());
 	}
 	// System.out.println("Final weights:"+index2Weight);
 	return index2Weight;
@@ -601,10 +586,6 @@ public class RDFIndex {
 
     public String getDefaultField() {
 	return subjectField;
-    }
-
-    public String getURIField() {
-	return uriField;
     }
 
     public String getTitle(int id) throws IOException {

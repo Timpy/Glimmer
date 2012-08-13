@@ -454,32 +454,33 @@ YUI({
 											addMoreField();
 
 											// Display class selection dropdown
-											var frag = '<select>';
-											var keys = [];
-											for ( var key in stats.classes) {
-												keys.push(key);
-											}
-											keys.sort();
-											for (clazz in keys) {
-												frag = frag
+											if (stats.classes.lenght > 0) {
+												var frag = '<select>';
+												var keys = [];
+												for ( var key in stats.classes) {
+													keys.push(key);
+												}
+												keys.sort();
+												for (clazz in keys) {
+													frag = frag
 														+ "<option value='"
 														+ keys[clazz]
 														+ "'>"
 														+ getLocalName(keys[clazz])
 														+ "</option>";
-											}
+												}
 
-											frag = frag + '</select>';
-											var fragNode = Y.Node.create(frag);
-											Y.one('#class-select').append(
+												frag = frag + '</select>';
+												var fragNode = Y.Node.create(frag);
+												Y.one('#class-select').append(
 													"I'm looking for a")
 													.append(fragNode).append(
 															"where");
-											changeProperties(keys[0]);
-											fragNode.on('change', function(e) {
-												changeProperties(e.target
-														.get('value'));
-											});
+												changeProperties(keys[0]);
+												fragNode.on('change', function(e) {
+													changeProperties(e.target.get('value'));
+												});
+											}
 
 											var tree = [];
 											function addClass(clazz) {

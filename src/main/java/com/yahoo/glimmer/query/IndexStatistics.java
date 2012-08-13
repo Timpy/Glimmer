@@ -76,23 +76,6 @@ public class IndexStatistics {
     public final static String TYPE_INDEX = "http_www_w3_org_1999_02_22_rdf_syntax_ns_type";
 
     public IndexStatistics(RDFIndex index) throws IOException {
-	init(index, null);
-    }
-
-    public IndexStatistics(RDFIndex index, OWLOntology onto) throws IOException {
-	init(index, onto);
-    }
-
-    private String removeVersion(String uri) {
-	// HACK: second part we shouldn't need
-	String result = uri.replaceFirst("[0-9]+\\.[0-9]+\\.[0-9]+\\/", "");
-	result = result.replaceFirst("[0-9]+_[0-9]_+[0-9]+_", "");
-	return result;
-    }
-
-    // TODO: we could fill out basic property stats (counts) without an ontology
-    private void init(RDFIndex index, OWLOntology onto) throws IOException {
-
 	// Order the fields by frequency
 	final Map<String, Integer> fieldDist = com.yahoo.glimmer.query.Util.getTermDistribution(index.getPredicateIndex());
 	fields = new ArrayList<String>(fieldDist.keySet());
@@ -114,7 +97,6 @@ public class IndexStatistics {
 	if (index.getIndexedFields().contains(TYPE_INDEX)) {
 	    Map<String, Integer> classDist = Util.getTermDistribution(index.getField(TYPE_INDEX));
 	    for (String clazzName : classDist.keySet()) {
-
 		classes.put(removeVersion(clazzName), new ClassStat(classDist.get(clazzName)));
 	    }
 	}
@@ -156,5 +138,11 @@ public class IndexStatistics {
 	}
 
     }
-
+    
+    private String removeVersion(String uri) {
+	// HACK: second part we shouldn't need
+	String result = uri.replaceFirst("[0-9]+\\.[0-9]+\\.[0-9]+\\/", "");
+	result = result.replaceFirst("[0-9]+_[0-9]_+[0-9]+_", "");
+	return result;
+    }
 }
