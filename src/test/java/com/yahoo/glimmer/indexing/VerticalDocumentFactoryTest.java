@@ -27,7 +27,6 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
     public void test1() throws IOException {
 	VerticalDocumentFactory.setupConf(conf, IndexType.VERTICAL, true, null, "@", new String[] { "http://predicate/1", "http://predicate/2", "http://predicate/3" });
 
-	resourcesHash.put("http://subject/", 33l);
 	resourcesHash.put("http://context/1", 55l);
 	resourcesHash.put("http://object/1", 45l);
 	resourcesHash.put("http://object/2", 46l);
@@ -36,7 +35,7 @@ public class VerticalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	factory.setResourcesHashFunction(resourcesHash);
 	assertEquals(3, factory.getFieldCount());
 	VerticalDocument document = (VerticalDocument) factory.getDocument();
-	document.setContent(rawContentInputStream);
+	document.setContent(CONTENT_BYTES, CONTENT_BYTES.length);
 
 
 	assertEquals("http://subject/", document.getSubject());

@@ -57,7 +57,7 @@ public class RDFQueryParser implements QueryParser {
 
     private SimpleParser parser;
 
-    private Index precompIndex;
+    private Index alignmentIndex;
     private List<String> properties;
     private Set<String> fields;
     private String defaultField;
@@ -76,14 +76,14 @@ public class RDFQueryParser implements QueryParser {
 		index.getAllResourcesMap());
     }
 
-    public RDFQueryParser(Index precompIndex, List<String> properties, Set<String> fields, String defaultField,
+    public RDFQueryParser(Index alignmentIndex, List<String> properties, Set<String> fields, String defaultField,
 	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> resourcesMap) {
-	init(precompIndex, properties, fields, defaultField, termProcessors, resourcesMap);
+	init(alignmentIndex, properties, fields, defaultField, termProcessors, resourcesMap);
     }
 
-    protected void init(Index precompIndex, List<String> properties, Set<String> fields, String defaultField,
+    protected void init(Index alignmentIndex, List<String> properties, Set<String> fields, String defaultField,
 	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> resourcesMap) {
-	this.precompIndex = precompIndex;
+	this.alignmentIndex = alignmentIndex;
 	this.properties = properties;
 	this.fields = fields;
 	this.defaultField = defaultField;
@@ -177,7 +177,7 @@ public class RDFQueryParser implements QueryParser {
 
     @Override
     public QueryParser copy() {
-	return new RDFQueryParser(precompIndex, properties, fields, defaultField, termProcessors, resourcesMap);
+	return new RDFQueryParser(alignmentIndex, properties, fields, defaultField, termProcessors, resourcesMap);
     }
 
     public class MyVisitor extends AbstractQueryBuilderVisitor<Query> {
@@ -214,8 +214,8 @@ public class RDFQueryParser implements QueryParser {
 
 	    IndexIterator ii;
 	    try {
-		if (precompIndex != null) {
-		    ii = precompIndex.documents(term.term);
+		if (alignmentIndex != null) {
+		    ii = alignmentIndex.documents(term.term);
 		    if (ii.hasNext()) {
 			for (int f = -1; (f = ii.nextDocument()) != -1;) {
 			    if (fields.contains(properties.get(f))) {
@@ -237,7 +237,11 @@ public class RDFQueryParser implements QueryParser {
 	    } catch (IOException e) {
 		throw new QueryBuilderVisitorException(e);
 	    }
-	    return new Or(disjuncts.toArray(new Query[disjuncts.size()]));
+	    if (disjuncts.size() > 1) {
+		return new Or(disjuncts.toArray(new Query[disjuncts.size()]));
+	    } else {
+		return disjuncts.get(0);
+	    }
 	}
 
 	@Override

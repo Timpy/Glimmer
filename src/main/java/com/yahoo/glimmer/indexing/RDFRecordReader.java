@@ -11,7 +11,6 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 import org.apache.commons.logging.Log;
@@ -32,12 +31,13 @@ import org.apache.hadoop.util.LineReader;
 
 public class RDFRecordReader extends RecordReader<LongWritable, RDFDocument> {
     private static final Log LOG = LogFactory.getLog(RDFRecordReader.class);
-    
+
     private CompressionCodecFactory compressionCodecs = null;
     private long start;
     private long pos;
     private long end;
     private LineReader in;
+    private Text line = new Text();
     private int maxLineLength;
 
     private LongWritable key;
@@ -115,24 +115,18 @@ public class RDFRecordReader extends RecordReader<LongWritable, RDFDocument> {
 	key.set(pos);
 
 	int newSize = 0;
-	while (pos < end) {
-	    Text line = new Text();
+	if (pos < end) {
+	    line.clear();
 	    newSize = in.readLine(line, maxLineLength, Math.max((int) Math.min(Integer.MAX_VALUE, end - pos), maxLineLength));
-	    if (newSize == 0) {
-		break;
-	    }
-	    pos += newSize;
-	    if (newSize < maxLineLength) {
+	    if (newSize != 0) {
+		pos += newSize;
+		if (newSize > maxLineLength) {
+		    // line too long. We'll lose the relations on the end..
+		    LOG.info("Truncated line of size " + newSize + " at pos " + (pos - newSize));
+		}
 		// TODO: pass in document specific metadata if we need
-		((RDFDocument) value).setContent(new ByteArrayInputStream(line.getBytes()));
-		break;
-	    } else {
-		// line too long. we create an empty doc
-		LOG.info("Skipped line of size " + newSize + " at pos " + (pos - newSize));
-		((RDFDocument) value).setContent(new ByteArrayInputStream(new byte[0]));
-		break;
+		((RDFDocument) value).setContent(line.getBytes(), line.getLength());
 	    }
-
 	}
 	if (newSize == 0) {
 	    key = null;

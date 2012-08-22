@@ -14,14 +14,9 @@ package com.yahoo.glimmer.query;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.index.BitStreamIndex;
-import it.unimi.dsi.mg4j.index.IndexIterator;
-import it.unimi.dsi.util.StringMap;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.util.HashMap;
-import java.util.Map;
 
 public class Util {
 
@@ -55,20 +50,4 @@ public class Util {
 	result = result.replaceAll("&#92;", "\\\\");
 	return result;
     }
-
-    public static Map<String, Integer> getTermDistribution(BitStreamIndex index) throws IOException {
-	Map<String, Integer> histogram = new HashMap<String, Integer>();
-
-	StringMap<? extends CharSequence> termMap = index.termMap;
-
-	for (CharSequence term : termMap.list()) {
-	    long id = termMap.get(term);
-	    IndexIterator it = index.documents(((int) id));
-	    histogram.put(term.toString(), it.frequency());
-	    it.dispose();
-	}
-	return histogram;
-
-    }
-
 }

@@ -31,7 +31,7 @@ import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper;
 
 public class TuplesToResourcesMapperTest {
     private Mockery context;
-    private Mapper<LongWritable,Text,Text,Text>.Context mrContext;
+    private Mapper<LongWritable,Text,Text,Object>.Context mrContext;
     private Counter nxParserExceptionCounter;
     private InputSplit inputSplit;
     

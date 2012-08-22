@@ -26,6 +26,10 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
+import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OutputCount;
+import com.yahoo.glimmer.util.BySubjectRecord;
+
 public class ResourceRecordWriterTest {
     private Mockery context;
     private Expectations e;
@@ -84,18 +88,33 @@ public class ResourceRecordWriterTest {
 	e.one(objectOs).write(e.with(new ByteMatcher("http://a/key\nbNode123\n", true)), e.with(0), e.with(22));
 	e.one(predicateOs).write(e.with(new ByteMatcher("3\thttp://a/key\n", true)), e.with(0), e.with(15));
 	e.one(subjectOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
-	e.one(bySubjectOs).write(e.with(new ByteMatcher("http://a/key\t<http://predicate/> <http://Object> .\n", true)), e.with(0), e.with(51));
+	e.one(bySubjectOs).write(e.with(new ByteMatcher("66\thttp://a/key\t<http://predicate/> <http://Object> .\n", true)), e.with(0), e.with(54));
 	
 	context.checking(e);
 	
 	ResourceRecordWriter writer = new ResourceRecordWriter(fs, new Path("/somepath"), null);
 	
-	writer.write(new Text("http://a/key"), new Text("PREDICATE:3"));
-	writer.write(new Text("http://a/key"), new Text("OBJECT"));
-	writer.write(new Text("http://a/key"), new Text("CONTEXT"));
-	writer.write(new Text("http://a/key"), new Text("ALL"));
-	writer.write(new Text("http://a/key"), new Text("<http://predicate/> <http://Object> ."));
-	writer.write(new Text("bNode123"), new Text("OBJECT"));
+	OutputCount outputCount = new OutputCount();
+	outputCount.output = OUTPUT.PREDICATE;
+	outputCount.count = 3;
+	writer.write(new Text("http://a/key"), outputCount);
+	outputCount.output = OUTPUT.OBJECT;
+	outputCount.count = 0;
+	writer.write(new Text("http://a/key"), outputCount);
+	outputCount.output = OUTPUT.CONTEXT;
+	outputCount.count = 0;
+	writer.write(new Text("http://a/key"), outputCount);
+	outputCount.output = OUTPUT.ALL;
+	outputCount.count = 0;
+	writer.write(new Text("http://a/key"), outputCount);
+	BySubjectRecord record = new BySubjectRecord();
+	record.setId(66);
+	record.setSubject("http://a/key");
+	record.addRelation("<http://predicate/> <http://Object> .");
+	writer.write(new Text("http://a/key"), record);
+	outputCount.output = OUTPUT.OBJECT;
+	outputCount.count = 0;
+	writer.write(new Text("bNode123"), outputCount);
 	writer.close(null);
 	
 	context.assertIsSatisfied();

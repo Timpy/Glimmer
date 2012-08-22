@@ -268,7 +268,9 @@ public class WOOScorer extends AbstractWeightedScorer implements DelegatingScore
     public void wrap(DocumentIterator documentIterator) throws IOException {
 	super.wrap(documentIterator);
 
-	assert !index2Weight.keySet().contains(null);
+	if (index2Weight.keySet().contains(null)) {
+	    throw new IllegalStateException("index2Weights contains a null key!!");
+	}
 
 	termVisitor.prepare(index2Weight.keySet());
 	if (DEBUG)

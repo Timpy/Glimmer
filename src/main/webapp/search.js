@@ -5,7 +5,7 @@ String.prototype.startsWith = function(str) {
 var stats = {};
 var fields = [ "any" ];
 var store = {};
-var ns = "http://woo.corp.yahoo.com/1.7.1/ns/".replace(/[^a-zA-Z0-9]+/g, "_");
+var ns;
 var webapp = "";
 var RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 var ONTOLOGY_ROOT = "http://www.w3.org/2002/07/owl#Thing";

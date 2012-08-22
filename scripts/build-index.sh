@@ -200,7 +200,7 @@ function computeHashes () {
 	echo
 	echo Generating Hashes..
 	echo "		If you get out of disk space errors you need more space in /tmp for ChunkedHashStore... files"
-	echo "		If you get out of heap errors try setting hadoop's HADOOP_HEAPSIZE or HADOOP_CLIENT_OPTS=\"-Xmx..."
+	echo "		If you get out of heap errors try setting hadoop's HADOOP_HEAPSIZE or HADOOP_CLIENT_OPTS=\"-Xmx3500m\""
 	echo
 	# Generate Hashes for subjects, predicates and objects and all
 	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.util.ComputeHashTool \

@@ -17,7 +17,9 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Reducer;
 
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
+import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OutputCount;
 import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.TUPLE_ELEMENTS;
+import com.yahoo.glimmer.util.BySubjectRecord;
 
 /**
  * Reducer
@@ -27,22 +29,33 @@ import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.TUPLE_ELE
  * keywords if that keyword occurs once or more as a value.
  * 
  */
-public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
-    private static final int MAX_RELATIONS = 10000;
-    public static final String VALUE_DELIMITER = "  ";
-    private StringBuilder sb = new StringBuilder();
-    
+public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
+    private OutputCount outputCount = new OutputCount();
+    private BySubjectRecord bySubjectRecord = new BySubjectRecord();
+    // Given that there is only 1 reducer writing a sorted list of subjects we
+    // can add the deduce the document ID and add it to bysubjects
+    // The alternative would be to generate a MPH over the list of subjects but
+    // that would require more memory when building the indices.
+    private int docId = 0;
+
     static enum Counters {
 	TOO_MANY_RELATIONS;
     }
 
-    protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Text>.Context context) throws IOException, InterruptedException {
+    protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Object>.Context context) throws IOException, InterruptedException {
 	int keyPredicateCount = 0;
 	int keyObjectCount = 0;
 	int keyContextCount = 0;
 	int relationsCount = 0;
-	sb.setLength(0);
 	
+	outputCount.output = OUTPUT.ALL;
+	outputCount.count = 0;
+	context.write(key, outputCount);
+	
+	// The docId's should match with OUTPUT.ALL hash values
+	bySubjectRecord.setId(docId++);
+	bySubjectRecord.clearRelations();
+
 	for (Text value : values) {
 	    String valueString = value.toString();
 
@@ -53,49 +66,41 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Text> {
 	    } else if (TUPLE_ELEMENTS.CONTEXT.name().equals(valueString)) {
 		keyContextCount++;
 	    } else {
+		bySubjectRecord.addRelation(valueString);
 		relationsCount++;
-		if (relationsCount <= MAX_RELATIONS) {
-		    try {
-			prefixDelimiterAppender(valueString);
-		    } catch (OutOfMemoryError e) { // TODO 
-			System.out.println("OOM l:" + sb.length() + " relationsCount:" + relationsCount + " when appending " + valueString.length()
-				+ " chars.");
-			throw e;
-		    }
-		}
 	    }
 	}
 	
-	if (relationsCount > MAX_RELATIONS) {
-	    System.out.println("Too many relations. Only indexing " + relationsCount + " of " + MAX_RELATIONS + ". Subject is:" + key.toString());
-	    context.getCounter(Counters.TOO_MANY_RELATIONS).increment(1);
-	}
-
-	context.write(key,  new Text(OUTPUT.ALL.name()));
 	
 	if (relationsCount > 0) {
-	    context.write(key, new Text(sb.toString()));
+	    bySubjectRecord.setSubject(key.toString());
+	    
+	    if (bySubjectRecord.getRelationsCount() != relationsCount) {
+		System.out.println("Too many relations. Only indexing " + bySubjectRecord.getRelationsCount() + " of " + relationsCount + ". Subject is:"
+			+ key.toString());
+		context.getCounter(Counters.TOO_MANY_RELATIONS).increment(1);
+	    }
 	}
-	
+
+
+	if (bySubjectRecord.hasRelations()) {
+	    context.write(key, bySubjectRecord);
+	}
+
 	if (keyPredicateCount > 0) {
-	    sb.setLength(0);
-	    sb.append(OUTPUT.PREDICATE.name());
-	    sb.append(':');
-	    sb.append(keyPredicateCount);
-	    context.write(key, new Text(sb.toString()));
+	    outputCount.output = OUTPUT.PREDICATE;
+	    outputCount.count = keyPredicateCount;
+	    context.write(key, outputCount);
 	}
 	if (keyObjectCount > 0) {
-	    context.write(key, new Text(OUTPUT.OBJECT.name()));
+	    outputCount.output = OUTPUT.OBJECT;
+	    outputCount.count = keyObjectCount;
+	    context.write(key, outputCount);
 	}
 	if (keyContextCount > 0) {
-	    context.write(key, new Text(OUTPUT.CONTEXT.name()));
+	    outputCount.output = OUTPUT.CONTEXT;
+	    outputCount.count = keyContextCount;
+	    context.write(key, outputCount);
 	}
     };
-
-    private void prefixDelimiterAppender(String s) {
-	if (sb.length() > 0) {
-	    sb.append(ResourcesReducer.VALUE_DELIMITER);
-	}
-	sb.append(s);
-    }
 }

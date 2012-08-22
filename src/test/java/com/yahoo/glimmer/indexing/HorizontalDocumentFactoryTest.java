@@ -30,7 +30,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals(4, factory.getFieldCount());
 	
 	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
-	document.setContent(rawContentInputStream);
+	document.setContent(CONTENT_BYTES, CONTENT_BYTES.length);
 	
 	assertEquals("http://subject/", document.getSubject());
 	
@@ -115,7 +115,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals(4, factory.getFieldCount());
 	
 	HorizontalDocument document = (HorizontalDocument)factory.getDocument();
-	document.setContent(rawContentInputStream);
+	document.setContent(CONTENT_BYTES, CONTENT_BYTES.length);
 	assertEquals("http://subject/", document.getSubject());
 	
 	MutableString word = new MutableString();

@@ -17,6 +17,7 @@ import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.semanticweb.yars.nx.Resource;
@@ -49,13 +50,14 @@ class VerticalDocument extends RDFDocument {
 	return IndexType.VERTICAL;
     }
 
-    protected void ensureParsed_(List<Relation> relations) throws IOException {
+    protected void ensureParsed_(Iterator<Relation> relations) throws IOException {
 	// clear fields
 	for (List<String> field : fields) {
 	    field.clear();
 	}
 
-	for (Relation relation : relations) {
+	while (relations.hasNext()) {
+	    Relation relation = relations.next();
 	    String predicate = relation.getPredicate().toString();
 	    // Check if prefix is on blacklist
 	    if (RDFDocumentFactory.isOnPredicateBlacklist(predicate)) {

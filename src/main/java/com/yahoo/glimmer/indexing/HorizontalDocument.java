@@ -17,6 +17,7 @@ import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.semanticweb.yars.nx.BNode;
@@ -62,7 +63,7 @@ class HorizontalDocument extends RDFDocument {
 	return IndexType.HORIZONTAL;
     }
 
-    protected void ensureParsed_(List<Relation> relations) throws IOException {
+    protected void ensureParsed_(Iterator<Relation> relations) throws IOException {
 	objects.clear();
 	predicates.clear();
 	contexts.clear();
@@ -74,6 +75,7 @@ class HorizontalDocument extends RDFDocument {
 	FastBufferedReader fbr;
 	// remove http/https or _:
 	int startAt = subject.indexOf(':');
+	
 	if (startAt < 0) {
 	    fbr = new FastBufferedReader(subject.toCharArray());
 	} else {
@@ -91,7 +93,8 @@ class HorizontalDocument extends RDFDocument {
 	}
 	fbr.close();
 
-	for (Relation relation : relations) {
+	while (relations.hasNext()) {
+	    Relation relation = relations.next();
 	    String predicate = relation.getPredicate().toString();
 
 	    // Check if prefix is on blacklist

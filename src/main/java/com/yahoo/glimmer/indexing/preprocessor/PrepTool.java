@@ -105,7 +105,7 @@ public class PrepTool extends Configured implements Tool {
 
 	job.setReducerClass(ResourcesReducer.class);
 	job.setOutputKeyClass(Text.class);
-	job.setOutputValueClass(Text.class);
+	job.setOutputValueClass(Object.class);
 
 	job.setOutputFormatClass(ResourceRecordWriter.OutputFormat.class);
 

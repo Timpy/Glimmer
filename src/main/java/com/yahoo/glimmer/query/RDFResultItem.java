@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.semanticweb.yars.nx.BNode;
 import org.semanticweb.yars.nx.Literal;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.Quad;
@@ -39,6 +40,7 @@ public class RDFResultItem extends ResultItem {
     private static final Node DEFAULT_CONTEXT = new Resource("default:");
 
     private List<Value> quads = new ArrayList<Value>();
+    private final Node subject;
 
     private Set<RDFResultItem> duplicates = new HashSet<RDFResultItem>();
 
@@ -80,11 +82,6 @@ public class RDFResultItem extends ResultItem {
     private transient Set<String> fieldNames;
     private transient DocumentCollection collection;
 
-    public RDFResultItem(String data, int id, double score) {
-	super(id, score);
-	parseData(data, null);
-    }
-
     public RDFResultItem(Set<String> fieldNames, DocumentCollection collection, int id, double score) throws IOException {
 	super(id, score);
 
@@ -95,11 +92,17 @@ public class RDFResultItem extends ResultItem {
 	    Document d = collection.document(id);
 	    title = d.title();
 	    uri = d.uri();
-	    this.parseData(Util.getText(d).toString(), fieldNames);
+	    String titleString = title.toString();
+	    if (titleString.startsWith("http://")) {
+		subject = new Resource(titleString);
+	    } else {
+		subject = new BNode(titleString);
+	    }
+	    parseData(subject, Util.getText(d).toString(), fieldNames);
 	    d.close();
 	} else {
 	    title = "Document #" + doc;
-
+	    subject = null;
 	}
     }
 
@@ -199,7 +202,7 @@ public class RDFResultItem extends ResultItem {
 
     }
 
-    private void parseData(String unparsed, Set<String> fieldNames) {
+    private void parseData(Node subject, String unparsed, Set<String> fieldNames) {
 
 	String[] tuples = unparsed.split(DOUBLE_SPACES);
 	Set<Triple> data = new HashSet<Triple>();
@@ -210,12 +213,12 @@ public class RDFResultItem extends ResultItem {
 		    // Empty line
 		    continue;
 		}
-		Node[] nodes = NxParser.parseNodes(tuple);
+		Node[] predicateObjectContext = NxParser.parseNodes(tuple);
 
-		if (nodes.length < 4) {
-		    data.add(new Quad(nodes[0], nodes[1], nodes[2], DEFAULT_CONTEXT));
+		if (predicateObjectContext.length < 3) {
+		    data.add(new Quad(subject, predicateObjectContext[0], predicateObjectContext[1], DEFAULT_CONTEXT));
 		} else {
-		    data.add(new Quad(nodes[0], nodes[1], nodes[2], nodes[3]));
+		    data.add(new Quad(subject, predicateObjectContext[0], predicateObjectContext[1], predicateObjectContext[2]));
 		}
 
 	    } catch (Exception e) {

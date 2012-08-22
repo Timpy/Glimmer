@@ -13,11 +13,9 @@ package com.yahoo.glimmer.indexing;
 
 import it.unimi.dsi.io.WordReader;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.semanticweb.yars.nx.Node;
@@ -26,6 +24,7 @@ import org.semanticweb.yars.nx.parser.ParseException;
 
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
+import com.yahoo.glimmer.util.BySubjectRecord;
 
 public abstract class RDFDocument {
     public static final String NO_CONTEXT = "";
@@ -33,10 +32,12 @@ public abstract class RDFDocument {
     // TODO RDFDocumnet should implement Hadoop's Writable but as we have a ref
     // to an InputStream for lazy parsing this isn't possible.
     protected final RDFDocumentFactory factory;
+    private BySubjectRecord record = new BySubjectRecord();
     /** Whether we already parsed the document. */
     private boolean parsed;
     /** The cached raw content. */
-    private InputStream rawContent;
+    private byte[]  contentBytes;
+    private int contentLength;
     private Integer id;
     private String subject;
 
@@ -44,14 +45,15 @@ public abstract class RDFDocument {
 
     public abstract IndexType getIndexType();
 
-    protected abstract void ensureParsed_(List<Relation> relations) throws IOException;
+    protected abstract void ensureParsed_(Iterator<Relation> relations) throws IOException;
 
     public RDFDocument(RDFDocumentFactory factory) {
 	this.factory = factory;
     }
 
-    public void setContent(InputStream rawContent) {
-	this.rawContent = rawContent;
+    public void setContent(byte[] bytes, int length) {
+	contentBytes = bytes;
+	contentLength = length;
 	parsed = false;
 	id = null;
 	subject = null;
@@ -63,45 +65,35 @@ public abstract class RDFDocument {
 	}
 	parsed = true;
 
-	if (rawContent == null) {
-	    throw new IOException("Trying to parse null rawContent");
-	}
-
-	BufferedReader r = new BufferedReader(new InputStreamReader(rawContent, factory.getInputStreamEncodeing()));
-	String line = r.readLine();
-	r.close();
-
-	if (line == null || line.trim().equals("")) {
+	if (contentLength == 0) {
 	    factory.incrementCounter(RdfCounters.EMPTY_LINES, 1);
 	    return;
 	}
-	// First part is subjects URL or BNode, second is the relations
-	subject = line.substring(0, line.indexOf('\t')).trim();
-	id = factory.lookupResource(subject);
-	if (id == null) {
-	    throw new IllegalStateException("Subject " + subject + " not in resources hash function!");
+	
+	if (!record.parse(contentBytes, 0, contentLength)) {
+	    factory.incrementCounter(RdfCounters.PARSE_ERROR, 1);
 	}
+	
+	id = record.getId();
+	subject = record.getSubject();
 
-	String relationsString = line.substring(line.indexOf('\t')).trim();
-	if (relationsString.isEmpty()) {
+	List<Relation> relations = new ArrayList<Relation>();
+	for (String relationString : record.getRelations()) {
+	    try {
+		Node[] relationNodes = NxParser.parseNodes(relationString);
+		Relation relation = new Relation(relationNodes);
+		relations.add(relation);
+	    } catch (ParseException e) {
+		System.err.println("Parsing failed for " + subject + ": " + e.getMessage() + "Content was: \n" + relationString);
+		return;
+	    }
+	}
+	if (relations.isEmpty()) {
 	    factory.incrementCounter(RdfCounters.EMPTY_DOCUMENTS, 1);
 	    return;
 	}
 
-	String[] relationsSplit = relationsString.split("  ");
-	List<Relation> relations = new ArrayList<Relation>(relationsSplit.length);
-	for (String relationLine : relationsSplit) {
-	    try {
-		Node[] relationNodes = NxParser.parseNodes(relationLine);
-		Relation relation = new Relation(relationNodes);
-		relations.add(relation);
-	    } catch (ParseException e) {
-		System.err.println("Parsing failed for " + subject + ": " + e.getMessage() + "Content was: \n" + line);
-		return;
-	    }
-	}
-
-	ensureParsed_(relations);
+	ensureParsed_(relations.iterator());
     }
 
     public int getId() {

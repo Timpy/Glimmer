@@ -18,22 +18,22 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import it.unimi.dsi.fastutil.objects.Reference2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Reference2DoubleOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import it.unimi.dsi.io.FileLinesCollection;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.mg4j.document.ConcatenatedDocumentCollection;
 import it.unimi.dsi.mg4j.document.Document;
 import it.unimi.dsi.mg4j.document.DocumentCollection;
-import it.unimi.dsi.mg4j.document.SimpleCompressedDocumentCollection;
 import it.unimi.dsi.mg4j.index.BitStreamIndex;
 import it.unimi.dsi.mg4j.index.DiskBasedIndex;
 import it.unimi.dsi.mg4j.index.Index;
 import it.unimi.dsi.mg4j.index.Index.UriKeys;
+import it.unimi.dsi.mg4j.index.IndexIterator;
 import it.unimi.dsi.mg4j.index.TermProcessor;
 import it.unimi.dsi.mg4j.query.QueryEngine;
 import it.unimi.dsi.mg4j.query.SelectedInterval;
@@ -45,22 +45,22 @@ import it.unimi.dsi.mg4j.search.score.DocumentScoreInfo;
 import it.unimi.dsi.mg4j.search.score.Scorer;
 import it.unimi.dsi.sux4j.io.FileLinesList;
 import it.unimi.dsi.util.SemiExternalGammaList;
+import it.unimi.dsi.util.StringMap;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.configuration.ConfigurationException;
 import org.apache.log4j.Logger;
 import org.semanticweb.owlapi.apibinding.OWLManager;
 import org.semanticweb.owlapi.model.OWLOntology;
@@ -68,19 +68,24 @@ import org.semanticweb.owlapi.model.OWLOntologyCreationException;
 import org.semanticweb.owlapi.model.OWLOntologyManager;
 
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
-import com.yahoo.glimmer.util.Util;
 
 public class RDFIndex {
     private final static Logger LOGGER = Logger.getLogger(RDFIndex.class);
+    private final static String TYPE_INDEX = "type";
     public final static int MAX_STEMMING = 1024;
+
+    private final static String BASENAME_INDEX_PROPERTY_KEY = "basename";
+
+    private final static String ALIGNMENT_INDEX_KEY = "alignment";
+    private final static String SUBJECT_INDEX_KEY = "subject";
+    private final static String PREDICATE_INDEX_KEY = "predicate";
+    private final static String OBJECT_INDEX_KEY = "object";
+    private final static String CONTEXT_INDEX_KEY = "context";
 
     /** The query engine. */
     private QueryEngine queryEngine;
     /** The document collection. */
     private DocumentCollection documentCollection = null;
-    /** An optional title list if the document collection is not present. */
-    /** The token index */
-    protected BitStreamIndex indexIdfs;
     /** Term counts in the token index */
     protected SemiExternalGammaList frequencies = null;
     /** Document priors */
@@ -88,12 +93,9 @@ public class RDFIndex {
     /** Map used to encode URIs for retrieving from the collection */
     protected Object2LongFunction<CharSequence> allResourcesMap;
     /** The alignment index **/
-    protected Index precompIndex;
-    /** The predicate index **/
-    protected Index predicateIndex;
+    protected Index alignmentIndex;
     /** Query logger for performance measurement */
     private QueryLogger queryLogger;
-    protected String subjectField = "subject";
     /**
      * All fields (includes non-indexed fields) This is a list because it's used
      * to look up field names by position.
@@ -104,10 +106,6 @@ public class RDFIndex {
 
     protected RDFQueryParser parser;
 
-    public RDFIndex(Context context) {
-	init(context);
-    }
-
     private static class InstantiatableConcatenatedDocumentCollection extends ConcatenatedDocumentCollection {
 	private static final long serialVersionUID = -8965500093785084788L;
 
@@ -115,72 +113,105 @@ public class RDFIndex {
 	    super(collectionName, collection);
 	}
     }
-
+    
+    private static DocumentCollection loadDocumentCollection(File collectionFile) throws RDFIndexException {
+	try {
+	    DocumentCollection documentCollection = (DocumentCollection) BinIO.loadObject(collectionFile);
+	    documentCollection.filename(collectionFile.getPath());
+	    return documentCollection;
+	} catch (Exception e) {
+	    throw new RDFIndexException(e);
+	}
+    }
     @SuppressWarnings("unchecked")
-    private void init(Context context) {
+    private static <T> T loadObjectOfType(File file) throws RDFIndexException {
+	if (file == null) {
+	    return null;
+	}
+	try {
+	    return (T)BinIO.loadObject(file);
+	} catch (Exception e) {
+	    throw new RDFIndexException("While loading from " + file.getPath(), e);
+	}
+    }
+
+    public RDFIndex(Context context) throws RDFIndexException {
+	File kbRootPath = context.getKbRootPath();
+	if (kbRootPath == null) {
+	    throw new IllegalArgumentException("path to knowledge base root is not set.");
+	}
+	if (!kbRootPath.isDirectory()) {
+	    throw new IllegalArgumentException("path to knowledge base root is not a directory.");
+	}
+
+	File verticalIndexDir = context.getVerticalIndexDir();
+	if (verticalIndexDir == null) {
+	    throw new IllegalArgumentException("path to vertical indexes is not set.");
+	}
+	if (!verticalIndexDir.isDirectory()) {
+	    throw new IllegalArgumentException("path to vertical indexes is not a directory.");
+	}
+
+	File horizontalIndexDir = context.getHorizontalIndexDir();
+	if (horizontalIndexDir == null) {
+	    throw new IllegalArgumentException("path to horizontal indexes is not set.");
+	}
+	if (!horizontalIndexDir.isDirectory()) {
+	    throw new IllegalArgumentException("path to horizontal indexes is not a directory.");
+	}
 
 	// Load the collection or titlelist
-	try {
-	    if (context.getCollection() != null) {
-		LOGGER.info("Loading collection from " + context.getCollection());
+	File collectionFile = context.getCollectionFile();
+	if (collectionFile != null) {
+	    LOGGER.info("Loading collection from " + collectionFile);
 
-		// Check if collection is a file or directory
-		String collectionString = context.getCollection();
-		if (new File(collectionString).isFile()) {
-		    documentCollection = (it.unimi.dsi.mg4j.document.SimpleCompressedDocumentCollection) BinIO.loadObject(collectionString);
-		    documentCollection.filename(collectionString);
+	    if (collectionFile.isFile()) {
+		documentCollection = loadDocumentCollection(collectionFile);
+	    } else if (collectionFile.isDirectory()) {
+		// A directory of collections
+		String[] fileNames = collectionFile.list(new FilenameFilter() {
+		    @Override
+		    public boolean accept(File dir, String name) {
+			if (name.endsWith(".collection"))
+			    return true;
+			return false;
+		    }
+		});
 
+		if (fileNames.length == 0) {
+		    throw new RuntimeException("No .collection files found in directory " + collectionFile.getPath());
+		}
+
+		if (fileNames.length == 1) {
+		    File file = new File(collectionFile, fileNames[0]);
+		    documentCollection = loadDocumentCollection(file);
 		} else {
-		    // A directory of collections
-		    // We are using our own SimpleCompressed.. class
 
-		    // HACK: add file separator
-		    if (!collectionString.endsWith(System.getProperty("file.separator"))) {
-			collectionString = collectionString + System.getProperty("file.separator");
-		    }
-		    List<String> names = new ArrayList<String>();
-		    List<DocumentCollection> collections = new ArrayList<DocumentCollection>();
+		    String[] names = new String[fileNames.length];
+		    DocumentCollection[] collections = new DocumentCollection[fileNames.length];
 
-		    String[] fileNames = new File(collectionString).list(new FilenameFilter() {
-
-			@Override
-			public boolean accept(File dir, String name) {
-			    if (name.endsWith(".collection"))
-				return true;
-			    return false;
-			}
-
-		    });
-		    if (fileNames == null) {
-			throw new RuntimeException("Collection directory is invalid");
-		    }
 		    // Sort names to get the collection order right
 		    Arrays.sort(fileNames);
-		    for (String file : fileNames) {
-
-			SimpleCompressedDocumentCollection collection = (SimpleCompressedDocumentCollection) BinIO.loadObject(collectionString + file);
-
-			collection.filename(collectionString + file);
-			names.add(collectionString + file);
-			collections.add(collection);
-
+		    for (int i = 0; i < fileNames.length; i++) {
+			File file = new File(collectionFile, fileNames[i]);
+			names[i] = file.getPath();
+			collections[i] = loadDocumentCollection(file);
 		    }
-		    ;
-		    documentCollection = new InstantiatableConcatenatedDocumentCollection(names.toArray(new String[] {}), collections.toArray(new DocumentCollection[] {}));
+		    documentCollection = new InstantiatableConcatenatedDocumentCollection(names, collections);
 		}
+	    } else {
+		throw new RuntimeException("Expected " + collectionFile.getPath() + " to be a collection file or directory containing collection files.");
 	    }
-	} catch (Exception e) {
-	    throw new RuntimeException(e);
 	}
 
 	if (documentCollection == null) {
 	    LOGGER.info("No collection specified, we will try to use a title list...");
-
-	    if (context.getTitleList() != null && !context.getTitleList().equals("")) {
-		LOGGER.info("Loading titlelist...");
+	    File titleListFile = context.getTitleListFile();
+	    if (titleListFile != null) {
+		LOGGER.info("Loading titlelist from " + titleListFile.getPath());
 		List<MutableString> titleList;
 		try {
-		    titleList = new FileLinesList(context.getTitleList(), "ASCII");
+		    titleList = new FileLinesList(titleListFile.getPath(), "ASCII");
 		    LOGGER.info("Loaded titlelist of size " + titleList.size() + ".");
 		    documentCollection = new TitleListDocumentCollection(titleList);
 		} catch (Exception e) {
@@ -190,131 +221,66 @@ public class RDFIndex {
 	}
 
 	// Load Resources hash
-	if (context.getAllResourcesMap() == null || context.getAllResourcesMap().equals("")) {
+	allResourcesMap = loadObjectOfType(context.getAllResourcesMapFile());
+	if (allResourcesMap == null) {
 	    LOGGER.warn("Warning, no resources map specified!");
 	} else {
-	    LOGGER.info("Loading resourses map " + context.getAllResourcesMap());
-	    try {
-		allResourcesMap = (Object2LongFunction<CharSequence>) BinIO.loadObject(context.getAllResourcesMap());
-	    } catch (IOException e) {
-		e.printStackTrace();
-	    } catch (ClassNotFoundException e) {
-		e.printStackTrace();
-	    }
-	    // System.out.println("Loaded MPH of size " + mph.size());
+	    LOGGER.info("Loading resourses map " + context.getAllResourcesMapFile().getPath());
 	}
 
-	EnumMap<UriKeys, String> map = new EnumMap<UriKeys, String>(UriKeys.class);
+	// Load vertical indexes
+	Object2ReferenceMap<String, Index> indexMap = loadIndexesFromDir(verticalIndexDir, context.getLoadDocumentSizes(), context.getLoadIndexesInMemory());
+	LOGGER.info("Loaded " + indexMap.size() + " vertical indices.");
 
-	if (context.getLoadIndexesIntoMemory())
-	    map.put(UriKeys.INMEMORY, "true");
-	else
-	    map.put(UriKeys.MAPPED, "true");
-
-	// Load the indices
-	if (context.getPathToIndex() == null || context.getPathToIndex().equals("")) {
-	    throw new IllegalArgumentException("<index> is a mandatory servlet init parameter");
+	if (!indexMap.containsKey(ALIGNMENT_INDEX_KEY)) {
+	    LOGGER.error("No alignment index found.");
 	}
 
-	final String[] indexBasenames;
-	if (context.getPathToIndex().endsWith(System.getProperty("file.separator"))) {
-	    // List .index files in directory
-	    File[] indexFiles = new File(context.getPathToIndex()).listFiles(new FilenameFilter() {
-		public boolean accept(File dir, String name) {
-		    if (name.endsWith(".properties"))
-			return true;
-		    return false;
-		}
-	    });
-	    indexBasenames = new String[indexFiles.length];
+	// Load horizontal indexes
+	indexMap.putAll(loadIndexesFromDir(horizontalIndexDir, true, context.getLoadIndexesInMemory()));
 
-	    for (int i = 0; i < indexFiles.length; i++) {
-		LOGGER.info("Loading index: '" + indexFiles[i] + "'");
-		String baseName = indexFiles[i].getName().substring(0, indexFiles[i].getName().lastIndexOf('.'));
-		indexBasenames[i] = indexFiles[i].getParent() + System.getProperty("file.separator") + baseName;
-	    }
-	} else {
-	    // Single base name
-	    indexBasenames = new String[] { context.getPathToIndex() };
+	if (!indexMap.containsKey(SUBJECT_INDEX_KEY)) {
+	    throw new IllegalStateException("No subjects index found.");
 	}
-
-	Object2ReferenceMap<String, Index> indexMap;
-	try {
-	    // This method also loads weights from the index URI
-	    // We ignore these weights
-	    Reference2DoubleOpenHashMap<Index> index2Weight = new Reference2DoubleOpenHashMap<Index>();
-	    indexMap = loadIndicesFromSpec(indexBasenames, context.getLoadDocumentSizes(), documentCollection, index2Weight,
-		    context.getLoadDocumentSizes(), map);
-	} catch (Exception e) {
-	    throw new IllegalArgumentException(e);
+	if (!indexMap.containsKey(PREDICATE_INDEX_KEY)) {
+	    throw new IllegalStateException("No predicates index found.");
 	}
-
-	LOGGER.info("Loaded " + indexBasenames.length + " indices.");
-
-	if (context != null && context.getSubjectIndex() != null) {
-	    indexIdfs = (BitStreamIndex) indexMap.get(context.getSubjectIndex());
-	    if (indexIdfs == null) {
-		// could always load sizes!
-		try {
-		    LOGGER.info("Loading token index.");
-		    indexIdfs = (BitStreamIndex) DiskBasedIndex.getInstance(context.getSubjectIndex(), true, true, true, map);
-		} catch (Exception e) {
-		    throw new RuntimeException(e);
-
-		}
-		indexMap.put(subjectField, indexIdfs);
-	    }
+	if (!indexMap.containsKey(OBJECT_INDEX_KEY)) {
+	    throw new IllegalStateException("No objects index found.");
+	}
+	if (!indexMap.containsKey(CONTEXT_INDEX_KEY)) {
+	    LOGGER.info("No context index found.");
 	}
 
 	// Load vertical field list (the encoded predicates)
-	if (context != null && context.getFieldList() != null) {
-	    fields = new ArrayList<String>();
-	    LOGGER.info("Loading field list from " + context.getFieldList());
-	    for (MutableString line : new FileLinesCollection(context.getFieldList(), "UTF-8")) {
-		fields.add(Util.encodeFieldName(line.toString()));
-	    }
-	}
-
-	// Load the alignment index
-	try {
-	    LOGGER.info("Loading alignment index from " + context.getAlignmentIndex());
-	    precompIndex = Index.getInstance(context.getAlignmentIndex() + "?mapped=1");
-	} catch (Exception e) {
-	    LOGGER.error("Failed to load alignment index", e);
-	}
-
-	// Load the predicate index
-	try {
-	    LOGGER.info("Loading predicate index from " + context.getPredicateIndex());
-	    predicateIndex = Index.getInstance(context.getPredicateIndex() + "?mapped=1");
-	} catch (Exception e) {
-	    throw new IllegalArgumentException(e);
-	}
+	// if (context.getFieldList() != null) {
+	// fields = new ArrayList<String>();
+	// LOGGER.info("Loading field list from " + context.getFieldList());
+	// for (MutableString line : new
+	// FileLinesCollection(context.getFieldList(), "UTF-8")) {
+	// fields.add(Util.encodeFieldName(line.toString()));
+	// }
+	// }
 
 	// Loading frequencies
-	if (context != null && context.getSubjectIndex() != null) {
-	    try {
-		LOGGER.info("Loading frequencies from " + context.getSubjectIndex() + DiskBasedIndex.FREQUENCIES_EXTENSION);
-		frequencies = new SemiExternalGammaList(new InputBitStream(context.getSubjectIndex() + DiskBasedIndex.FREQUENCIES_EXTENSION), 1,
-			indexIdfs.termMap.size());
-		if (frequencies.size() != indexIdfs.numberOfDocuments) {
-		    LOGGER.warn("Loaded " + frequencies.size() + " frequency values but index_idfs.numberOfDocuments is " + indexIdfs.numberOfDocuments);
-		}
-	    } catch (Exception e) {
-		LOGGER.error("Failed to load token index: " + context.getSubjectIndex());
-		throw new IllegalArgumentException(e);
+	Index subjectIndex = indexMap.get(SUBJECT_INDEX_KEY);
+	String filename = (String) subjectIndex.properties.getProperty(BASENAME_INDEX_PROPERTY_KEY);
+	filename += DiskBasedIndex.FREQUENCIES_EXTENSION;
+	try {
+	    LOGGER.info("Loading frequencies from " + filename);
+	    frequencies = new SemiExternalGammaList(new InputBitStream(filename), 1, subjectIndex.numberOfTerms);
+	    if (frequencies.size() != subjectIndex.numberOfDocuments) {
+		LOGGER.warn("Loaded " + frequencies.size() + " frequency values but subject.numberOfDocuments is " + subjectIndex.numberOfDocuments);
 	    }
-	} else {
-	    LOGGER.warn("Token index is null");
+	} catch (Exception e) {
+	    throw new IllegalArgumentException("Failed to load frequences for subject index from " + filename, e);
 	}
 
 	// This is empty for non-payload indices
-	final Reference2ReferenceMap<Index, Object> index2Parser = new Reference2ReferenceOpenHashMap<Index, Object>();
-
-	queryEngine = new QueryEngine(null, // we will only pass in parsed
-					    // queries
-		new DocumentIteratorBuilderVisitor(indexMap, index2Parser, indexMap.get(((Object2ReferenceLinkedOpenHashMap<String, Index>) indexMap)
-			.firstKey()), MAX_STEMMING), indexMap);
+	Reference2ReferenceMap<Index, Object> index2Parser = new Reference2ReferenceOpenHashMap<Index, Object>();
+	DocumentIteratorBuilderVisitor builderVisitor = new DocumentIteratorBuilderVisitor(indexMap, index2Parser, subjectIndex, MAX_STEMMING);
+	// QueryParser is null as we will only pass in parsed queries
+	queryEngine = new QueryEngine(null, builderVisitor, indexMap);
 
 	// We set up an interval selector only if there is a collection for
 	// snippeting
@@ -324,15 +290,11 @@ public class RDFIndex {
 	queryEngine.intervalSelector = null;
 
 	// Load priors
-	if (context != null && context.getPathToDocumentPriors() != null) {
-	    LOGGER.info("Loading priors from " + context.getPathToDocumentPriors());
-	    try {
-		documentPriors = (HashMap<Integer, Integer>) BinIO.loadObject(context.getPathToDocumentPriors());
-	    } catch (Exception e) {
-		LOGGER.warn("Failed to load priors", e);
-	    }
+	documentPriors = loadObjectOfType(context.getDocumentPriorsFile());
+	if (documentPriors != null) {
+	    LOGGER.info("Loaded priors from " + context.getDocumentPriorsFile());
 	} else {
-	    LOGGER.info("Path to priors is null");
+	    LOGGER.info("Path to priors is null. None loaded.");
 	}
 
 	// Sets field weight and scorer
@@ -345,8 +307,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), "subject", termProcessors,
-		getAllResourcesMap());
+	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), SUBJECT_INDEX_KEY, termProcessors, getAllResourcesMap());
 
 	// Compute stats
 	try {
@@ -375,6 +336,37 @@ public class RDFIndex {
 
     }
 
+    private Object2ReferenceMap<String, Index> loadIndexesFromDir(File indexDir, boolean loadDocSizes, boolean inMemory) throws RDFIndexException {
+	EnumMap<UriKeys, String> indexOptionsmap = new EnumMap<UriKeys, String>(UriKeys.class);
+	if (inMemory) {
+	    indexOptionsmap.put(UriKeys.INMEMORY, "true");
+	} else {
+	    indexOptionsmap.put(UriKeys.MAPPED, "true");
+	}
+
+	// List .properties files in index directory
+	File[] propertiesFiles = indexDir.listFiles(new FilenameFilter() {
+	    public boolean accept(File dir, String name) {
+		return name.endsWith(".properties");
+	    }
+	});
+
+	List<String> indexBasenames = new ArrayList<String>();
+
+	for (int i = 0; i < propertiesFiles.length; i++) {
+	    String baseName = propertiesFiles[i].getName();
+	    baseName = baseName.substring(0, baseName.lastIndexOf('.'));
+	    if (ALIGNMENT_INDEX_KEY.equals(baseName)) {
+		continue;
+	    }
+	    LOGGER.info("Loading vertical index: '" + baseName + "'");
+	    indexBasenames.add(new File(indexDir, baseName).getPath());
+	}
+
+	Reference2DoubleOpenHashMap<Index> index2Weight = new Reference2DoubleOpenHashMap<Index>();
+	return loadIndicesFromSpec(indexBasenames, documentCollection, index2Weight, loadDocSizes, indexOptionsmap);
+    }
+
     /**
      * Parses a given array of index URIs/weights, loading the correspoding
      * indices and writing the result of parsing in the given maps.
@@ -396,44 +388,48 @@ public class RDFIndex {
      *            an empty, writable map that will be filled with a map from
      *            indices to respective weights.
      */
-    protected Object2ReferenceMap<String, Index> loadIndicesFromSpec(final String[] indexBasenames, boolean loadSizes,
-	    final DocumentCollection documentCollection, final Reference2DoubleMap<Index> index2Weight, boolean sizes, EnumMap<UriKeys, String> map)
-	    throws IOException, ConfigurationException, URISyntaxException, ClassNotFoundException, SecurityException, InstantiationException,
-	    IllegalAccessException, InvocationTargetException, NoSuchMethodException {
+    protected Object2ReferenceMap<String, Index> loadIndicesFromSpec(final List<String> indexBasenames, final DocumentCollection documentCollection,
+	    final Reference2DoubleMap<Index> index2Weight, boolean documentSizes, EnumMap<UriKeys, String> map) throws RDFIndexException {
 
 	Object2ReferenceLinkedOpenHashMap<String, Index> name2Index = new Object2ReferenceLinkedOpenHashMap<String, Index>(Hash.DEFAULT_INITIAL_SIZE, .5f);
 
-	for (int i = 0; i < indexBasenames.length; i++) {
-
+	for (String indexBasename : indexBasenames) {
 	    // We must be careful, as ":" is used by Windows to separate the
 	    // device from the path.
-	    final int split = indexBasenames[i].lastIndexOf(':');
+	    final int split = indexBasename.lastIndexOf(':');
 	    double weight = 1;
 
 	    if (split != -1) {
 		try {
-		    weight = Double.parseDouble(indexBasenames[i].substring(split + 1));
+		    weight = Double.parseDouble(indexBasename.substring(split + 1));
 		} catch (NumberFormatException e) {
 		}
 	    }
 
 	    final Index index;
 
-	    if (split == -1 || indexBasenames[i].startsWith("mg4j://")) {
+	    if (split == -1 || indexBasename.startsWith("mg4j://")) {
 		// index = Index.getInstance(basenameWeight[i], true,
 		// loadSizes);
 
 		// System.out.println("BASENAME: " + basenameWeight[i]);
 		try {
-		    index = (BitStreamIndex) DiskBasedIndex.getInstance(indexBasenames[i], true, sizes, true, map);
+		    index = DiskBasedIndex.getInstance(indexBasename, true, documentSizes, true, map);
 		    index2Weight.put(index, 1);
 		} catch (ArrayIndexOutOfBoundsException e) {
 		    // Empty index
-		    System.err.println("Failed to open index: " + indexBasenames[i]);
+		    System.err.println("Failed to open index: " + indexBasename);
 		    continue;
+		} catch (Exception e) {
+		    throw new RDFIndexException(e);
 		}
+		index.properties.setProperty(BASENAME_INDEX_PROPERTY_KEY, indexBasename);
 	    } else {
-		index = (BitStreamIndex) DiskBasedIndex.getInstance(indexBasenames[i], true, sizes, true, map);
+		try {
+		    index = DiskBasedIndex.getInstance(indexBasename, true, documentSizes, true, map);
+		} catch (Exception e) {
+		    throw new RDFIndexException(e);
+		}
 		// index = Index.getInstance(basenameWeight[i].substring(0,
 		// split));
 		index2Weight.put(index, weight);
@@ -446,7 +442,7 @@ public class RDFIndex {
 	     * " documents, but the document collection has size " +
 	     * documentCollection.size());
 	     */
-	    name2Index.put(index.field != null ? index.field : indexBasenames[i], index);
+	    name2Index.put(index.field != null ? index.field : indexBasename, index);
 	}
 	return name2Index;
     }
@@ -460,7 +456,7 @@ public class RDFIndex {
 	    // TODO load from file if needed
 	    b.put(getField(indexName), db);
 	}
-	b.put(indexIdfs, db);
+	b.put(queryEngine.indexMap.get(SUBJECT_INDEX_KEY), db);
 	return b;
     }
 
@@ -474,24 +470,22 @@ public class RDFIndex {
     private Reference2DoubleOpenHashMap<Index> loadWeights(Context context) {
 	Reference2DoubleOpenHashMap<Index> index2Weight = new Reference2DoubleOpenHashMap<Index>();
 
-	Object2ReferenceMap<String, Index> indexMap = queryEngine.indexMap;
-
-	for (String index : indexMap.keySet()) {
-	    String w = context.getString("w." + index);
+	ObjectSet<String> indexNames = queryEngine.indexMap.keySet();
+	for (String indexName : indexNames) {
+	    Index index = queryEngine.indexMap.get(indexName);
+	    String w = context.getString("w." + indexName);
 	    if (w == null) { // unimportant
-		index2Weight.put((Index) indexMap.get(index), context.getwf_unimportant() * indexMap.keySet().size());
+		index2Weight.put(index, context.getWfUnimportant() * indexNames.size());
 	    } else {
 		if (w.equals(SetDocumentPriors.IMPORTANT))
-		    index2Weight.put((Index) indexMap.get(index), context.getwf_important() * indexMap.keySet().size());
+		    index2Weight.put(index, context.getWfImportant() * indexNames.size());
 		else if (w.equals(SetDocumentPriors.UNIMPORTANT))
-		    index2Weight.put((Index) indexMap.get(index), context.getwf_unimportant() * indexMap.keySet().size());
+		    index2Weight.put(index, context.getWfUnimportant() * indexNames.size());
 		else if (w.equals(SetDocumentPriors.NEUTRAL))
-		    index2Weight.put((Index) indexMap.get(index), context.getwf_neutral() * indexMap.keySet().size());
+		    index2Weight.put(index, context.getWfNeutral() * indexNames.size());
 	    }
 	}
-	if (context.getSubjectIndex() != null) {
-	    index2Weight.put((Index) indexMap.get(context.getSubjectIndex()), context.getSubjectWeight() * indexMap.keySet().size());
-	}
+	
 	// System.out.println("Final weights:"+index2Weight);
 	return index2Weight;
     }
@@ -501,14 +495,20 @@ public class RDFIndex {
 	Reference2DoubleOpenHashMap<Index> bByIndex = loadB(context);
 
 	double[] documentWeights = new double[3];
-	documentWeights[Integer.parseInt(SetDocumentPriors.IMPORTANT)] = context.getws_important();
-	documentWeights[Integer.parseInt(SetDocumentPriors.UNIMPORTANT)] = context.getws_unimportant();
-	documentWeights[Integer.parseInt(SetDocumentPriors.NEUTRAL)] = context.getws_neutral();
+	documentWeights[Integer.parseInt(SetDocumentPriors.IMPORTANT)] = context.getWsImportant();
+	documentWeights[Integer.parseInt(SetDocumentPriors.UNIMPORTANT)] = context.getWsUnimportant();
+	documentWeights[Integer.parseInt(SetDocumentPriors.NEUTRAL)] = context.getWsNeutral();
 
-	return new WOOScorer(context.getK1(), bByIndex, indexIdfs.termMap, frequencies, indexIdfs.sizes, (double) indexIdfs.numberOfOccurrences
-		/ indexIdfs.numberOfDocuments, indexIdfs.numberOfDocuments, context.getw_matches(), documentWeights, context.getdl_cutoff(), documentPriors,
-		context.getmax_number_of_fields_norm());
-
+	StringMap<? extends CharSequence> subjectTermMap;
+	Index subjectIndex = getSubjectIndex();
+	if (subjectIndex instanceof BitStreamIndex) {
+	    subjectTermMap = ((BitStreamIndex) subjectIndex).termMap;
+	} else {
+	    throw new IllegalStateException("Subject index is not a BitStreamIndex. Don't know how to get its termMap.");
+	}
+	return new WOOScorer(context.getK1(), bByIndex, subjectTermMap, frequencies, subjectIndex.sizes, (double) subjectIndex.numberOfOccurrences
+		/ subjectIndex.numberOfDocuments, subjectIndex.numberOfDocuments, context.getWMatches(), documentWeights, context.getDlCutoff(), documentPriors,
+		context.getMaxNumberOfDieldsNorm());
     }
 
     /**
@@ -538,6 +538,10 @@ public class RDFIndex {
 
     }
 
+    private Index getSubjectIndex() {
+	return queryEngine.indexMap.get(SUBJECT_INDEX_KEY);
+    }
+
     /**
      * The indexed fields, including the token and uri fields of the horizontal
      * index.
@@ -560,8 +564,8 @@ public class RDFIndex {
 	return fields;
     }
 
-    public BitStreamIndex getField(String alias) {
-	return (BitStreamIndex) queryEngine.indexMap.get(alias);
+    public Index getField(String alias) {
+	return queryEngine.indexMap.get(alias);
     }
 
     public long getDocID(String uri) {
@@ -572,12 +576,8 @@ public class RDFIndex {
 	return documentCollection;
     }
 
-    public BitStreamIndex getPredicateIndex() {
-	return (BitStreamIndex) predicateIndex;
-    }
-
-    public BitStreamIndex getAlignmentIndex() {
-	return (BitStreamIndex) precompIndex;
+    public Index getAlignmentIndex() {
+	return alignmentIndex;
     }
 
     public Object2LongFunction<CharSequence> getAllResourcesMap() {
@@ -585,7 +585,7 @@ public class RDFIndex {
     }
 
     public String getDefaultField() {
-	return subjectField;
+	return SUBJECT_INDEX_KEY;
     }
 
     public String getTitle(int id) throws IOException {
@@ -627,7 +627,50 @@ public class RDFIndex {
 	return queryLogger;
     }
 
-    public BitStreamIndex getIndexIdfs() {
-	return indexIdfs;
+    public Index getIndexIdfs() {
+	return queryEngine.indexMap.get(SUBJECT_INDEX_KEY);
     }
+
+    public Map<String, Integer> getPredicateTermDistribution() throws IOException {
+	return getTermDistribution(queryEngine.indexMap.get(PREDICATE_INDEX_KEY));
+    }
+
+    public Map<String, Integer> getTypeTermDistribution() throws IOException {
+	Index typeField = getField(TYPE_INDEX);
+	if (typeField == null) {
+	    return Collections.emptyMap();
+	} else {
+	    return getTermDistribution(typeField);
+	}
+    }
+
+    private static Map<String, Integer> getTermDistribution(Index index) throws IOException {
+	if (index instanceof BitStreamIndex) {
+	    StringMap<? extends CharSequence> termMap = ((BitStreamIndex) index).termMap;
+
+	    Map<String, Integer> histogram = new HashMap<String, Integer>();
+
+	    for (CharSequence term : termMap.list()) {
+		long id = termMap.get(term);
+		IndexIterator it = index.documents(((int) id));
+		histogram.put(term.toString(), it.frequency());
+		it.dispose();
+	    }
+	    return histogram;
+	}
+	throw new IllegalArgumentException("Index is not a BitStreamIndex");
+    }
+
+    public static class RDFIndexException extends Exception {
+	private static final long serialVersionUID = -6825941506094477867L;
+
+	public RDFIndexException(Exception e) {
+	    super(e);
+	}
+	
+	public RDFIndexException(String message, Exception e) {
+	    super(message, e);
+	}
+    }
+
 }

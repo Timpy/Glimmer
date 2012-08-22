@@ -20,6 +20,7 @@ import javax.annotation.PreDestroy;
 
 import com.yahoo.glimmer.query.Context;
 import com.yahoo.glimmer.query.RDFIndex;
+import com.yahoo.glimmer.query.RDFIndex.RDFIndexException;
 
 public class IndexMap extends HashMap<String, RDFIndex> {
     private static final long serialVersionUID = -2657141430471199765L;
@@ -35,40 +36,37 @@ public class IndexMap extends HashMap<String, RDFIndex> {
     }
 
     @PostConstruct
-    public void load() throws IOException {
+    public void load() throws IOException, RDFIndexException {
 	Context context = new Context(configFilename);
 
-	if (context.getMultiIndexPath() == null) {
+	File multiIndexPath = context.getMultiIndexPath();
+	if (multiIndexPath == null) {
 	    // Single index, index.path property must be present
 	    RDFIndex index = new RDFIndex(context);
-	    put(context.getPathToIndex(), index);
+	    put(context.getKbRootPath().getName(), index);
 	} else {
 	    // Multiple indices under a root directory
 	    // In this case the config file is a template that we copy and configure for
 	    // each index
-	    File indexedDir = new File(context.getMultiIndexPath());
-	    if (!indexedDir.exists()) {
-		throw new RuntimeException("The multiindex path " + context.getMultiIndexPath() + " does not exist.");
+	    if (!multiIndexPath.exists()) {
+		throw new RuntimeException("The multiindex path " + multiIndexPath + " does not exist.");
 	    }
-	    if (!indexedDir.isDirectory()) {
-		throw new RuntimeException("The multiindex path " + context.getMultiIndexPath() + " is not a directory.");
+	    if (!multiIndexPath.isDirectory()) {
+		throw new RuntimeException("The multiindex path " + multiIndexPath + " is not a directory.");
 	    }
 	    String multiIndexDirPrefix = context.getMultiIndexDirPrefix();
-	    if (multiIndexDirPrefix == null || multiIndexDirPrefix.isEmpty()) {
-		throw new RuntimeException("Please set " + Context.MULTIINDEX_DIR_PREFIX_KEY + " in the config properties file");
-	    }
-	    for (File file : new File(context.getMultiIndexPath()).listFiles()) {
+	    for (File file : multiIndexPath.listFiles()) {
 		String filename = file.getName();
 		if (file.isDirectory() && filename.matches(multiIndexDirPrefix + "\\w+")) {
 		    String indexName = filename.substring(multiIndexDirPrefix.length());
 		    Context contextCopy = new Context(context);
-		    contextCopy.setIndexPath(file.getAbsolutePath());
+		    contextCopy.setKbRootPath(file);
 		    RDFIndex index = new RDFIndex(contextCopy);
 		    put(indexName, index);
 		}
 	    }
 	    if (isEmpty()) {
-		throw new RuntimeException("No indexed directories found in " + indexedDir.getAbsoluteFile() + " with prefixes of " + multiIndexDirPrefix);
+		throw new RuntimeException("No indexed directories found in " + multiIndexPath.getPath() + " with prefixes of " + multiIndexDirPrefix);
 	    }
 	}
     }

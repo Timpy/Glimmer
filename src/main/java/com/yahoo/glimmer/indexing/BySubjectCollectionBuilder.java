@@ -17,7 +17,6 @@ import it.unimi.dsi.mg4j.document.HdfsSimpleCompressedDocumentCollectionBuilder;
 import it.unimi.dsi.mg4j.document.IdentityDocumentFactory;
 
 import java.io.IOException;
-import java.io.StringReader;
 
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,17 +34,20 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
+import com.yahoo.glimmer.util.BySubjectRecord;
+
 public class BySubjectCollectionBuilder extends Configured implements Tool {
     public static class MapClass extends Mapper<LongWritable, Text, MutableString, MutableString> {
+	
 	private final MutableString word = new MutableString();
 	private final MutableString nonWord = new MutableString();
+	private BySubjectRecord bySubjectParser = new BySubjectRecord();
+	FastBufferedReader fbr = new FastBufferedReader();
 	private static int count;
+	private int docId;
 
 	@Override
 	public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-
-	    String nextLine = value.toString();
-
 	    if (count++ % 100000 == 0) {
 		System.out.println("Processed " + count + " lines.");
 
@@ -66,21 +68,28 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 		System.out.println("Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
 
 	    }
-
-	    int indexOfFirstTab = nextLine.indexOf('\t');
-	    String url = nextLine.substring(0, indexOfFirstTab);
-	    String doc = nextLine.substring(indexOfFirstTab + 1);
 	    
-	    word.append(url);
+	    bySubjectParser.parse(value);
+	    
+	    // Start new doc.  
+	    // As the doc id's must me the same as the values from the ALL resources hash they are not consecutive.
+	    // We need to create 'empty docs' for the ALL resource hash values that aren't subjects.
+	    while (docId < bySubjectParser.getId()) {
+		context.write(word, word);
+		docId++;
+	    }
+	    word.append(bySubjectParser.getSubject());
 	    context.write(word, word);
 
-	    FastBufferedReader fbr = new FastBufferedReader(new StringReader(doc));
+	    fbr.setReader(bySubjectParser.getRelationsReader());
 	    while (fbr.next(word, nonWord)) {
 		context.write(word, nonWord);
 	    }
 
+	    // End Doc.
 	    word.setLength(0);
 	    context.write(word, word);
+	    docId++;
 	}
     }
 
@@ -98,10 +107,16 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	@Override
 	public void write(MutableString key, MutableString value) throws IOException, InterruptedException {
 	    if (key.length() == 0 && value.length() == 0) {
-		// End last doc.
-		builder.endTextField();
-		builder.endDocument();
-		newDoc = true;
+		if (newDoc) {
+		    // Empty doc.
+		    builder.startDocument("","");
+		    builder.endDocument();
+		} else {
+		    // End last doc.
+		    builder.endTextField();
+		    builder.endDocument();
+		    newDoc = true;
+		}
 	    } else if (newDoc) {
 		newDoc = false;
 		builder.startDocument(key.toString(), value.toString());

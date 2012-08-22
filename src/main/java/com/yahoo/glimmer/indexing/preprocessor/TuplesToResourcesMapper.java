@@ -46,7 +46,7 @@ import org.semanticweb.yars.nx.parser.ParseException;
  * http://context/ CONTEXT
  * 
  */
-public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Text> {
+public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Object> {
     private static final Log LOG = LogFactory.getLog(TuplesToResourcesMapper.class);
     private static final int MAX_NODES = 5; // Our Any23 extractions include a 5
 					    // Literal which is the extractor
@@ -75,7 +75,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
 
     private InputSplit lastInputSplit;
 
-    protected void setup(Mapper<LongWritable, Text, Text, Text>.Context context) throws java.io.IOException, InterruptedException {
+    protected void setup(Mapper<LongWritable, Text, Text, Object>.Context context) throws java.io.IOException, InterruptedException {
 	Configuration conf = context.getConfiguration();
 	boolean includeContexts = conf.getBoolean(INCLUDE_CONTEXTS_KEY, true);
 	setIncludeContexts(includeContexts);
@@ -119,7 +119,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Te
     }
 
     @Override
-    protected void map(LongWritable key, Text valueText, Mapper<LongWritable, Text, Text, Text>.Context context) throws java.io.IOException,
+    protected void map(LongWritable key, Text valueText, Mapper<LongWritable, Text, Text, Object>.Context context) throws java.io.IOException,
 	    InterruptedException {
 
 	if (!context.getInputSplit().equals(lastInputSplit)) {

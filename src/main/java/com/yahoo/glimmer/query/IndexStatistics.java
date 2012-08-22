@@ -29,6 +29,7 @@ import org.semanticweb.owlapi.model.OWLProperty;
 import com.yahoo.glimmer.vocabulary.OwlUtils;
 
 public class IndexStatistics {
+    protected String nameSpace;
 
     // Fields of the index
     protected List<String> fields = new ArrayList<String>();
@@ -73,11 +74,9 @@ public class IndexStatistics {
 	}
     }
 
-    public final static String TYPE_INDEX = "http_www_w3_org_1999_02_22_rdf_syntax_ns_type";
-
     public IndexStatistics(RDFIndex index) throws IOException {
 	// Order the fields by frequency
-	final Map<String, Integer> fieldDist = com.yahoo.glimmer.query.Util.getTermDistribution(index.getPredicateIndex());
+	final Map<String, Integer> fieldDist = index.getPredicateTermDistribution();
 	fields = new ArrayList<String>(fieldDist.keySet());
 	Collections.sort(fields, new Comparator<String>() {
 	    @Override
@@ -94,11 +93,9 @@ public class IndexStatistics {
 	}
 
 	// Capture basic statistics about class frequency
-	if (index.getIndexedFields().contains(TYPE_INDEX)) {
-	    Map<String, Integer> classDist = Util.getTermDistribution(index.getField(TYPE_INDEX));
-	    for (String clazzName : classDist.keySet()) {
-		classes.put(removeVersion(clazzName), new ClassStat(classDist.get(clazzName)));
-	    }
+	Map<String, Integer> classDist = index.getTypeTermDistribution();
+	for (String clazzName : classDist.keySet()) {
+	    classes.put(removeVersion(clazzName), new ClassStat(classDist.get(clazzName)));
 	}
     }
 
@@ -141,8 +138,8 @@ public class IndexStatistics {
     
     private String removeVersion(String uri) {
 	// HACK: second part we shouldn't need
-	String result = uri.replaceFirst("[0-9]+\\.[0-9]+\\.[0-9]+\\/", "");
-	result = result.replaceFirst("[0-9]+_[0-9]_+[0-9]+_", "");
-	return result;
+	uri = uri.replaceFirst("[0-9]+\\.[0-9]+\\.[0-9]+\\/", "");
+	uri = uri.replaceFirst("[0-9]+_[0-9]_+[0-9]+_", "");
+	return uri;
     }
 }

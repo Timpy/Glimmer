@@ -11,6 +11,7 @@ package com.yahoo.glimmer.indexing.preprocessor;
  *  See accompanying LICENSE file.
  */
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -29,22 +30,34 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 
+import com.yahoo.glimmer.util.BySubjectRecord;
+
 /**
  * Writes to different output files depending on the contents of the value.
  * 
  * @author tep
  * 
  */
-public class ResourceRecordWriter extends RecordWriter<Text, Text> {
-    private static final char BY_SUBJECT_DELIMITER = '\t';
-
+public class ResourceRecordWriter extends RecordWriter<Text, Object> {
     public static enum OUTPUT {
-	ALL("all"), BY_SUBJECT("bySubject"), CONTEXT("contexts"), OBJECT("objects"), PREDICATE("predicates"), SUBJECT("subjects");
+	ALL("all", false), BY_SUBJECT("bySubject", false), CONTEXT("contexts", false), OBJECT("objects", false), PREDICATE("predicates", true), SUBJECT("subjects", false);
 
 	final String filename;
+	final boolean includeCounts;
 
-	private OUTPUT(String filename) {
+	private OUTPUT(String filename, boolean includeCounts) {
+	    this.includeCounts = includeCounts;
 	    this.filename = filename;
+	}
+    }
+
+    public static class OutputCount {
+	public OUTPUT output;
+	public int count;
+	
+	@Override
+	public String toString() {
+	    return (output == null ? null : output.toString()) + "(" + count + ")";
 	}
     }
 
@@ -66,7 +79,7 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 		Path file = new Path(taskWorkPath, output.filename);
 		out = fs.create(file, false);
 	    }
-	    writersMap.put(output, new OutputStreamWriter(out, Charset.forName("UTF-8")));
+	    writersMap.put(output, new BufferedWriter(new OutputStreamWriter(out, Charset.forName("UTF-8"))));
 	}
     }
 
@@ -75,42 +88,37 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
      *            A resource as an unquoted string.
      * @param value
      *            VALUE_DELIMITER separated <predicate> <object> <context> .
-     *            string or one of 'ALL' 'PREDICATE' 'OBJECT' or 'CONTEXT' depending
-     *            on where the key should be written.
+     *            string or one of 'ALL' 'PREDICATE' 'OBJECT' or 'CONTEXT'
+     *            depending on where the key should be written.
      */
     @Override
-    public void write(Text key, Text value) throws IOException, InterruptedException {
+    public void write(Text key, Object value) throws IOException, InterruptedException {
 	String keyString = key.toString();
-	String valueString = value.toString();
 
-	if (OUTPUT.ALL.name().equals(valueString)) {
-	    Writer allWriter = writersMap.get(OUTPUT.ALL);
-	    allWriter.write(keyString);
-	    allWriter.write('\n');
-	} else if (valueString.startsWith(OUTPUT.PREDICATE.name())) {
-	    Writer predicateWriter = writersMap.get(OUTPUT.PREDICATE);
-	    predicateWriter.write(valueString.substring(OUTPUT.PREDICATE.name().length() + 1));
-	    predicateWriter.write('\t');
-	    predicateWriter.write(keyString);
-	    predicateWriter.write('\n');
-	} else if (OUTPUT.OBJECT.name().equals(valueString)) {
-	    Writer objectWriter = writersMap.get(OUTPUT.OBJECT);
-	    objectWriter.write(keyString);
-	    objectWriter.write('\n');
-	} else if (OUTPUT.CONTEXT.name().equals(valueString)) {
-	    Writer contextWriter = writersMap.get(OUTPUT.CONTEXT);
-	    contextWriter.write(keyString);
-	    contextWriter.write('\n');
-	} else {
-	    // SUBJECT
+	if (value instanceof OutputCount) {
+	    OutputCount outputCount = (OutputCount) value;
+
+	    Writer writer = writersMap.get(outputCount.output);
+
+	    if (outputCount.output.includeCounts) {
+		writer.write(Integer.toString(outputCount.count));
+		writer.write('\t');
+	    }
+	    writer.write(keyString);
+	    writer.write('\n');
+	    
+	} else if (value instanceof BySubjectRecord) {
+	    BySubjectRecord record = (BySubjectRecord) value;
 	    Writer subjectWriter = writersMap.get(OUTPUT.SUBJECT);
+	    
+	    // SUBJECT
 	    subjectWriter.write(keyString);
 	    subjectWriter.write('\n');
-	    Writer bySubjectWriter = writersMap.get(OUTPUT.BY_SUBJECT);
-	    bySubjectWriter.write(keyString);
-	    bySubjectWriter.write(BY_SUBJECT_DELIMITER);
-	    bySubjectWriter.write(valueString);
-	    bySubjectWriter.write('\n');
+	    
+	    // bySubject
+	    record.writeTo(writersMap.get(OUTPUT.BY_SUBJECT));
+	} else {
+	    throw new IllegalArgumentException("Don't know how to write a " + value.getClass().getSimpleName());
 	}
     }
 
@@ -121,9 +129,9 @@ public class ResourceRecordWriter extends RecordWriter<Text, Text> {
 	}
     }
 
-    public static class OutputFormat extends FileOutputFormat<Text, Text> {
+    public static class OutputFormat extends FileOutputFormat<Text, Object> {
 	@Override
-	public RecordWriter<Text, Text> getRecordWriter(TaskAttemptContext job) throws IOException, InterruptedException {
+	public RecordWriter<Text, Object> getRecordWriter(TaskAttemptContext job) throws IOException, InterruptedException {
 	    Path taskWorkPath = getDefaultWorkFile(job, "");
 	    Configuration conf = job.getConfiguration();
 	    CompressionCodec outputCompressionCodec = null;
