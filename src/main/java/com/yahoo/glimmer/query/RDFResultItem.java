@@ -12,11 +12,14 @@ package com.yahoo.glimmer.query;
  */
 
 import it.unimi.dsi.fastutil.objects.Object2LongFunction;
+import it.unimi.dsi.io.WordReader;
+import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.mg4j.document.Document;
 import it.unimi.dsi.mg4j.document.DocumentCollection;
 import it.unimi.dsi.mg4j.query.ResultItem;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -98,7 +101,7 @@ public class RDFResultItem extends ResultItem {
 	    } else {
 		subject = new BNode(titleString);
 	    }
-	    parseData(subject, Util.getText(d).toString(), fieldNames);
+	    parseData(subject, getText(d).toString(), fieldNames);
 	    d.close();
 	} else {
 	    title = "Document #" + doc;
@@ -258,5 +261,25 @@ public class RDFResultItem extends ResultItem {
 	    sb.append(quad.triple.getSubject() + " " + quad.triple.getPredicate() + " " + quad.triple.getObject() + " " + quad.source + "\n");
 	}
 	return sb.toString();
+    }
+    
+    public static String getText(Document d) throws IOException {
+
+	// should depend on the factory and the factory fields, but the
+	// collection we have has only one field - > spit it all
+	Reader r = (Reader) d.content(0);
+	WordReader rr = d.wordReader(0).setReader(r);
+	MutableString text = new MutableString();
+	MutableString word = new MutableString(), nonWord = new MutableString();
+	try {
+	    while (rr.next(word, nonWord)) {
+		text.append(word);
+		text.append(nonWord);
+	    }
+	} catch (IOException e) {
+	    // throw new RuntimeException( e );
+	    e.printStackTrace();
+	}
+	return text.toString();
     }
 }

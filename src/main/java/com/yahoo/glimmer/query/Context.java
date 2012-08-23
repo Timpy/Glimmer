@@ -21,32 +21,33 @@ import java.util.Properties;
 
 public class Context extends Properties {
     private static final long serialVersionUID = 8416864704849882837L;
-    
+
     private static final String ALL_RESOURCES_MAP_KEY = "allResorcesMap";
-    
+    private static final String ALL_RESOURCES_KEY = "allResorces";
+
     private static final String MULTIINDEX_DIR_PREFIX_KEY = "multiindex.dirprefix";
     private static final String MULTIINDEX_PATH_KEY = "multiindex.path";
-    
+
     private static final String COLLECTION_KEY = "collection";
     private static final String VERTICAL_DIR_KEY = "vertical.dir";
     private static final String HORIZONTAL_DIR_KEY = "horizontal.dir";
     private static final String TITLE_LIST_KEY = "title.list";
-    
+
     private static final String ONTOLOGY_PATH_KEY = "ontology.path";
-    
+
     private static final String LOAD_INDEXES_IN_MEMORY_TAG = "indexes.in.memory";
     private static final String LOAD_DOC_SIZES_TAG = "load.doc.sizes";
-    
+
     private static final String DOCUMENT_PRIOR_FIELD_KEY = "prior.field";
     private static final String DOCUMENT_PRIOR_RULES_KEY = "prior.rules";
     private static final String DOCUMENT_PRIORS_KEY = "document.priors";
-    
+
     private static final String DL_CUTOFF_TAG = "dl.cutoff";
     private static final String KB_ROOT_PATH_KEY = "kb.root";
     private static final String K1_TAG = "k1";
     private static final String B_TAG = "b";
     private static final String MAX_NORM_TAG = "max.norm";
-    
+
     private static final String W_MATCHES_TAG = "w.matches";
     private static final String WF_IMPORTANT_TAG = "wf.important";
     private static final String WF_NEUTRAL_TAG = "wf.neutral";
@@ -71,64 +72,14 @@ public class Context extends Properties {
 	super.load(fs);
     }
 
-    public boolean getBoolean(String key, boolean defaultValue) {
-	String value = getProperty(key);
-	if (value == null) {
-	    return defaultValue;
-	}
-	return Boolean.parseBoolean(value);
-    }
-    public Boolean getBoolean(String key) {
-	String value = getProperty(key);
-	if (value == null) {
-	    return null;
-	}
-	return Boolean.parseBoolean(value);
-    }
-
-    private double getDouble(String key, double defaultValue) {
-	String value = getProperty(key);
-	if (value == null) {
-	    return defaultValue;
-	}
-	return Double.parseDouble(value);
-    }
-    public Double getDouble(String key) {
-	String value = getProperty(key);
-	if (value == null) {
-	    return null;
-	}
-	return Double.parseDouble(value);
-    }
-
-    private int getInt(String key, int defaultValue) {
-	String value = getProperty(key);
-	if (value == null) {
-	    return defaultValue;
-	}
-	return Integer.parseInt(value);
-    }
-    public Integer getInteger(String key) {
-	String value = getProperty(key);
-	if (value == null) {
-	    return null;
-	}
-	return Integer.parseInt(value);
-    }
-
-    public String getString(String key, String defaultValue) {
-	return getProperty(key, defaultValue);
-    }
-    public String getString(String key) {
-	return getProperty(key);
-    }
-    
-    
-    
     public File getAllResourcesMapFile() {
 	return getKbRootRelativeFile(getProperty(ALL_RESOURCES_MAP_KEY, "all.smap"));
     }
 
+    public File getAllResourcesFile() {
+	return getKbRootRelativeFile(getProperty(ALL_RESOURCES_KEY, "all.txt"));
+    }
+    
     public double getB() {
 	return getDouble(B_TAG, 0.75);
     }
@@ -136,12 +87,11 @@ public class Context extends Properties {
     public File getCollectionFile() {
 	return getKbRootRelativeFile(getProperty(COLLECTION_KEY, "collection"));
     }
-    
 
     public File getVerticalIndexDir() {
 	return getKbRootRelativeFile(getProperty(VERTICAL_DIR_KEY, "vertical"));
     }
-    
+
     public File getHorizontalIndexDir() {
 	return getKbRootRelativeFile(getProperty(HORIZONTAL_DIR_KEY, "horizontal"));
     }
@@ -190,8 +140,8 @@ public class Context extends Properties {
 	return new File(pathName);
     }
 
-    public String getOntoPath() {
-	return getProperty(ONTOLOGY_PATH_KEY);
+    public File getOntoPath() {
+	return new File(getProperty(ONTOLOGY_PATH_KEY));
     }
 
     public File getKbRootPath() {
@@ -201,7 +151,7 @@ public class Context extends Properties {
 	}
 	return new File(kbRootPath);
     }
-    
+
     public void setKbRootPath(File root) {
 	setProperty(KB_ROOT_PATH_KEY, root.getPath());
     }
@@ -247,5 +197,64 @@ public class Context extends Properties {
 	    return null;
 	}
 	return new File(kbRootPath, filename);
+    }
+
+    /*
+     * Generic getters only below..
+     */
+    public boolean getBoolean(String key, boolean defaultValue) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return defaultValue;
+	}
+	return Boolean.parseBoolean(value);
+    }
+
+    public Boolean getBoolean(String key) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return null;
+	}
+	return Boolean.parseBoolean(value);
+    }
+
+    public double getDouble(String key, double defaultValue) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return defaultValue;
+	}
+	return Double.parseDouble(value);
+    }
+
+    public Double getDouble(String key) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return null;
+	}
+	return Double.parseDouble(value);
+    }
+
+    private int getInt(String key, int defaultValue) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return defaultValue;
+	}
+	return Integer.parseInt(value);
+    }
+
+    public Integer getInteger(String key) {
+	String value = getProperty(key);
+	if (value == null) {
+	    return null;
+	}
+	return Integer.parseInt(value);
+    }
+
+    public String getString(String key, String defaultValue) {
+	return getProperty(key, defaultValue);
+    }
+
+    public String getString(String key) {
+	return getProperty(key);
     }
 }

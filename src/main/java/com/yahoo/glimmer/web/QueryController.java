@@ -32,12 +32,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import com.yahoo.glimmer.query.IndexStatistics;
 import com.yahoo.glimmer.query.QueryLogger;
 import com.yahoo.glimmer.query.RDFIndex;
+import com.yahoo.glimmer.query.RDFIndexStatistics;
 import com.yahoo.glimmer.query.RDFQueryResult;
 import com.yahoo.glimmer.query.RDFResultItem;
-import com.yahoo.glimmer.query.Util;
 
 @Controller()
 public class QueryController {
@@ -69,8 +68,33 @@ public class QueryController {
     
     @RequestMapping(value = "/indexStatistics", method = RequestMethod.GET)
     public Map<String, ?> getIndextStatistics(@ModelAttribute(INDEX_KEY) RDFIndex index, @RequestParam(required = false) String callback) {
-	IndexStatistics statistics = index.getStatistics();
+	RDFIndexStatistics statistics = index.getStatistics();
 	return Collections.singletonMap(OBJECT_KEY, statistics);
+    }
+
+    @RequestMapping(value = "/query", method = RequestMethod.GET)
+    public Map<String, ?> query(@ModelAttribute(INDEX_KEY) RDFIndex index, @Valid QueryCommand command) throws QueryParserException, QueryBuilderVisitorException, IOException {
+	String rawQuery;
+	Query query;
+	switch (command.getType()) {
+	case MG4J:
+	    rawQuery = decodeEntities(command.getQuery());
+	    query = new SimpleParser().parse(rawQuery);
+	    break;
+	case YAHOO:
+	    rawQuery = decodeEntities(command.getQuery());
+	    try {
+		query = index.getParser().parse(rawQuery);
+	    } catch (QueryParserException e) {
+		throw new HttpMessageNotReadableException("Query failed to parse");
+	    }
+	    break;
+	default:
+	    throw new HttpMessageNotReadableException("No query type given.");
+	}
+
+	RDFQueryResult result = querier.doQuery(index, query, command.getPageStart(), command.getPageSize(), command.isDeref());
+	return Collections.singletonMap(OBJECT_KEY, result);
     }
 
     @RequestMapping(value = "/getDocument", method = RequestMethod.GET)
@@ -121,29 +145,15 @@ public class QueryController {
 	return Collections.singletonMap(OBJECT_KEY, result);
     }
 
-    @RequestMapping(value = "/query", method = RequestMethod.GET)
-    public Map<String, ?> query(@ModelAttribute(INDEX_KEY) RDFIndex index, @Valid QueryCommand command) throws QueryParserException, QueryBuilderVisitorException, IOException {
-	String rawQuery;
-	Query query;
-	switch (command.getType()) {
-	case MG4J:
-	    rawQuery = Util.decodeEntities(command.getQuery());
-	    query = new SimpleParser().parse(rawQuery);
-	    break;
-	case YAHOO:
-	    rawQuery = Util.decodeEntities(command.getQuery());
-	    try {
-		query = index.getParser().parse(rawQuery);
-	    } catch (QueryParserException e) {
-		throw new HttpMessageNotReadableException("Query failed to parse");
-	    }
-	    break;
-	default:
-	    throw new HttpMessageNotReadableException("No query type given.");
+    public static String decodeEntities(String query) {
+	if (query == null || query.equals("")) {
+	    return null;
 	}
 
-	RDFQueryResult result = querier.doQuery(index, query, command.getPageStart(), command.getPageSize(), command.isDeref());
-	return Collections.singletonMap(OBJECT_KEY, result);
+	String result = query.replaceAll("&quot;", "\"");
+	result = result.replaceAll("&#39;", "'");
+	result = result.replaceAll("&#92;", "\\\\");
+	return result;
     }
 
     @Resource

@@ -11,6 +11,9 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.dsi.fastutil.objects.Object2LongFunction;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.mg4j.index.Index;
 import it.unimi.dsi.mg4j.index.IndexIterator;
 import it.unimi.dsi.mg4j.index.TermProcessor;
@@ -38,12 +41,9 @@ import it.unimi.dsi.mg4j.query.nodes.Weight;
 import it.unimi.dsi.mg4j.query.parser.QueryParser;
 import it.unimi.dsi.mg4j.query.parser.QueryParserException;
 import it.unimi.dsi.mg4j.query.parser.SimpleParser;
-import it.unimi.dsi.fastutil.objects.Object2LongFunction;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -59,37 +59,29 @@ public class RDFQueryParser implements QueryParser {
 
     private Index alignmentIndex;
     private List<String> properties;
-    private Set<String> fields;
+    private Map<String,String> fieldNameSuffixToFieldNameMap;
+    private Set<String> fieldNamesSet;
     private String defaultField;
     private Map<String, ? extends TermProcessor> termProcessors;
     private Object2LongFunction<CharSequence> resourcesMap;
     private final static Pattern RESOURCE_PATTERN = Pattern.compile("\\((http://.*)\\)");
+    private final static Pattern FIELD_NAME_PATTEN = Pattern.compile("(\\w+):");
 
-    public RDFQueryParser(RDFIndex index) {
-
-	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(index.getIndexedFields()
-		.size());
-	for (String alias : index.getIndexedFields())
-	    termProcessors.put(alias, index.getField(alias).termProcessor);
-
-	init(index.getAlignmentIndex(), index.getAllFields(), index.getIndexedFields(), index.getDefaultField(), termProcessors,
-		index.getAllResourcesMap());
-    }
-
-    public RDFQueryParser(Index alignmentIndex, List<String> properties, Set<String> fields, String defaultField,
+    public RDFQueryParser(Index alignmentIndex, List<String> properties, Map<String,String> fieldNameSuffixToFieldNameMap, String defaultField,
 	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> resourcesMap) {
-	init(alignmentIndex, properties, fields, defaultField, termProcessors, resourcesMap);
+	init(alignmentIndex, properties, new HashSet<String>(fieldNameSuffixToFieldNameMap.values()), fieldNameSuffixToFieldNameMap, defaultField, termProcessors, resourcesMap);
     }
 
-    protected void init(Index alignmentIndex, List<String> properties, Set<String> fields, String defaultField,
+    protected void init(Index alignmentIndex, List<String> properties, Set<String> fieldNamesSet, Map<String,String> fieldNameSuffixToFieldNameMap, String defaultField,
 	    final Map<String, ? extends TermProcessor> termProcessors, final Object2LongFunction<CharSequence> resourcesMap) {
 	this.alignmentIndex = alignmentIndex;
 	this.properties = properties;
-	this.fields = fields;
+	this.fieldNameSuffixToFieldNameMap = fieldNameSuffixToFieldNameMap;
+	this.fieldNamesSet = fieldNamesSet;
 	this.defaultField = defaultField;
 	this.termProcessors = termProcessors;
 	this.resourcesMap = resourcesMap;
-	parser = new SimpleParser(fields, defaultField, termProcessors);
+	parser = new SimpleParser(fieldNamesSet, defaultField, termProcessors);
     }
 
     public final static String cleanQuery(String query) {
@@ -136,14 +128,31 @@ public class RDFQueryParser implements QueryParser {
 
 	try {
 	    LOGGER.info("Unparsed query:" + unparsed);
-	    Matcher m = RESOURCE_PATTERN.matcher(unparsed);
-	    boolean result = m.find();
-	    if (result) {
+	    // Replace the short field names there corresponding field name.
+	    // name:tad -> http_xmlns_com_foaf_0_1_name:tad
+	    Matcher m = FIELD_NAME_PATTEN.matcher(unparsed);
+	    if (m.find()) {
+		StringBuffer sb = new StringBuffer();
+		do {
+		    String fieldName = m.group(1);
+		    String fullFieldName = fieldNameSuffixToFieldNameMap.get(fieldName);
+		    if (fullFieldName != null) {
+			m.appendReplacement(sb, fullFieldName);
+		    } else {
+			m.appendReplacement(sb, fieldName);
+		    }
+		    sb.append(':');
+		} while (m.find());
+		m.appendTail(sb);
+		unparsed = sb.toString();
+	    }
+	    LOGGER.info("Query after feild name expansion:" + unparsed);
+	    m = RESOURCE_PATTERN.matcher(unparsed);
+	    if (m.find()) {
 		StringBuffer sb = new StringBuffer();
 		do {
 		    m.appendReplacement(sb, Long.toString(resourcesMap.get(m.group(1))));
-		    result = m.find();
-		} while (result);
+		} while (m.find());
 		m.appendTail(sb);
 		unparsed = sb.toString();
 	    }
@@ -177,7 +186,7 @@ public class RDFQueryParser implements QueryParser {
 
     @Override
     public QueryParser copy() {
-	return new RDFQueryParser(alignmentIndex, properties, fields, defaultField, termProcessors, resourcesMap);
+	return new RDFQueryParser(alignmentIndex, properties, fieldNameSuffixToFieldNameMap, defaultField, termProcessors, resourcesMap);
     }
 
     public class MyVisitor extends AbstractQueryBuilderVisitor<Query> {
@@ -218,7 +227,7 @@ public class RDFQueryParser implements QueryParser {
 		    ii = alignmentIndex.documents(term.term);
 		    if (ii.hasNext()) {
 			for (int f = -1; (f = ii.nextDocument()) != -1;) {
-			    if (fields.contains(properties.get(f))) {
+			    if (fieldNamesSet.contains(properties.get(f))) {
 				// System.err.println( "From vertical index: " +
 				// properties.get( f ) );
 				disjuncts.add(new Select(properties.get(f), term));
@@ -228,7 +237,7 @@ public class RDFQueryParser implements QueryParser {
 		    ii.dispose();
 		} else {
 		    // No alignment index: we look in all fields
-		    for (String field : fields) {
+		    for (String field : fieldNamesSet) {
 			disjuncts.add(new Select(field, term));
 		    }
 
@@ -277,9 +286,9 @@ public class RDFQueryParser implements QueryParser {
 	    // Create a disjunct of selects on all fields
 	    final ObjectArrayList<Query> disjuncts = new ObjectArrayList<Query>();
 	    for (String property : properties) {
-		if (fields.contains(property))
+		if (fieldNamesSet.contains(property)) {
 		    disjuncts.add(new Select(property, new Consecutive(subNode)));
-
+		}
 	    }
 	    disjuncts.add(new Select(defaultField, new Consecutive(subNode)));
 

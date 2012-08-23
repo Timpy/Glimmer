@@ -12,7 +12,6 @@ package com.yahoo.glimmer.web;
  */
 
 import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.query.ResultItem;
 
 import java.io.PrintWriter;
 import java.util.Map;
@@ -24,7 +23,7 @@ import org.springframework.web.servlet.View;
 
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.query.RDFQueryResult;
-import com.yahoo.glimmer.query.Util;
+import com.yahoo.glimmer.query.RDFResultItem;
 
 public class DocObjectView implements View {
     private boolean includeUri;
@@ -53,12 +52,12 @@ public class DocObjectView implements View {
 		throw new IllegalArgumentException("Model does not contain an index!");
 	    }
 	    RDFQueryResult result = (RDFQueryResult) object;
-	    for (ResultItem item : result.getResultItems()) {
+	    for (RDFResultItem item : result.getResultItems()) {
 		Document doc = index.getCollection().document(item.doc);
 		if (includeUri) {
 		    writer.println(item.uri + "\t");
 		}
-		Util.getText(doc);
+		RDFResultItem.getText(doc);
 		doc.close();
 	    }
 	} else {

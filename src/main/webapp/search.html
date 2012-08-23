@@ -15,7 +15,7 @@
 	<script type="text/javascript" src="search.js"></script>
 	<div id="container" class="container">
 		<div id="pageHeader">
-			<h1>WOWSer (The WOO Browser)</h1>
+			<h1>Glimmer - An RDF Search Engine</h1>
 		</div>
 		<div id="selectionbar"></div>
 		<div id="mainContent">
@@ -30,11 +30,6 @@
 				</div>
 			</div>
 			<div id="topContent">
-				<!-- 
-                                          <div id = "statisticsBox">
-					    Number of entities in this KB: <div id="statistics"></div>
-					  </div>
-                                        -->
 				<div id="searchBoxes">
 					<div class="dataset">
 						Dataset: <select id="dataset" name="dataset">
@@ -66,34 +61,6 @@
 						</form>
 					</div>
 
-					<h2>Field-based search</h2>
-					<a id="togglefields">show</a>
-					<div id="field-hider" style="display: none">
-						<div id="field-loader">
-							<div>Loading...</div>
-							<img src="http://ontologyonline.org/img/ajax-loader.gif"
-								alt="Loading Image" />
-						</div>
-						<div id="field-message">&nbsp;</div>
-						<form id="search-by-field" action="javascript:void(0);">
-							<input type="checkbox" id="match-mode" name="match-mode" checked>
-							Match all
-							<div id="params">
-								&nbsp;
-								<!--
-									<div class="param">
-									<input class="query" type="text" name="query"/>
-									<select class="field" id="field"  name="field">
-									<option value="any">any</option>
-									</select>
-									</div>
-									-->
-							</div>
-							<input id="add" type="button" class="button" value="Add more" />
-							<br /> <input type="submit" class="button" value="Search">
-						</form>
-					</div>
-
 					<h2>Ontology-based search</h2>
 					<a id="toggleonto">show</a>
 					<div id="onto-hider" style="display: none">
@@ -122,10 +89,9 @@
 					class="yui3-skin-sam">
 					<ul>
 						<li id="result-list-tab"><a href="#list">List View</a></li>
-						<li id="result-map-tab"><a href="#map">Map View</a></li>
 					</ul>
 					<div>
-						<div id="list">
+						<div id="list" style="width: 940px; height: 500px">
 							<!-- <h2>Results</h2> -->
 							<div id="result-loader" style="display: none">
 								<div>Loading...</div>
@@ -135,13 +101,8 @@
 							<div id="result-stats"></div>
 							<div id="results"></div>
 						</div>
-						<div id="map" style="width: 940px; height: 500px"></div>
 					</div>
 				</div>
-			</div>
-			<div id="disclaimer">
-				For errors please contact <a href="mailto:pmika@yahoo-inc.com">Peter
-					Mika</a> or <a href="mailto:krl@yahoo-inc.com">Carlo Curino</a>.
 			</div>
 		</div>
 	</div>

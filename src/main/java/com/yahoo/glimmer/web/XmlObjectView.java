@@ -25,7 +25,7 @@ import org.springframework.web.servlet.View;
 import com.thoughtworks.xstream.XStream;
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.query.RDFQueryResult;
-import com.yahoo.glimmer.query.Util;
+import com.yahoo.glimmer.query.RDFResultItem;
 
 /**
  * @{View} that renders the model Object under OBJECT_KEY as XML
@@ -70,7 +70,7 @@ public class XmlObjectView implements View {
 		writer.println("<uri>" + item.uri + "</uri>");
 		
 		Document d = index.getCollection().document(item.doc);
-		writer.println("<contents>" + Util.getText(d) + "</contents>");
+		writer.println("<contents>" + RDFResultItem.getText(d) + "</contents>");
 		
 	    }
 	} else {

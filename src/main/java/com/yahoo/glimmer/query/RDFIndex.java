@@ -51,23 +51,21 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
-import org.semanticweb.owlapi.apibinding.OWLManager;
-import org.semanticweb.owlapi.model.OWLOntology;
-import org.semanticweb.owlapi.model.OWLOntologyCreationException;
-import org.semanticweb.owlapi.model.OWLOntologyManager;
 
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
+import com.yahoo.glimmer.util.Util;
 
 public class RDFIndex {
     private final static Logger LOGGER = Logger.getLogger(RDFIndex.class);
@@ -91,18 +89,25 @@ public class RDFIndex {
     /** Document priors */
     protected HashMap<Integer, Integer> documentPriors = null;
     /** Map used to encode URIs for retrieving from the collection */
-    protected Object2LongFunction<CharSequence> allResourcesMap;
+    protected Object2LongFunction<CharSequence> allResourcesToIds;
+    /** Map used to decode URIs */
+    protected FileLinesList allIdsToResources;
     /** The alignment index **/
     protected Index alignmentIndex;
     /** Query logger for performance measurement */
     private QueryLogger queryLogger;
-    /**
-     * All fields (includes non-indexed fields) This is a list because it's used
-     * to look up field names by position.
-     */
-    private List<String> fields;
 
-    protected IndexStatistics stats;
+    private Map<String, Integer> predicateDistribution;
+    private Map<String, Integer> typeTermDistribution;
+
+    /**
+     * All predicates (including non indexed) ordered by usage.
+     */
+    private List<String> allPredicatesOrdered;
+
+    private List<String> verticalPredicates;
+
+    protected RDFIndexStatistics stats;
 
     protected RDFQueryParser parser;
 
@@ -113,7 +118,7 @@ public class RDFIndex {
 	    super(collectionName, collection);
 	}
     }
-    
+
     private static DocumentCollection loadDocumentCollection(File collectionFile) throws RDFIndexException {
 	try {
 	    DocumentCollection documentCollection = (DocumentCollection) BinIO.loadObject(collectionFile);
@@ -123,13 +128,14 @@ public class RDFIndex {
 	    throw new RDFIndexException(e);
 	}
     }
+
     @SuppressWarnings("unchecked")
     private static <T> T loadObjectOfType(File file) throws RDFIndexException {
 	if (file == null) {
 	    return null;
 	}
 	try {
-	    return (T)BinIO.loadObject(file);
+	    return (T) BinIO.loadObject(file);
 	} catch (Exception e) {
 	    throw new RDFIndexException("While loading from " + file.getPath(), e);
 	}
@@ -220,17 +226,30 @@ public class RDFIndex {
 	    }
 	}
 
-	// Load Resources hash
-	allResourcesMap = loadObjectOfType(context.getAllResourcesMapFile());
-	if (allResourcesMap == null) {
+	// Load all resources hash function
+	allResourcesToIds = loadObjectOfType(context.getAllResourcesMapFile());
+	if (allResourcesToIds == null) {
 	    LOGGER.warn("Warning, no resources map specified!");
 	} else {
-	    LOGGER.info("Loading resourses map " + context.getAllResourcesMapFile().getPath());
+	    LOGGER.info("Loaded resourses map " + context.getAllResourcesMapFile().getPath() + " with " + allResourcesToIds.size() + " entries.");
+	}
+
+	// Load the reverse all resource function.
+	File allResourcesFile = context.getAllResourcesFile();
+	if (!allResourcesFile.exists()) {
+	    throw new RDFIndexException("All resources file " + allResourcesFile.getPath() + " does not exist.");
+	}
+	try {
+	    allIdsToResources = new FileLinesList(allResourcesFile.getPath(), "UTF-8");
+	} catch (IOException e) {
+	    throw new RDFIndexException("Couldn't open all resources file " + allResourcesFile.getPath() + " as a FileLinesList.", e);
 	}
 
 	// Load vertical indexes
 	Object2ReferenceMap<String, Index> indexMap = loadIndexesFromDir(verticalIndexDir, context.getLoadDocumentSizes(), context.getLoadIndexesInMemory());
 	LOGGER.info("Loaded " + indexMap.size() + " vertical indices.");
+
+	verticalPredicates = Collections.unmodifiableList(new ArrayList<String>(indexMap.keySet()));
 
 	if (!indexMap.containsKey(ALIGNMENT_INDEX_KEY)) {
 	    LOGGER.error("No alignment index found.");
@@ -252,16 +271,6 @@ public class RDFIndex {
 	    LOGGER.info("No context index found.");
 	}
 
-	// Load vertical field list (the encoded predicates)
-	// if (context.getFieldList() != null) {
-	// fields = new ArrayList<String>();
-	// LOGGER.info("Loading field list from " + context.getFieldList());
-	// for (MutableString line : new
-	// FileLinesCollection(context.getFieldList(), "UTF-8")) {
-	// fields.add(Util.encodeFieldName(line.toString()));
-	// }
-	// }
-
 	// Loading frequencies
 	Index subjectIndex = indexMap.get(SUBJECT_INDEX_KEY);
 	String filename = (String) subjectIndex.properties.getProperty(BASENAME_INDEX_PROPERTY_KEY);
@@ -274,6 +283,63 @@ public class RDFIndex {
 	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException("Failed to load frequences for subject index from " + filename, e);
+	}
+
+	try {
+	    predicateDistribution = Collections.unmodifiableMap(getTermDistribution(indexMap.get(PREDICATE_INDEX_KEY), true));
+	    Index typeField = indexMap.get(TYPE_INDEX);
+	    if (typeField == null) {
+		typeTermDistribution = Collections.emptyMap();
+	    } else {
+		typeTermDistribution = Collections.unmodifiableMap(getTermDistribution(typeField, true));
+	    }
+	} catch (IOException e) {
+	    throw new RDFIndexException(e);
+	}
+
+	// allPredicates list sorted by frequence.
+	allPredicatesOrdered = new ArrayList<String>(predicateDistribution.keySet());
+	Collections.sort(allPredicatesOrdered, new Comparator<String>() {
+	    @Override
+	    public int compare(String a, String b) {
+		return predicateDistribution.get(b).compareTo(predicateDistribution.get(a));
+	    }
+	});
+	
+	allPredicatesOrdered = Collections.unmodifiableList(allPredicatesOrdered);
+	
+	// We need to maintain insertion order and test inclusion.
+	LinkedHashMap<String, String> fieldNameSuffixToFieldNameOrderedMap = new LinkedHashMap<String, String>();
+	fieldNameSuffixToFieldNameOrderedMap.put(SUBJECT_INDEX_KEY, SUBJECT_INDEX_KEY);
+	fieldNameSuffixToFieldNameOrderedMap.put(PREDICATE_INDEX_KEY, PREDICATE_INDEX_KEY);
+	fieldNameSuffixToFieldNameOrderedMap.put(OBJECT_INDEX_KEY, OBJECT_INDEX_KEY);
+	
+	for (String fullName : allPredicatesOrdered) {
+	    fullName = Util.encodeFieldName(fullName);
+	    int i = fullName.length();
+	    String suffix;
+	    do {
+		i = fullName.lastIndexOf('_', i);
+		if (i == -1) {
+		    suffix = fullName;
+		    break;
+		}
+		suffix = fullName.substring(i + 1);
+	    } while (fieldNameSuffixToFieldNameOrderedMap.containsKey(suffix));
+	    if (fieldNameSuffixToFieldNameOrderedMap.containsKey(suffix)) {
+		throw new RDFIndexException("None unique field name " + suffix);
+	    }
+	    fieldNameSuffixToFieldNameOrderedMap.put(suffix, fullName);
+	}
+	
+	stats = RDFIndexStatisticsBuilder.create(fieldNameSuffixToFieldNameOrderedMap, typeTermDistribution);
+	// Load the ontology if provided
+	if (context.getOntoPath() != null) {
+	    try {
+		RDFIndexStatisticsBuilder.addOntology(stats, context.getOntoPath(), predicateDistribution);
+	    } catch (FileNotFoundException e) {
+		throw new RDFIndexException("Ontology file not found:" + context.getOntoPath());
+	    }
 	}
 
 	// This is empty for non-payload indices
@@ -307,33 +373,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), getAllFields(), getIndexedFields(), SUBJECT_INDEX_KEY, termProcessors, getAllResourcesMap());
-
-	// Compute stats
-	try {
-	    stats = new IndexStatistics(this);
-	} catch (IOException e) {
-	    throw new RuntimeException(e);
-	}
-
-	// Load the ontology if provided
-	if (context.getOntoPath() != null) {
-	    OWLOntologyManager manager = OWLManager.createOWLOntologyManager();
-	    File owlOntologyFile = new File(context.getOntoPath());
-	    if (!owlOntologyFile.exists()) {
-		URL owlOntologyUrl = this.getClass().getClassLoader().getResource(context.getOntoPath());
-		if (owlOntologyUrl != null) {
-		    owlOntologyFile = new File(owlOntologyUrl.getFile());
-		}
-	    }
-	    try {
-		OWLOntology onto = manager.loadOntologyFromOntologyDocument(owlOntologyFile);
-		stats.loadInfoFromOntology(onto);
-	    } catch (OWLOntologyCreationException e) {
-		throw new IllegalArgumentException("Ontology failed to load:" + e.getMessage());
-	    }
-	}
-
+	parser = new RDFQueryParser(getAlignmentIndex(), allPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_INDEX_KEY, termProcessors, getAllResourcesMap());
     }
 
     private Object2ReferenceMap<String, Index> loadIndexesFromDir(File indexDir, boolean loadDocSizes, boolean inMemory) throws RDFIndexException {
@@ -485,7 +525,7 @@ public class RDFIndex {
 		    index2Weight.put(index, context.getWfNeutral() * indexNames.size());
 	    }
 	}
-	
+
 	// System.out.println("Final weights:"+index2Weight);
 	return index2Weight;
     }
@@ -507,8 +547,8 @@ public class RDFIndex {
 	    throw new IllegalStateException("Subject index is not a BitStreamIndex. Don't know how to get its termMap.");
 	}
 	return new WOOScorer(context.getK1(), bByIndex, subjectTermMap, frequencies, subjectIndex.sizes, (double) subjectIndex.numberOfOccurrences
-		/ subjectIndex.numberOfDocuments, subjectIndex.numberOfDocuments, context.getWMatches(), documentWeights, context.getDlCutoff(), documentPriors,
-		context.getMaxNumberOfDieldsNorm());
+		/ subjectIndex.numberOfDocuments, subjectIndex.numberOfDocuments, context.getWMatches(), documentWeights, context.getDlCutoff(),
+		documentPriors, context.getMaxNumberOfDieldsNorm());
     }
 
     /**
@@ -561,7 +601,7 @@ public class RDFIndex {
      * @return
      */
     public List<String> getAllFields() {
-	return fields;
+	return verticalPredicates;
     }
 
     public Index getField(String alias) {
@@ -569,7 +609,7 @@ public class RDFIndex {
     }
 
     public long getDocID(String uri) {
-	return allResourcesMap.get(uri);
+	return allResourcesToIds.get(uri);
     }
 
     public DocumentCollection getCollection() {
@@ -580,8 +620,21 @@ public class RDFIndex {
 	return alignmentIndex;
     }
 
+    @Deprecated
     public Object2LongFunction<CharSequence> getAllResourcesMap() {
-	return allResourcesMap;
+	return allResourcesToIds;
+    }
+
+    public Long lookupResourceId(CharSequence key) {
+	return allResourcesToIds.get(key);
+    }
+
+    public synchronized String lookupResourceById(long id) {
+	MutableString value = allIdsToResources.get((int) id);
+	if (value != null) {
+	    return value.toString();
+	}
+	return null;
     }
 
     public String getDefaultField() {
@@ -596,7 +649,7 @@ public class RDFIndex {
 	return title;
     }
 
-    public IndexStatistics getStatistics() {
+    public RDFIndexStatistics getStatistics() {
 	return stats;
     }
 
@@ -632,28 +685,28 @@ public class RDFIndex {
     }
 
     public Map<String, Integer> getPredicateTermDistribution() throws IOException {
-	return getTermDistribution(queryEngine.indexMap.get(PREDICATE_INDEX_KEY));
+	return predicateDistribution;
     }
 
     public Map<String, Integer> getTypeTermDistribution() throws IOException {
-	Index typeField = getField(TYPE_INDEX);
-	if (typeField == null) {
-	    return Collections.emptyMap();
-	} else {
-	    return getTermDistribution(typeField);
-	}
+	return typeTermDistribution;
     }
 
-    private static Map<String, Integer> getTermDistribution(Index index) throws IOException {
+    private Map<String, Integer> getTermDistribution(Index index, boolean termsAreResourceIds) throws IOException {
 	if (index instanceof BitStreamIndex) {
 	    StringMap<? extends CharSequence> termMap = ((BitStreamIndex) index).termMap;
 
 	    Map<String, Integer> histogram = new HashMap<String, Integer>();
 
 	    for (CharSequence term : termMap.list()) {
-		long id = termMap.get(term);
-		IndexIterator it = index.documents(((int) id));
-		histogram.put(term.toString(), it.frequency());
+		long docId = termMap.get(term);
+		IndexIterator it = index.documents(((int) docId));
+		if (termsAreResourceIds) {
+		    int termAsId = Integer.parseInt(term.toString());
+		    histogram.put(lookupResourceById(termAsId), it.frequency());
+		} else {
+		    histogram.put(term.toString(), it.frequency());
+		}
 		it.dispose();
 	    }
 	    return histogram;
@@ -667,10 +720,13 @@ public class RDFIndex {
 	public RDFIndexException(Exception e) {
 	    super(e);
 	}
-	
+
+	public RDFIndexException(String message) {
+	    super(message);
+	}
+
 	public RDFIndexException(String message, Exception e) {
 	    super(message, e);
 	}
     }
-
 }
