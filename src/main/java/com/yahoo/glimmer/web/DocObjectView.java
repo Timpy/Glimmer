@@ -11,8 +11,6 @@ package com.yahoo.glimmer.web;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.mg4j.document.Document;
-
 import java.io.PrintWriter;
 import java.util.Map;
 
@@ -21,7 +19,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.springframework.web.servlet.View;
 
-import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.query.RDFQueryResult;
 import com.yahoo.glimmer.query.RDFResultItem;
 
@@ -47,18 +44,12 @@ public class DocObjectView implements View {
 
 	// Return URIs and docs separated by tab
 	if (object instanceof RDFQueryResult) {
-	    RDFIndex index = (RDFIndex) model.get(QueryController.INDEX_KEY);
-	    if (index == null) {
-		throw new IllegalArgumentException("Model does not contain an index!");
-	    }
 	    RDFQueryResult result = (RDFQueryResult) object;
 	    for (RDFResultItem item : result.getResultItems()) {
-		Document doc = index.getCollection().document(item.doc);
 		if (includeUri) {
-		    writer.println(item.uri + "\t");
+		    writer.println(item.getSubject());
 		}
-		RDFResultItem.getText(doc);
-		doc.close();
+		writer.println(item.toString());
 	    }
 	} else {
 	    writer.print(object.toString());

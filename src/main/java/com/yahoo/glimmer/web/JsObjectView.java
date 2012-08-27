@@ -19,14 +19,11 @@ import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.semanticweb.yars.nx.Node;
-import org.semanticweb.yars.nx.Triple;
 import org.springframework.web.servlet.View;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
 import com.google.gson.JsonSerializer;
@@ -53,24 +50,6 @@ public class JsObjectView implements View {
 		public JsonElement serialize(Object object, Type arg1, JsonSerializationContext arg2) {
 		    if (object instanceof CharSequence) {
 			return new JsonPrimitive(((CharSequence) object).toString());
-		    }
-		    return null;
-		}
-	    }).registerTypeAdapter(Node.class, new JsonSerializer<Object>() {
-		public JsonElement serialize(Object object, Type arg1, JsonSerializationContext arg2) {
-		    if (object instanceof Node) {
-			return new JsonPrimitive(((Node) object).toString());
-		    }
-		    return null;
-		}
-	    }).registerTypeAdapter(Triple.class, new JsonSerializer<Object>() {
-		public JsonElement serialize(Object object, Type arg1, JsonSerializationContext arg2) {
-		    if (object instanceof Triple) {
-			JsonObject jo = new JsonObject();
-			jo.addProperty("subject", ((Triple) object).getSubject().toString());
-			jo.addProperty("predicate", ((Triple) object).getPredicate().toString());
-			jo.addProperty("object", ((Triple) object).getObject().toString());
-			return jo;
 		    }
 		    return null;
 		}

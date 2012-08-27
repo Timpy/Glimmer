@@ -11,9 +11,6 @@ package com.yahoo.glimmer.web;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.query.ResultItem;
-
 import java.io.PrintWriter;
 import java.util.Map;
 
@@ -28,16 +25,17 @@ import com.yahoo.glimmer.query.RDFQueryResult;
 import com.yahoo.glimmer.query.RDFResultItem;
 
 /**
- * @{View} that renders the model Object under OBJECT_KEY as XML
+ * @{View that renders the model Object under OBJECT_KEY as XML
  * 
  * @author tep@yahoo-inc.com
  */
 public class XmlObjectView implements View {
     private XStream xStream = new XStream();
-    
+
     @Override
     public String getContentType() {
-	// Setting charset= means that response.getWriter() will return a Writer that writes in that charset.
+	// Setting charset= means that response.getWriter() will return a Writer
+	// that writes in that charset.
 	return "text/xml; charset=UTF-8";
     }
 
@@ -47,31 +45,28 @@ public class XmlObjectView implements View {
 	if (object == null) {
 	    throw new IllegalArgumentException("Model does not contain an object!");
 	}
-	
+
 	response.setContentType(getContentType());
 	PrintWriter writer = response.getWriter();
-	
+
 	if (object instanceof RDFQueryResult) {
 	    RDFIndex index = (RDFIndex) model.get(QueryController.INDEX_KEY);
 	    if (index == null) {
 		throw new IllegalArgumentException("Model does not contain an index!");
 	    }
-	    
+
 	    RDFQueryResult result = (RDFQueryResult) object;
 	    // FIXME: this is not XML!!!!
 	    int resultCount = 0;
-	    for (ResultItem item : result.getResultItems()) {
+	    for (RDFResultItem item : result.getResultItems()) {
 		resultCount++;
 		writer.println("<result> " + resultCount + "</result>");
-		if (index.getIndexIdfs() != null) {
-		    writer.println("<documentSize> " + index.getIndexIdfs().sizes.getInt(item.doc) + "</documentSize>");
-		}
-		writer.println("<score>" + item.score + "</score>");
-		writer.println("<uri>" + item.uri + "</uri>");
-		
-		Document d = index.getCollection().document(item.doc);
-		writer.println("<contents>" + RDFResultItem.getText(d) + "</contents>");
-		
+		writer.println("<documentSize> " + index.getDocumentSize(item.getDocId()) + "</documentSize>");
+		writer.println("<score>" + item.getScore() + "</score>");
+		writer.println("<uri>" + item.getSubject() + "</uri>");
+
+		//TODO
+		writer.println("<contents>..todo..</contents>");
 	    }
 	} else {
 	    xStream.toXML(object, writer);

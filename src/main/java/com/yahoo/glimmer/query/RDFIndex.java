@@ -57,6 +57,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,7 +106,7 @@ public class RDFIndex {
      */
     private List<String> allPredicatesOrdered;
 
-    private List<String> verticalPredicates;
+    private Set<String> verticalPredicates;
 
     protected RDFIndexStatistics stats;
 
@@ -221,7 +222,7 @@ public class RDFIndex {
 		    LOGGER.info("Loaded titlelist of size " + titleList.size() + ".");
 		    documentCollection = new TitleListDocumentCollection(titleList);
 		} catch (Exception e) {
-		    throw new IllegalArgumentException(e);
+		    throw new IllegalArgumentException("Failed to open TitleListDocumentCollection.", e);
 		}
 	    }
 	}
@@ -249,7 +250,7 @@ public class RDFIndex {
 	Object2ReferenceMap<String, Index> indexMap = loadIndexesFromDir(verticalIndexDir, context.getLoadDocumentSizes(), context.getLoadIndexesInMemory());
 	LOGGER.info("Loaded " + indexMap.size() + " vertical indices.");
 
-	verticalPredicates = Collections.unmodifiableList(new ArrayList<String>(indexMap.keySet()));
+	verticalPredicates = Collections.unmodifiableSet(new HashSet<String>(indexMap.keySet()));
 
 	if (!indexMap.containsKey(ALIGNMENT_INDEX_KEY)) {
 	    LOGGER.error("No alignment index found.");
@@ -373,7 +374,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), allPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_INDEX_KEY, termProcessors, getAllResourcesMap());
+	parser = new RDFQueryParser(getAlignmentIndex(), allPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_INDEX_KEY, termProcessors, allResourcesToIds);
     }
 
     private Object2ReferenceMap<String, Index> loadIndexesFromDir(File indexDir, boolean loadDocSizes, boolean inMemory) throws RDFIndexException {
@@ -592,23 +593,15 @@ public class RDFIndex {
 	return queryEngine.indexMap.keySet();
     }
 
-    /**
-     * All the potential fields in the vertical index. Only the subset returned
-     * by {@link #getIndexedFields()} are indexed.
-     * 
-     * Note: this does not include the fields of the horizontal index.
-     * 
-     * @return
-     */
-    public List<String> getAllFields() {
-	return verticalPredicates;
-    }
-
     public Index getField(String alias) {
 	return queryEngine.indexMap.get(alias);
     }
 
-    public long getDocID(String uri) {
+    public Long getSubjectId(String uri) {
+	return allResourcesToIds.get(uri);
+    }
+    
+    public Long getObjectID(String uri) {
 	return allResourcesToIds.get(uri);
     }
 
@@ -621,10 +614,6 @@ public class RDFIndex {
     }
 
     @Deprecated
-    public Object2LongFunction<CharSequence> getAllResourcesMap() {
-	return allResourcesToIds;
-    }
-
     public Long lookupResourceId(CharSequence key) {
 	return allResourcesToIds.get(key);
     }
@@ -680,10 +669,6 @@ public class RDFIndex {
 	return queryLogger;
     }
 
-    public Index getIndexIdfs() {
-	return queryEngine.indexMap.get(SUBJECT_INDEX_KEY);
-    }
-
     public Map<String, Integer> getPredicateTermDistribution() throws IOException {
 	return predicateDistribution;
     }
@@ -728,5 +713,17 @@ public class RDFIndex {
 	public RDFIndexException(String message, Exception e) {
 	    super(message, e);
 	}
+    }
+
+    public Document getDocument(int docId) throws IOException {
+	return documentCollection.document(docId);
+    }
+
+    public Integer getDocumentSize(int docId) {
+	return getSubjectIndex().sizes.get(docId);
+    }
+    
+    public Set<String> getIndexedPredicates() {
+	return verticalPredicates;
     }
 }

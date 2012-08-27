@@ -92,58 +92,38 @@ YUI({
 								var kbname = Y.one("#dataset").get('value');
 								return '<span class="id"><a href="search.html?kb=' + kbname + '&subject=' + value.substring(9) + '">' + label + '</a></span>';
 							}
+						} else if (anchor != undefined){
+							return '<span class="id"><a href="' + value + '">' + anchor + '</a></span>';
 						} else {
 							return '<span class="id">' + value + '</span>';
 						}
 					}
 
-					// SingleLocationBusiness specific
-					function getMarker(result) {
-						var lat, lon;
-						for (qid in result.quads) {
-							if (getLocalName(result.quads[qid].triple.predicate) === "latitude") {
-								lat = result.quads[qid].triple.object;
-							} else if (getLocalName(result.quads[qid].triple.predicate) === "longitude") {
-								lon = result.quads[qid].triple.object;
-							}
-						}
-						return ({
-							"id" : result.title,
-							"lat" : lat,
-							"lon" : lon
-						});
-					}
-
 					function renderResult(result, node) {
-
 						var li = Y.Node.create("<li class=\"result\"></li>");
-						var title = result.uri;
-						if (title == null)
-							title = result.title;
-						// Sort the quads
 
 						function predSort(a, b) {
-							return (fieldLongNames.indexOf(encode(a.triple.predicate)) - fieldLongNames.indexOf(encode(b.triple.predicate)));
+							return (fieldLongNames.indexOf(encode(a.predicate)) - fieldLongNames.indexOf(encode(b.predicate)));
 						}
-						result.quads.sort(predSort);
+						result.relations.sort(predSort);
 
-						// Group the quads by predicate
+						// Group the relations by predicate
 						var map = [];
 						var labels = [];
 						var types = [];
 
-						if (result.hasOwnProperty("quads")) {
-							for (qid in result.quads) {
-								if (map[result.quads[qid].triple.predicate] == null) {
-									map[result.quads[qid].triple.predicate] = [ result.quads[qid] ];
+						if (result.hasOwnProperty("relations")) {
+							for (qid in result.relations) {
+								if (map[result.relations[qid].predicate] == null) {
+									map[result.relations[qid].predicate] = [ result.relations[qid] ];
 								} else {
-									map[result.quads[qid].triple.predicate].push(result.quads[qid]);
+									map[result.relations[qid].predicate].push(result.relations[qid]);
 								}
-								if (result.quads[qid].hasOwnProperty("label") && result.quads[qid].label != null) {
-									labels[result.quads[qid].triple.object] = result.quads[qid].label;
+								if (result.relations[qid].hasOwnProperty("label") && result.relations[qid].label != null) {
+									labels[result.relations[qid].object] = result.relations[qid].label;
 								}
-								if (result.quads[qid].triple.predicate == RDF_TYPE) {
-									types.push(stripVersion(result.quads[qid].triple.object));
+								if (result.relations[qid].predicate == RDF_TYPE) {
+									types.push(stripVersion(result.relations[qid].object));
 								}
 							}
 						}
@@ -159,13 +139,13 @@ YUI({
 						for (type in types) {
 							li.append('&nbsp;<a class="type" href="' + types[type] + '">' + getLocalName(types[type]) + '</a>&nbsp;/');
 						}
-						li.append('<span class="id">' + renderValue(title) + '</span>');
+						li.append('<span class="id">' + renderValue(result.subject) + '</span>');
 
 						var table = Y.Node
 								.create('<table class=\"result\"><col class=\"predicate-col\"/><col class=\"value-col\"/><th class="result-header">Property</th><th class=\"result-header\">Value</th></table>');
 						var i = 0;
 						for ( var pred in map) {
-							// alert(Object.getOwnPropertyNames(result.quads[qid]));
+							// alert(Object.getOwnPropertyNames(result.relations[qid]));
 							if (pred == RDF_TYPE)
 								continue;
 							var row = "";
@@ -175,14 +155,14 @@ YUI({
 								row = row + '<tr class="odd">';
 							}
 							row = row + "<td class=\"predicate\">" + getLocalName(pred) + "</td>" + "<td>";
-							for ( var qid in map[pred]) {
-								if (labels[map[pred][qid].triple.object] != null) {
-									row = row + '<span title="' + getProviderName(map[pred][qid].source[0]) + '" class="source-'
-											+ getProviderName(map[pred][qid].source[0]) + '">'
-											+ renderValue(map[pred][qid].triple.object, labels[map[pred][qid].triple.object]) + '</span><br/>';
+							for (var qid in map[pred]) {
+								if (labels[map[pred][qid].object] != null) {
+									row = row + '<span title="' + getProviderName(map[pred][qid].context[0]) + '" class="source-'
+											+ getProviderName(map[pred][qid].context[0]) + '">'
+											+ renderValue(map[pred][qid].object, labels[map[pred][qid].object]) + '</span><br/>';
 								} else {
-									row = row + '<span title="' + getProviderName(map[pred][qid].source[0]) + '" class="source-'
-											+ getProviderName(map[pred][qid].source[0]) + '">' + renderValue(map[pred][qid].triple.object) + '</span><br/>';
+									row = row + '<span title="' + getProviderName(map[pred][qid].context[0]) + '" class="source-'
+											+ getProviderName(map[pred][qid].context[0]) + '">' + renderValue(map[pred][qid].object) + '</span><br/>';
 								}
 							}
 							row = row + '</td></tr>';
@@ -233,16 +213,6 @@ YUI({
 									var markers = [];
 									for ( var result in results) {
 										renderResult(results[result], ol);
-
-										var marker = getMarker(results[result]);
-										if (marker != null) {
-											marker["label"] = result; // label
-											// the
-											// marker
-											// with
-											// index
-											markers.push(marker);
-										}
 									}
 
 									Y.one("#results").setContent("").append(ol);

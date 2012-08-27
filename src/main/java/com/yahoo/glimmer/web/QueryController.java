@@ -101,27 +101,18 @@ public class QueryController {
     public Map<String, ?> getDocument(@ModelAttribute(INDEX_KEY) RDFIndex index, @RequestParam(required = false) String callback, @RequestParam(required = false) Long id, @RequestParam(required = false) String subject) throws IOException {
 	LOGGER.info("id=" + id + " subject=" + subject);
 	
-	
-	if (id == null) {
-	    if (subject == null) {
-
-	    } else {
-		if (index.getAllResourcesMap() == null) {
-		    throw new HttpMessageNotReadableException("mph needs to be loaded for subject to work.");
-		} else {
-		    id = index.getDocID(subject);
-		}
+	if (id == null && subject != null && !subject.isEmpty()) {
+	    id = index.getSubjectId(subject);
+	    if (id == null) {
+		throw new HttpMessageNotReadableException("subject not in collection.");
 	    }
-	}
-
-	if (id == -1 || id >= index.getAllResourcesMap().size()) {
-	    throw new HttpMessageNotReadableException("subject not in collection.");
 	}
 
 	ObjectArrayList<RDFResultItem> resultItems = new ObjectArrayList<RDFResultItem>();
 	int numResults;
-	final RDFResultItem resultItem = new RDFResultItem(index.getIndexedFields(), index.getCollection(), id.intValue(), 1.0d);
-	if (index.getCollection() != null && subject != null && !resultItem.uri().equals(subject)) {
+	RDFResultItem resultItem = Querier.createRdfResultItem(index, id.intValue(), 1.0d, false);
+	
+	if (subject != null && !subject.equals(resultItem.getSubject())) {
 	    // Ignore the result if the MPH tricked us and returned a
 	    // result with a different URI
 	    numResults = 0;
