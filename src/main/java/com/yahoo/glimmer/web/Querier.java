@@ -45,6 +45,8 @@ public class Querier {
     private static final String RELATION_DELIMITOR = "  ";
     private static final String DEFAULT_CONTEXT = "default:";
 
+    private QueryLogger queryLogger = new QueryLogger();
+
     public RDFQueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref) throws QueryBuilderVisitorException, IOException {
 	if (startItem < 0 || maxNumItems < 0 || maxNumItems > 10000) {
 	    throw new IllegalArgumentException("Bad item range - start:" + startItem + " maxNumItems:" + maxNumItems);
@@ -52,7 +54,9 @@ public class Querier {
 
 	ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results = new ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>>();
 
-	int numResults = index.process(query, startItem, maxNumItems, results);
+	queryLogger.start();
+	
+	int numResults = index.process(startItem, maxNumItems, results, query);
 
 	if (results.size() > maxNumItems) {
 	    results.size(maxNumItems);
@@ -72,15 +76,8 @@ public class Querier {
 	    }
 	}
 
-	// Stop the timer
-	long time = 0;
-	QueryLogger queryLogger = index.getQueryLogger();
-	if (queryLogger != null) {
-	    queryLogger.endQuery(query, numResults);
-	    time = queryLogger.getTime();
-	}
-
-	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", numResults, resultItems, time);
+	long time = queryLogger.endQuery(query, numResults);
+	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", numResults, resultItems, (int)time);
 	return result;
     }
 

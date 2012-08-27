@@ -19,11 +19,11 @@ import java.util.List;
 public class RDFQueryResult {
     private final List<RDFResultItem> resultItems;
     private final int numResults;
-    private final long time;
+    private final int time;
     private final String query;
     private final String parsedQuery;
 
-    public RDFQueryResult(String query, String parsedQuery, int numResults, List<RDFResultItem> resultItems, long time) {
+    public RDFQueryResult(String query, String parsedQuery, int numResults, List<RDFResultItem> resultItems, int time) {
 	super();
 	this.resultItems = resultItems;
 	this.numResults = numResults;

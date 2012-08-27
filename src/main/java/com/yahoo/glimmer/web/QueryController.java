@@ -32,7 +32,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import com.yahoo.glimmer.query.QueryLogger;
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.query.RDFIndexStatistics;
 import com.yahoo.glimmer.query.RDFQueryResult;
@@ -121,18 +120,7 @@ public class QueryController {
 	    numResults = 1;
 	}
 
-	// Stop the timer
-	QueryLogger queryLogger = index.getQueryLogger();
-
-	long time;
-	if (queryLogger != null) {
-	    queryLogger.endQuery(null, numResults);
-	    time = queryLogger.getTime();
-	} else {
-	    time = 0;
-	}
-
-	RDFQueryResult result = new RDFQueryResult("", null, numResults, resultItems, time);
+	RDFQueryResult result = new RDFQueryResult("", null, numResults, resultItems, 0);
 	return Collections.singletonMap(OBJECT_KEY, result);
     }
 

@@ -95,8 +95,6 @@ public class RDFIndex {
     protected FileLinesList allIdsToResources;
     /** The alignment index **/
     protected Index alignmentIndex;
-    /** Query logger for performance measurement */
-    private QueryLogger queryLogger;
 
     private Map<String, Integer> predicateDistribution;
     private Map<String, Integer> typeTermDistribution;
@@ -366,9 +364,6 @@ public class RDFIndex {
 
 	// Sets field weight and scorer
 	reconfigure(context);
-
-	// Configure the query logger
-	queryLogger = new QueryLogger();
 
 	// Init query parser
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
@@ -646,14 +641,8 @@ public class RDFIndex {
 	return parser;
     }
 
-    public int process(final Query[] query, final int offset, final int length,
-	    final ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results) throws QueryBuilderVisitorException, IOException {
-	return queryEngine.copy().process(query, offset, length, results);
-    }
-
-    public int process(final Query query, final int offset, final int length,
-	    final ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results) throws QueryBuilderVisitorException, IOException {
-	return queryEngine.copy().process(query, offset, length, results);
+    public int process(final int offset, final int length, final ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results, final Query ... queries) throws QueryBuilderVisitorException, IOException {
+	return queryEngine.copy().process(queries, offset, length, results);
     }
 
     public void destroy() {
@@ -663,10 +652,6 @@ public class RDFIndex {
 	} catch (IOException e) {
 	    e.printStackTrace();
 	}
-    }
-
-    public QueryLogger getQueryLogger() {
-	return queryLogger;
     }
 
     public Map<String, Integer> getPredicateTermDistribution() throws IOException {
