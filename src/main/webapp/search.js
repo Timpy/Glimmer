@@ -80,22 +80,24 @@ YUI({
 
 					// A value (URI or Literal) to be rendered. URI optionally
 					// has anchortext
-					function renderValue(value, anchor) {
+					function renderValue(ref, value) {
 
-						if (value.startsWith("urn:uuid:")) {
-							var label = value.substring(9);
-							if (anchor != undefined && anchor != null)
-								label = anchor;
-							if (typeof (pubby) != "undefined" && pubby != null) {
-								return '<span class="id"><a href="' + pubby + value.substring(9) + '">' + label + '</a></span>';
-							} else {
-								var kbname = Y.one("#dataset").get('value');
-								return '<span class="id"><a href="search.html?kb=' + kbname + '&subject=' + value.substring(9) + '">' + label + '</a></span>';
+						if (ref.startsWith("urn:uuid:")) {
+							ref = ref.substring(9);
+							if (value == undefined) {
+								value = ref;
 							}
-						} else if (anchor != undefined){
-							return '<span class="id"><a href="' + value + '">' + anchor + '</a></span>';
+							var kbname = Y.one("#dataset").get('value');
+							return '<a href="search.html?kb=' + kbname + '&subject=' + ref + '">' + value + '</a>';
+						}
+						
+						if (value == undefined) {
+							value = ref;
+						}
+						if (ref.startsWith("http:")) {
+							return '<a href="' + ref + '">' + value + '</a>';
 						} else {
-							return '<span class="id">' + value + '</span>';
+							return value;
 						}
 					}
 
@@ -133,7 +135,7 @@ YUI({
 						types.sort(typeSort);
 
 						if (result.hasOwnProperty("label") && result.label != null) {
-							li.append('<span class="label">' + renderValue(result.label) + '</span>');
+							li.append('<span class="label">' + result.label + '</span>');
 						}
 						li.append("<br/>");
 						for (type in types) {
