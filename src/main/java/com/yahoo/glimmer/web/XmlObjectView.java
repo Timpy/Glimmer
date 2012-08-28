@@ -61,7 +61,6 @@ public class XmlObjectView implements View {
 	    for (RDFResultItem item : result.getResultItems()) {
 		resultCount++;
 		writer.println("<result> " + resultCount + "</result>");
-		writer.println("<documentSize> " + index.getDocumentSize(item.getDocId()) + "</documentSize>");
 		writer.println("<score>" + item.getScore() + "</score>");
 		writer.println("<uri>" + item.getSubject() + "</uri>");
 

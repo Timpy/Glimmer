@@ -77,7 +77,7 @@ public class Querier {
 	}
 
 	long time = queryLogger.endQuery(query, numResults);
-	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", numResults, resultItems, (int)time);
+	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", resultItems, (int)time);
 	return result;
     }
 
@@ -87,7 +87,7 @@ public class Querier {
 	    return null;
 	}
 	RDFResultItem item = new RDFResultItem();
-	item.setDocId(docId);
+	item.setSubjectId(docId);
 	item.setScore(score);
 	String subject = doc.title().toString();
 	item.setSubject(subject);
@@ -154,21 +154,19 @@ public class Querier {
 	    label = object;
 	}
 
-	if (label == null && lookupObjectLabels) {
+	Integer subjectIdOfObject = index.getSubjectId(object);
+	
+	if (label == null && lookupObjectLabels && subjectIdOfObject != null) {
 	    // If the object is also a subject Resource/BNode this will
-	    // return
-	    // that subjects id with is the same as the docId.
-	    Long subjectIdForObject = index.getSubjectId(object);
-	    if (subjectIdForObject != null) {
-		// Parse the subject doc that this object refers too..
-		RDFResultItem objectItem = createRdfResultItem(index, subjectIdForObject.intValue(), 0.0d, false);
-		if (objectItem != null) {
-		    label = objectItem.getLabel();
-		}
+	    // return that subjects id with is the same as the docId.
+	    // Parse the subject doc that this object refers too..
+	    RDFResultItem objectItem = createRdfResultItem(index, subjectIdOfObject, 0.0d, false);
+	    if (objectItem != null) {
+		label = objectItem.getLabel();
 	    }
 	}
 
-	item.addRelation(predicate, object, context, indexed, label);
+	item.addRelation(predicate, object, subjectIdOfObject, context, indexed, label);
 	return true;
     }
 }

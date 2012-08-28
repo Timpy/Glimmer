@@ -81,24 +81,22 @@ YUI({
 					// A value (URI or Literal) to be rendered. URI optionally
 					// has anchortext
 					function renderValue(ref, value) {
-
 						if (ref.startsWith("urn:uuid:")) {
 							ref = ref.substring(9);
 							if (value == undefined) {
 								value = ref;
 							}
 							var kbname = Y.one("#dataset").get('value');
-							return '<a href="search.html?kb=' + kbname + '&subject=' + ref + '">' + value + '</a>';
+							return '<a href="search.html?index=' + kbname + '&subject=' + ref + '">' + value + '</a>';
 						}
-						
+
 						if (value == undefined) {
 							value = ref;
 						}
 						if (ref.startsWith("http:")) {
 							return '<a href="' + ref + '">' + value + '</a>';
-						} else {
-							return value;
 						}
+						return value;
 					}
 
 					function renderResult(result, node) {
@@ -111,21 +109,18 @@ YUI({
 
 						// Group the relations by predicate
 						var map = [];
-						var labels = [];
 						var types = [];
 
 						if (result.hasOwnProperty("relations")) {
-							for (qid in result.relations) {
-								if (map[result.relations[qid].predicate] == null) {
-									map[result.relations[qid].predicate] = [ result.relations[qid] ];
+							for (relationIndex in result.relations) {
+								var relation = result.relations[relationIndex];
+								if (map[relation.predicate] == null) {
+									map[relation.predicate] = [ relation ];
 								} else {
-									map[result.relations[qid].predicate].push(result.relations[qid]);
+									map[relation.predicate].push(relation);
 								}
-								if (result.relations[qid].hasOwnProperty("label") && result.relations[qid].label != null) {
-									labels[result.relations[qid].object] = result.relations[qid].label;
-								}
-								if (result.relations[qid].predicate == RDF_TYPE) {
-									types.push(stripVersion(result.relations[qid].object));
+								if (relation.predicate == RDF_TYPE) {
+									types.push(stripVersion(relation.object));
 								}
 							}
 						}
@@ -141,39 +136,61 @@ YUI({
 						for (type in types) {
 							li.append('&nbsp;<a class="type" href="' + types[type] + '">' + getLocalName(types[type]) + '</a>&nbsp;/');
 						}
-						li.append('<span class="id">' + renderValue(result.subject) + '</span>');
+						var span = Y.Node.create('<span class="id"><a href=' + result.subject + '>' + result.subject + '</a></span>');
+						if (result.subjectId != undefined) {
+							var sourceLink = Y.Node.create('<a href="#">&nbsp;-&gt;</a>');
+							var closure = closureCall(getDocumentByIdOrSubject, result.subjectId);
+							sourceLink.on('click', closure);
+							span.appendChild(sourceLink);
+						}
+						li.append(span);
 
 						var table = Y.Node
 								.create('<table class=\"result\"><col class=\"predicate-col\"/><col class=\"value-col\"/><th class="result-header">Property</th><th class=\"result-header\">Value</th></table>');
 						var i = 0;
-						for ( var pred in map) {
-							// alert(Object.getOwnPropertyNames(result.relations[qid]));
-							if (pred == RDF_TYPE)
+						for (var predicate in map) {
+							if (predicate == RDF_TYPE)
 								continue;
-							var row = "";
-							if (i++ % 2 == 0) {
-								row = row + '<tr class="even">';
-							} else {
-								row = row + '<tr class="odd">';
-							}
-							row = row + "<td class=\"predicate\">" + getLocalName(pred) + "</td>" + "<td>";
-							for (var qid in map[pred]) {
-								if (labels[map[pred][qid].object] != null) {
-									row = row + '<span title="' + getProviderName(map[pred][qid].context[0]) + '" class="source-'
-											+ getProviderName(map[pred][qid].context[0]) + '">'
-											+ renderValue(map[pred][qid].object, labels[map[pred][qid].object]) + '</span><br/>';
-								} else {
-									row = row + '<span title="' + getProviderName(map[pred][qid].context[0]) + '" class="source-'
-											+ getProviderName(map[pred][qid].context[0]) + '">' + renderValue(map[pred][qid].object) + '</span><br/>';
+							
+							var tdPredicate = Y.Node.create('<td class="predicate">' + getLocalName(predicate) + '</td>');
+							
+							var tdValues = Y.Node.create('<td></td>');
+							for ( var relationIndex in map[predicate]) {
+								var item = map[predicate][relationIndex];
+								var providedName = getProviderName(item.context[0]);
+								var div = Y.Node.create('<div title="' + providedName + '" class="source-' + providedName + '"></div>');
+								div.appendChild(renderValue(item.object, item.label));
+								if (item.subjectIdOfObject != undefined) {
+									var sourceLink = Y.Node.create('<a href="#">&nbsp;-&gt;</a>');
+									var closure = closureCall(getDocumentByIdOrSubject, item.subjectIdOfObject);
+									sourceLink.on('click', closure);
+									div.appendChild(sourceLink);
 								}
+								tdValues.appendChild(div);
 							}
-							row = row + '</td></tr>';
-							table.append(row);
+							
+							var tr;
+							if (i++ % 2 == 0) {
+								tr = Y.Node.create('<tr class="even"></tr>');
+							} else {
+								tr = Y.Node.create('<tr class="odd"></tr>');
+							}
+							tr.appendChild(tdPredicate);
+							tr.appendChild(tdValues);
+							table.appendChild(tr);
 						}
 
 						li.append(table);
 						node.append(li);
 
+					}
+					
+					function closureCall(func, param) {
+						var f = func;
+						var p = param;
+						return function () {
+							f(p);
+						}
 					}
 
 					function executeUnifiedSearch(e) {
@@ -195,41 +212,42 @@ YUI({
 					function executeSearchByID(e) {
 						loadResults("subject=urn:uuid:" + Y.one('#id-text').get('value'));
 					}
+					
+					function getDocumentByIdOrSubject(idOrSubject) {
+						loadResults(idOrSubject, "DOCUMENT");
+					}
 
-					function loadResults(query) {
+					function loadResults(query, type) {
+						type = typeof type !== 'undefined' ? type : "YAHOO";
+						
 						Y.one("#result-loader").show();
 
 						dataSource.sendRequest({
 							request : 'query?index=' + Y.one("#dataset").get('value') + '&query=' + query + '&pageSize=' + Y.one("#numresults").get('value')
-									+ '&deref=' + Y.one("#dereference").get('checked'),
+									+ '&deref=' + Y.one("#dereference").get('checked') + "&type=" + type,
 							callback : {
-
 								success : function(e) {
+									var result = e.response.results[0];
+									
 									Y.one("#result-loader").hide();
 									Y.one("#resultContainer").show();
-									Y.one("#result-stats").setContent("Rendering...");
+									Y.one("#result-stats").setContent("Found " + result.numResults + " results in " + result.time + " ms.");
 
 									var ol = Y.Node.create("<ol></ol>");
 
-									var results = e.response.results[0].resultItems;
 									var markers = [];
-									for ( var result in results) {
-										renderResult(results[result], ol);
+									for ( var i in result.resultItems) {
+										renderResult(result.resultItems[i], ol);
 									}
 
 									Y.one("#results").setContent("").append(ol);
-									Y.one("#result-stats").setContent(
-											"Found " + e.response.results[0].numResults + " results in " + e.response.results[0].time + " ms.");
-
 								},
 								failure : function(e) {
 									alert(e.error.message);
 								}
 							}
 						});
-
 					}
-					;
 
 					function changeProperties(clazz) {
 						Y.one('#class-properties').setContent('');

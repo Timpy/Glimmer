@@ -592,12 +592,27 @@ public class RDFIndex {
 	return queryEngine.indexMap.get(alias);
     }
 
-    public Long getSubjectId(String uri) {
-	return allResourcesToIds.get(uri);
+    /**
+     * 
+     * @param uri - Resource or BNode
+     * @return the doc id if the given uri is a valid doc uri.
+     * @throws IOException 
+     */
+    public Integer getSubjectId(String uri) throws IOException {
+	Long id = allResourcesToIds.get(uri);
+	if (id != null) {
+	    // Check that the doc is a valid doc(has contents)..  TODO could use the subjects signed hash here..
+	    Document doc = documentCollection.document(id.intValue());
+	    if (doc.title().length() > 0) {
+		return id.intValue();
+	    }
+	}
+	return null;
     }
     
-    public Long getObjectID(String uri) {
-	return allResourcesToIds.get(uri);
+    public Integer getObjectID(String uri) {
+	Long id = allResourcesToIds.get(uri);
+	return id == null ? null :id.intValue();
     }
 
     public DocumentCollection getCollection() {

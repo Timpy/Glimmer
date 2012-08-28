@@ -18,13 +18,15 @@ public class RDFResultItem {
     public static class Relation {
 	private final String predicate;
 	private final String object;
+	private final Integer subjectIdOfObject;
 	private final String context;
 	private final boolean indexed;
 	private final String label;
 	
-	private Relation(String predicate, String object, String context, boolean indexed, String label) {
+	private Relation(String predicate, String object, Integer subjectIdOfObject, String context, boolean indexed, String label) {
 	    this.predicate = predicate;
 	    this.object = object;
+	    this.subjectIdOfObject = subjectIdOfObject;
 	    this.context = context;
 	    this.indexed = indexed;
 	    this.label = label;
@@ -36,6 +38,10 @@ public class RDFResultItem {
 
 	public String getObject() {
 	    return object;
+	}
+	
+	public int getSubjectIdOfObject() {
+	    return subjectIdOfObject;
 	}
 
 	public String getContext() {
@@ -70,7 +76,7 @@ public class RDFResultItem {
 
     // The Subject which is the same as the title and URI.
     private String subject;
-    private int docId;
+    private int subjectId;
     private double score;
     private final List<Relation> relations = new ArrayList<Relation>();
 
@@ -83,11 +89,11 @@ public class RDFResultItem {
     public void setSubject(String subject) {
 	this.subject = subject;
     }
-    public int getDocId() {
-	return docId;
+    public int getSubjectId() {
+	return subjectId;
     }
-    public void setDocId(int docId) {
-	this.docId = docId;
+    public void setSubjectId(int subjectId) {
+	this.subjectId = subjectId;
     }
     
     public double getScore() {
@@ -100,8 +106,8 @@ public class RDFResultItem {
     public List<Relation> getRelations() {
 	return relations;
     }
-    public void addRelation(String predicate, String object, String context, boolean indexed, String label) {
-	relations.add(new Relation(predicate, object, context, indexed, label));
+    public void addRelation(String predicate, String object, Integer subjectIdOfObject, String context, boolean indexed, String label) {
+	relations.add(new Relation(predicate, object, subjectIdOfObject, context, indexed, label));
     }
 
     public String getLabel() {
@@ -115,7 +121,7 @@ public class RDFResultItem {
 	StringBuilder sb = new StringBuilder();
 	sb.append(subject);
 	sb.append('(');
-	sb.append(docId);
+	sb.append(subjectId);
 	sb.append(") score:");
 	sb.append(score);
 	sb.append('\n');

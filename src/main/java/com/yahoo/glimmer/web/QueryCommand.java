@@ -16,12 +16,12 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 public class QueryCommand {
-    public static enum QueryType {YAHOO, MG4J};
+    public static enum QueryType {YAHOO, MG4J, DOCUMENT};
     
     @NotNull
-    public String query;
-    @NotNull
     public QueryCommand.QueryType type = QueryType.YAHOO;
+    @NotNull
+    public String query;
     public String callback;
     @Min(0)
     public int pageStart;
