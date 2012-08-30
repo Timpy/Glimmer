@@ -18,7 +18,6 @@ import it.unimi.dsi.mg4j.query.parser.SimpleParser;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 
 import javax.annotation.Resource;
@@ -33,7 +32,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.query.RDFIndexStatistics;
 import com.yahoo.glimmer.query.RDFQueryResult;
-import com.yahoo.glimmer.query.RDFResultItem;
 
 @Controller()
 public class QueryController {
@@ -94,7 +92,7 @@ public class QueryController {
 	    } catch (QueryParserException e) {
 		throw new IllegalArgumentException("Query failed to parse");
 	    }
-	     result = querier.doQuery(index, query, command.getPageStart(), command.getPageSize(), command.isDeref());
+	    result = querier.doQuery(index, query, command.getPageStart(), command.getPageSize(), command.isDeref());
 	    break;
 	case DOCUMENT:
 	    rawQuery = command.getQuery().trim();
@@ -114,14 +112,7 @@ public class QueryController {
 		    throw new IllegalArgumentException("subject " + rawQuery + " is not in collection.");
 		}
 	    }
-	    RDFResultItem resultItem = Querier.createRdfResultItem(index, id.intValue(), 1.0d, command.isDeref());
-	    List<RDFResultItem> results;
-	    if (resultItem != null) {
-		results = Collections.singletonList(resultItem);
-	    } else {
-		results = Collections.emptyList();
-	    }
-	    result = new RDFQueryResult("", null, results, 0);
+	    result = querier.doQueryForDocId(index, id, command.isDeref());
 	    break;
 	default:
 	    throw new IllegalArgumentException("No query type given.");

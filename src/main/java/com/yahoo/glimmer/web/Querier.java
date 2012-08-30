@@ -24,6 +24,8 @@ import it.unimi.dsi.mg4j.search.score.DocumentScoreInfo;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.util.Collections;
+import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.semanticweb.yars.nx.Node;
@@ -55,7 +57,7 @@ public class Querier {
 	ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results = new ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>>();
 
 	queryLogger.start();
-	
+
 	int numResults = index.process(startItem, maxNumItems, results, query);
 
 	if (results.size() > maxNumItems) {
@@ -76,12 +78,26 @@ public class Querier {
 	    }
 	}
 
-	long time = queryLogger.endQuery(query, numResults);
-	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", resultItems, (int)time);
+	long time = queryLogger.endQuery(query.toString(), numResults);
+	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", resultItems, (int) time);
 	return result;
     }
 
-    public static RDFResultItem createRdfResultItem(RDFIndex index, int docId, double score, boolean lookupObjectLabels) throws IOException {
+    public RDFQueryResult doQueryForDocId(RDFIndex index, int id, boolean deref) throws IOException {
+	queryLogger.start();
+	RDFResultItem resultItem = Querier.createRdfResultItem(index, id, 1.0d, deref);
+	long time = queryLogger.endQuery("getDoc " + Integer.toString(id), 1);
+	
+	List<RDFResultItem> results;
+	if (resultItem != null) {
+	    results = Collections.singletonList(resultItem);
+	} else {
+	    results = Collections.emptyList();
+	}
+	return new RDFQueryResult("", null, results, (int)time);
+    }
+
+    private static RDFResultItem createRdfResultItem(RDFIndex index, int docId, double score, boolean lookupObjectLabels) throws IOException {
 	Document doc = index.getDocument(docId);
 	if (doc == null || doc.title().length() == 0) {
 	    return null;
@@ -93,7 +109,8 @@ public class Querier {
 	item.setSubject(subject);
 
 	Reader r = (Reader) doc.content(0);
-	// We need to copy the WordReader otherwise the nested calls to createRdfResultItem() share the same instance.
+	// We need to copy the WordReader otherwise the nested calls to
+	// createRdfResultItem() share the same instance.
 	WordReader wr = doc.wordReader(0).copy().setReader(r);
 	StringBuilder sb = new StringBuilder();
 	MutableString word = new MutableString();
@@ -155,7 +172,7 @@ public class Querier {
 	}
 
 	Integer subjectIdOfObject = index.getSubjectId(object);
-	
+
 	if (label == null && lookupObjectLabels && subjectIdOfObject != null) {
 	    // If the object is also a subject Resource/BNode this will
 	    // return that subjects id with is the same as the docId.

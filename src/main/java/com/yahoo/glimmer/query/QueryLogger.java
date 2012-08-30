@@ -11,8 +11,6 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.mg4j.query.nodes.Query;
-
 import org.apache.log4j.Logger;
 
 public class QueryLogger {
@@ -46,7 +44,7 @@ public class QueryLogger {
 	threadLocalStartTime.set(System.currentTimeMillis());
     }
 
-    public synchronized long endQuery(Query query, int numResults) {
+    public synchronized long endQuery(String query, int numResults) {
 	Long startTime = threadLocalStartTime.get();
 	if (startTime == null) {
 	    throw new IllegalStateException("start() wasn't called!!");
@@ -63,7 +61,7 @@ public class QueryLogger {
 	    rollingCount += 1;
 	}
 
-	LOGGER.info("#" + LOG_SEPARATOR + numQueries + LOG_SEPARATOR + ((query != null) ? query.toString() : "") + LOG_SEPARATOR + duration + LOG_SEPARATOR
+	LOGGER.info("#" + LOG_SEPARATOR + numQueries + LOG_SEPARATOR + query + LOG_SEPARATOR + duration + LOG_SEPARATOR
 		+ ((double) sumTime / (double) numQueries) + LOG_SEPARATOR + rollingSum + LOG_SEPARATOR + rollingCount + LOG_SEPARATOR
 		+ ((double) rollingSum / (double) rollingCount) + LOG_SEPARATOR + numResults);
 	threadLocalStartTime.set(null);
