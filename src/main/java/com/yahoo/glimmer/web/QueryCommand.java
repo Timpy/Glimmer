@@ -16,7 +16,7 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 
 public class QueryCommand {
-    public static enum QueryType {YAHOO, MG4J, DOCUMENT};
+    public static enum QueryType {YAHOO, MG4J};
     
     @NotNull
     public QueryCommand.QueryType type = QueryType.YAHOO;

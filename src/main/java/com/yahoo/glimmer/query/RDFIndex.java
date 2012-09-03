@@ -603,11 +603,12 @@ public class RDFIndex {
 	if (id != null) {
 	    // Check that the doc is a valid doc(has contents)..  TODO could use the subjects signed hash here..
 	    Document doc = documentCollection.document(id.intValue());
-	    if (doc.title().length() > 0) {
-		return id.intValue();
+	    if (doc.title().length() == 0) {
+		id = null;
 	    }
+	    doc.close();
 	}
-	return null;
+	return id == null ? null : id.intValue();
     }
     
     public Integer getObjectID(String uri) {

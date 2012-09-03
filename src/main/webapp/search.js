@@ -60,401 +60,432 @@ function unescape(s) {
 
 YUI({
 	gallery : 'gallery-2011.01.03-18-30'
-})
-		.use(
-				'gallery-yui3treeview',
-				'history',
-				'tabview',
-				'node',
-				'datatable-scroll',
-				'event',
-				'datasource',
-				'querystring-parse-simple',
-				'autocomplete',
-				'autocomplete-filters',
-				'autocomplete-highlighters',
-				function(Y) {
-					var dataSource = new Y.DataSource.Get({
-						source : webapp + "ajax/"
-					});
+}).use(
+	'gallery-yui3treeview',
+	'history',
+	'tabview',
+	'node',
+	'datatable-scroll',
+	'event',
+	'datasource',
+	'querystring-parse-simple',
+	'autocomplete',
+	'autocomplete-filters',
+	'autocomplete-highlighters',
+	
+	function(Y) {
+		var dataSource = new Y.DataSource.Get({
+			source : webapp + "ajax/"
+		});
+		
+		Y.HistoryHash.hashPrefix = '!';
+		var history = new Y.HistoryHash();
 
-					// A value (URI or Literal) to be rendered. URI optionally
-					// has anchortext
-					function renderValue(ref, value) {
-						if (ref.startsWith("urn:uuid:")) {
-							ref = ref.substring(9);
-							if (value == undefined) {
-								value = ref;
+		function initDataSet() {
+			fieldShortNames = [ "any" ];
+			fieldLongNames = [ "any" ];
+			Y.one("#results").setContent("");
+			Y.one("#result-stats").setContent("");
+			Y.one("#class-select").setContent("");
+			Y.one("#resultContainer").hide();
+
+			Y.one("#statistics-tree").setContent("");
+			Y.one("#statistics-loader").show();
+
+			dataSource.sendRequest({
+				request : 'indexStatistics?index=' + Y.one("#dataset").get('value'),
+				callback : {
+					success : function(e) {
+						stats = e.response.results[0];
+
+						Y.one("#class-loader").hide();
+						Y.one("#class-message").setContent("");
+
+						Y.one("#statistics-loader").hide();
+
+						var autocompletefields = [ 'OR' ];
+						for ( var key in stats.fields) {
+							fieldShortNames.push(key);
+							fieldLongNames.push(stats.fields[key]);
+							// fill up the autocomplete
+							// suggestion box
+							autocompletefields.push(key);
+						}
+
+						Y.one('#ac-input').plug(Y.Plugin.AutoComplete, {
+							resultFilters : 'phraseMatch',
+							queryDelimiter : ' ',
+							tabSelect : 'true',
+							typeAhead : 'true',
+							source : autocompletefields
+						});
+
+						// Display class selection dropdown
+						if (stats.classes.lenght > 0) {
+							var frag = '<select>';
+							var keys = [];
+							for ( var key in stats.classes) {
+								keys.push(key);
 							}
-							var kbname = Y.one("#dataset").get('value');
-							return '<a href="search.html?index=' + kbname + '&subject=' + ref + '">' + value + '</a>';
-						}
-
-						if (value == undefined) {
-							value = ref;
-						}
-						if (ref.startsWith("http:")) {
-							return '<a href="' + ref + '">' + value + '</a>';
-						}
-						return value;
-					}
-
-					function renderResult(result, node) {
-						var li = Y.Node.create("<li class=\"result\"></li>");
-
-						function predSort(a, b) {
-							return (fieldLongNames.indexOf(encode(a.predicate)) - fieldLongNames.indexOf(encode(b.predicate)));
-						}
-						result.relations.sort(predSort);
-
-						// Group the relations by predicate
-						var map = [];
-						var types = [];
-
-						if (result.hasOwnProperty("relations")) {
-							for (relationIndex in result.relations) {
-								var relation = result.relations[relationIndex];
-								if (map[relation.predicate] == null) {
-									map[relation.predicate] = [ relation ];
-								} else {
-									map[relation.predicate].push(relation);
-								}
-								if (relation.predicate == RDF_TYPE) {
-									types.push(stripVersion(relation.object));
-								}
+							keys.sort();
+							for (clazz in keys) {
+								frag = frag + "<option value='" + keys[clazz] + "'>" + getLocalName(keys[clazz]) + "</option>";
 							}
-						}
-						function typeSort(a, b) {
-							return stats.classes[b].count - stats.classes[a].count;
-						}
-						types.sort(typeSort);
 
-						if (result.hasOwnProperty("label") && result.label != null) {
-							li.append('<span class="label">' + result.label + '</span>');
+							frag = frag + '</select>';
+							var fragNode = Y.Node.create(frag);
+							Y.one('#class-select').append("I'm looking for a").append(fragNode).append("where");
+							changeProperties(keys[0]);
+							fragNode.on('change', function(e) {
+								changeProperties(e.target.get('value'));
+							});
 						}
-						li.append("<br/>");
-						for (type in types) {
-							li.append('&nbsp;<a class="type" href="' + types[type] + '">' + getLocalName(types[type]) + '</a>&nbsp;/');
-						}
-						var span = Y.Node.create('<span class="id"><a href=' + result.subject + '>' + result.subject + '</a></span>');
-						if (result.subjectId != undefined) {
-							var sourceLink = Y.Node.create('<a href="#">&nbsp;-&gt;</a>');
-							var closure = closureCall(getDocumentByIdOrSubject, result.subjectId);
-							sourceLink.on('click', closure);
-							span.appendChild(sourceLink);
-						}
-						li.append(span);
 
-						var table = Y.Node
-								.create('<table class=\"result\"><col class=\"predicate-col\"/><col class=\"value-col\"/><th class="result-header">Property</th><th class=\"result-header\">Value</th></table>');
-						var i = 0;
-						for (var predicate in map) {
-							if (predicate == RDF_TYPE)
-								continue;
-							
-							var tdPredicate = Y.Node.create('<td class="predicate">' + getLocalName(predicate) + '</td>');
-							
-							var tdValues = Y.Node.create('<td></td>');
-							for ( var relationIndex in map[predicate]) {
-								var item = map[predicate][relationIndex];
-								var providedName = getProviderName(item.context[0]);
-								var div = Y.Node.create('<div title="' + providedName + '" class="source-' + providedName + '"></div>');
-								div.appendChild(renderValue(item.object, item.label));
-								if (item.subjectIdOfObject != undefined) {
-									var sourceLink = Y.Node.create('<a href="#">&nbsp;-&gt;</a>');
-									var closure = closureCall(getDocumentByIdOrSubject, item.subjectIdOfObject);
-									sourceLink.on('click', closure);
-									div.appendChild(sourceLink);
+						var tree = [];
+						function addClass(clazz) {
+							var sub = [];
+							var count = 0;
+							if (stats.classes[clazz] != undefined) {
+								count = stats.classes[clazz].count;
+								for (uri in stats.classes[clazz].children) {
+									var child = stats.classes[clazz].children[uri];
+									if (stats.classes[child] != undefined)
+										sub.push(addClass(child));
 								}
-								tdValues.appendChild(div);
-							}
-							
-							var tr;
-							if (i++ % 2 == 0) {
-								tr = Y.Node.create('<tr class="even"></tr>');
 							} else {
-								tr = Y.Node.create('<tr class="odd"></tr>');
+								// Class appears in the
+								// ontology but no instances
+								return [];
 							}
-							tr.appendChild(tdPredicate);
-							tr.appendChild(tdValues);
-							table.appendChild(tr);
+							if (sub.length > 0) {
+								return {
+									label : getLocalName(clazz) + " (" + count + ") ",
+									type : "TreeView",
+									children : sub
+								};
+							} else {
+								return {
+									label : getLocalName(clazz) + " (" + count + ") "
+								};
+							}
 						}
 
-						li.append(table);
-						node.append(li);
-
-					}
-					
-					function closureCall(func, param) {
-						var f = func;
-						var p = param;
-						return function () {
-							f(p);
-						}
-					}
-
-					function executeUnifiedSearch(e) {
-						var query = Y.one("#ac-input").get('value');
-						loadResults(query);
-					}
-
-					function executeSearchByClass(e) {
-						var query = '';
-						var params = Y.all(".class-property").each(function(thisNode) {
-							if (thisNode.get('value') != '') {
-								query = query + ' ';
-								query = query + ns + thisNode.get('name') + ':' + thisNode.get('value');
-							}
+						// Render TreeView
+						Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
+						tree.push(addClass(ONTOLOGY_ROOT));
+						var treeview = new Y.TreeView({
+							srcNode : '#statisticsTreeList',
+							contentBox : null,
+							type : "TreeView",
+							children : tree
 						});
-						loadResults(query);
-					}
 
-					function executeSearchByID(e) {
-						loadResults("subject=urn:uuid:" + Y.one('#id-text').get('value'));
-					}
-					
-					function getDocumentByIdOrSubject(idOrSubject) {
-						loadResults(idOrSubject, "DOCUMENT");
-					}
+						treeview.render();
+						// Expand the top level of the tree
+						var statisticsTree = Y.one('#statistics-tree').removeClass('yui3-tree-collapsed');
 
-					function loadResults(query, type) {
-						type = typeof type !== 'undefined' ? type : "YAHOO";
+						// Render statistics box
+						/*
+						 * Y.one("#statistics").setContent(''); var sidestats =
+						 * [];a for (clazz in keys) { sidestats.push({"Entity" :
+						 * getLocalName(keys[clazz]), "Count":
+						 * stats.classes[keys[clazz]].count}); } var
+						 * dtScrollingY = new Y.DataTable.Base({ columnset : [{
+						 * key : "Entity", label : "Entity" }, { key : "Count",
+						 * label : "Count" }], recordset : sidestats, summary :
+						 * "Y axis scrolling table" });
+						 * dtScrollingY.plug(Y.Plugin.DataTableScroll, { height :
+						 * "400px" }); dtScrollingY.render("#statistics");
+						 */
+
+						doQuery(history.get());
+					},
+					failure : function(e) {
+						Y.one("#statistics-loader").hide();
+						alert("Failed to preload fields : " + e.error.message);
+					}
+				}
+			});
+		}
+
+		function getDocumentByIdOrSubject(idOrSubject) {
+			Y.one("#ac-input").set('value', "doc:" + idOrSubject);
+			executeUnifiedSearch(null);
+		}
+		
+		function executeUnifiedSearch(e) {
+			var query = Y.one("#ac-input").get('value');
+			loadResults(query);
+		}
+
+		function executeSearchByClass(e) {
+			var query = '';
+			var params = Y.all(".class-property").each(function(thisNode) {
+				if (thisNode.get('value') != '') {
+					query = query + ' ';
+					query = query + ns + thisNode.get('name') + ':' + thisNode.get('value');
+				}
+			});
+			loadResults(query);
+		}
+
+		function loadResults(query) {
+			Y.one("#result-loader").show();
+			
+			history.add({
+				'index': Y.one("#dataset").get('value'),
+				'query': query,
+				'pageSize': Y.one("#numresults").get('value'),
+				'deref': Y.one("#dereference").get('checked'),
+			});
+		}
+
+		function doQuery(paramsMap) {
+			if (paramsMap['index'] == undefined || paramsMap['query'] == undefined) { // || paramsMap['query'].length == 0) {
+				return;
+			}
+			var paramsArgs = "";
+			for (key in paramsMap) {
+				if (paramsArgs.length > 0) {
+					paramsArgs += '&';
+				}
+				paramsArgs += key + '=' + paramsMap[key];
+			}
+			
+			dataSource.sendRequest({
+				request : 'query?' + paramsArgs,
+				callback : {
+					success : function(e) {
+						var result = e.response.results[0];
 						
-						Y.one("#result-loader").show();
+						Y.one("#result-loader").hide();
+						Y.one("#resultContainer").show();
+						Y.one("#result-stats").setContent("Found " + result.numResults + " results in " + result.time + " ms.");
 
-						dataSource.sendRequest({
-							request : 'query?index=' + Y.one("#dataset").get('value') + '&query=' + query + '&pageSize=' + Y.one("#numresults").get('value')
-									+ '&deref=' + Y.one("#dereference").get('checked') + "&type=" + type,
-							callback : {
-								success : function(e) {
-									var result = e.response.results[0];
-									
-									Y.one("#result-loader").hide();
-									Y.one("#resultContainer").show();
-									Y.one("#result-stats").setContent("Found " + result.numResults + " results in " + result.time + " ms.");
+						var ol = Y.Node.create("<ol></ol>");
 
-									var ol = Y.Node.create("<ol></ol>");
-
-									var markers = [];
-									for ( var i in result.resultItems) {
-										renderResult(result.resultItems[i], ol);
-									}
-
-									Y.one("#results").setContent("").append(ol);
-								},
-								failure : function(e) {
-									alert(e.error.message);
-								}
-							}
-						});
-					}
-
-					function changeProperties(clazz) {
-						Y.one('#class-properties').setContent('');
-						var frag = '<table>';
-						for ( var i in stats.classes[clazz].properties) {
-							frag = frag + '<tr><td>' + getLocalName(stats.classes[clazz].properties[i])
-									+ '</td><td><input class="class-property yui3-hastooltip" type="text" title="' + /* TODO */'" name="'
-									+ getLocalName(stats.classes[clazz].properties[i]) + '"/></td></tr>';
+						var markers = [];
+						for ( var i in result.resultItems) {
+							renderResult(result.resultItems[i], ol);
 						}
-						frag = frag + '</table>';
-						Y.one('#class-properties').append(Y.Node.create(frag)).show();
+
+						Y.one("#results").setContent("").append(ol);
+					},
+					failure : function(e) {
+						alert(e.error.message);
 					}
+				}
+			});
+		}
 
-					function initDataSet() {
+		function renderResult(result, node) {
+			var li = Y.Node.create("<li class=\"result\"></li>");
 
-						fieldShortNames = [ "any" ];
-						fieldLongNames = [ "any" ];
-						Y.one("#results").setContent("");
-						Y.one("#result-stats").setContent("");
-						Y.one("#class-select").setContent("");
-						Y.one("#resultContainer").hide();
+			function predSort(a, b) {
+				return (fieldLongNames.indexOf(encode(a.predicate)) - fieldLongNames.indexOf(encode(b.predicate)));
+			}
+			result.relations.sort(predSort);
 
-						Y.one("#statistics-tree").setContent("");
-						Y.one("#statistics-loader").show();
+			// Group the relations by predicate
+			var map = [];
+			var types = [];
 
-						dataSource.sendRequest({
-							request : 'indexStatistics?index=' + Y.one("#dataset").get('value'),
-							callback : {
-								success : function(e) {
-									stats = e.response.results[0];
-
-									Y.one("#class-loader").hide();
-									Y.one("#class-message").setContent("");
-
-									Y.one("#statistics-loader").hide();
-
-									var autocompletefields = [ 'OR' ];
-									for ( var key in stats.fields) {
-										fieldShortNames.push(key);
-										fieldLongNames.push(stats.fields[key]);
-										// fill up the autocomplete
-										// suggestion box
-										autocompletefields.push(key);
-									}
-
-									Y.one('#ac-input').plug(Y.Plugin.AutoComplete, {
-										resultFilters : 'phraseMatch',
-										queryDelimiter : ' ',
-										tabSelect : 'true',
-										typeAhead : 'true',
-										source : autocompletefields
-									});
-
-									// Display class selection dropdown
-									if (stats.classes.lenght > 0) {
-										var frag = '<select>';
-										var keys = [];
-										for ( var key in stats.classes) {
-											keys.push(key);
-										}
-										keys.sort();
-										for (clazz in keys) {
-											frag = frag + "<option value='" + keys[clazz] + "'>" + getLocalName(keys[clazz]) + "</option>";
-										}
-
-										frag = frag + '</select>';
-										var fragNode = Y.Node.create(frag);
-										Y.one('#class-select').append("I'm looking for a").append(fragNode).append("where");
-										changeProperties(keys[0]);
-										fragNode.on('change', function(e) {
-											changeProperties(e.target.get('value'));
-										});
-									}
-
-									var tree = [];
-									function addClass(clazz) {
-										var sub = [];
-										var count = 0;
-										if (stats.classes[clazz] != undefined) {
-											count = stats.classes[clazz].count;
-											for (uri in stats.classes[clazz].children) {
-												var child = stats.classes[clazz].children[uri];
-												if (stats.classes[child] != undefined)
-													sub.push(addClass(child));
-											}
-										} else {
-											// Class appears in the
-											// ontology but no instances
-											return [];
-										}
-										if (sub.length > 0) {
-											return {
-												label : getLocalName(clazz) + " (" + count + ") ",
-												type : "TreeView",
-												children : sub
-											};
-										} else {
-											return {
-												label : getLocalName(clazz) + " (" + count + ") "
-											};
-										}
-									}
-
-									// Render TreeView
-									Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
-									tree.push(addClass(ONTOLOGY_ROOT));
-									var treeview = new Y.TreeView({
-										srcNode : '#statisticsTreeList',
-										contentBox : null,
-										type : "TreeView",
-										children : tree
-									});
-
-									treeview.render();
-									// Expand the top level of the tree
-									var statisticsTree = Y.one('#statistics-tree').removeClass('yui3-tree-collapsed');
-
-									// Render statistics box
-									/*
-									 * Y.one("#statistics").setContent(''); var
-									 * sidestats = [];a for (clazz in keys) {
-									 * sidestats.push({"Entity" :
-									 * getLocalName(keys[clazz]), "Count":
-									 * stats.classes[keys[clazz]].count}); } var
-									 * dtScrollingY = new Y.DataTable.Base({
-									 * columnset : [{ key : "Entity", label :
-									 * "Entity" }, { key : "Count", label :
-									 * "Count" }], recordset : sidestats,
-									 * summary : "Y axis scrolling table" });
-									 * dtScrollingY.plug(Y.Plugin.DataTableScroll, {
-									 * height : "400px" });
-									 * dtScrollingY.render("#statistics");
-									 */
-
-									// On load, check if there were any
-									// query parameters
-									if (args['subject'] != undefined && args['subject'] != null) {
-										var queryNode = Y.one("#id-text");
-										queryNode.set('value', args['subject']);
-										executeSearchByID();
-									}
-
-								},
-								failure : function(e) {
-									alert("Failed to preload fields : " + e.error.message);
-								}
-							}
-						});
+			if (result.hasOwnProperty("relations")) {
+				for (relationIndex in result.relations) {
+					var relation = result.relations[relationIndex];
+					if (map[relation.predicate] == null) {
+						map[relation.predicate] = [ relation ];
+					} else {
+						map[relation.predicate].push(relation);
 					}
-
-					function initDataSetList(selectedDataSetName) {
-						dataSource.sendRequest({
-							request : 'dataSetList?',
-							callback : {
-								success : function(e) {
-									dataSetNames = e.response.results;
-
-									for ( var i in dataSetNames) {
-										var dataSetName = dataSetNames[i];
-										Y.one("#dataset").append('<option value=\"' + dataSetName + '\">' + dataSetName + '</option>');
-										if ((selectedDataSetName == null && i == 0) || dataSetName == selectedDataSetName) {
-											Y.one("#dataset").set('value', dataSetName);
-											// Load the fields for the dataset
-											initDataSet();
-										}
-									}
-									Y.one('#dataset').on('change', initDataSet);
-								},
-								failure : function(e) {
-									alert("Failed to load data set list : " + e.error.message);
-								}
-							}
-						});
+					if (relation.predicate == RDF_TYPE) {
+						types.push(stripVersion(relation.object));
 					}
+				}
+			}
+			function typeSort(a, b) {
+				return stats.classes[b].count - stats.classes[a].count;
+			}
+			types.sort(typeSort);
 
-					// Everything below is run automatically upon loading the
-					// page
+			if (result.hasOwnProperty("label") && result.label != null) {
+				li.append('<span class="label">' + result.label + '</span>');
+			}
+			li.append("<br/>");
+			for (type in types) {
+				li.append('&nbsp;<a class="type" href="' + types[type] + '">' + getLocalName(types[type]) + '</a>&nbsp;/');
+			}
+			var span = Y.Node.create('<span class="id"><a href=' + result.subject + '>' + result.subject + '</a></span>');
+			if (result.subjectId != undefined) {
+				appendDocLink(span, result.subjectId);
+			}
+			li.append(span);
 
-					initDataSetList(args['kb']);
+			var table = Y.Node
+					.create('<table class=\"result\"><col class=\"predicate-col\"/><col class=\"value-col\"/><th class="result-header">Property</th><th class=\"result-header\">Value</th></table>');
+			var i = 0;
+			for (var predicate in map) {
+				if (predicate == RDF_TYPE)
+					continue;
+				
+				var tdPredicate = Y.Node.create('<td class="predicate">' + getLocalName(predicate) + '</td>');
+				
+				var tdValues = Y.Node.create('<td></td>');
+				for ( var relationIndex in map[predicate]) {
+					var item = map[predicate][relationIndex];
+					var providedName = getProviderName(item.context[0]);
+					var div = Y.Node.create('<div title="' + providedName + '" class="source-' + providedName + '"></div>');
+					div.appendChild(renderValue(item.object, item.label));
+					if (item.subjectIdOfObject != undefined) {
+						appendDocLink(div, item.subjectIdOfObject);
+					}
+					tdValues.appendChild(div);
+				}
+				
+				var tr;
+				if (i++ % 2 == 0) {
+					tr = Y.Node.create('<tr class="even"></tr>');
+				} else {
+					tr = Y.Node.create('<tr class="odd"></tr>');
+				}
+				tr.appendChild(tdPredicate);
+				tr.appendChild(tdValues);
+				table.appendChild(tr);
+			}
 
-					// Add handlers
+			li.append(table);
+			node.append(li);
 
-					// On submit, retrieve and display search results
-					Y.one('#search-by-class').on('submit', executeSearchByClass);
+		}
 
-					// On submit, retrieve and display search results
-					Y.one('#search-by-id').on('submit', executeSearchByID);
+		function appendDocLink(parent, docId) {
+			var func = getDocumentByIdOrSubject;
+			var param = docId;
+			var closure = function() {
+				func(param);
+			}
+			var element = Y.Node.create('<span class="doc-link">&nbsp;-&gt;</span>');
+			element.on('click', closure);
+			parent.appendChild(element);
+		}
+		
+		// A value (URI or Literal) to be rendered. URI optionally
+		// has anchortext
+		function renderValue(ref, value) {
+			if (ref.startsWith("urn:uuid:")) {
+				ref = ref.substring(9);
+				if (value == undefined) {
+					value = ref;
+				}
+				var kbname = Y.one("#dataset").get('value');
+				return '<a href="search.html?index=' + kbname + '&subject=' + ref + '">' + value + '</a>';
+			}
 
-					// On submit, retrieve and display search results
-					Y.one('#unifiedsearchform').on('submit', executeUnifiedSearch);
+			if (value == undefined) {
+				value = ref;
+			}
+			if (ref.startsWith("http:")) {
+				return '<a href="' + ref + '">' + value + '</a>';
+			}
+			return value;
+		}
 
-					// Toggle ontology search box
-					Y.one('#toggleonto').on('click', function(e) {
-						var node = Y.one('#onto-hider');
-						var link = Y.one('#toggleonto');
-						if (link.getContent() == "hide") {
-							node.hide();
-							link.setContent("show");
-						} else {
-							node.show();
-							link.setContent("hide");
-						}
-					});
-
-					var tabview = new Y.TabView({
-						srcNode : '#resultContainer'
-					});
-					tabview.render();
-
+		function changeProperties(clazz) {
+			Y.one('#class-properties').setContent('');
+			var frag = '<table>';
+			for ( var i in stats.classes[clazz].properties) {
+				frag = frag + '<tr><td>' + getLocalName(stats.classes[clazz].properties[i])
+						+ '</td><td><input class="class-property yui3-hastooltip" type="text" title="' + /* TODO */'" name="'
+						+ getLocalName(stats.classes[clazz].properties[i]) + '"/></td></tr>';
+			}
+			frag = frag + '</table>';
+			Y.one('#class-properties').append(Y.Node.create(frag)).show();
+		}
+		
+		function updateSearchBoxes(paramsMap) {
+			if (paramsMap['query'] != undefined) {
+				Y.one("#ac-input").set('value', paramsMap['query']);
+			} else {
+				Y.one("#ac-input").set('value', '');
+			}
+			if (paramsMap['pageSize'] != undefined) {
+				Y.one("#numresults").set('value', paramsMap['pageSize']);
+			}
+			if (paramsMap['deref'] != undefined) {
+				Y.one("#dereference").set('checked', paramsMap['deref'] == 'true');
+			}
+			if (paramsMap['index'] != undefined) {
+				var selectOption;
+				Y.one("#dataset").get("options").each( function() {
+					if (this.get('value') == paramsMap['index']) {
+						selectOption = this;
+					}
 				});
+				
+				if (selectOption == undefined) {
+					alert("The given index " + paramsMap['index'] + " was not found on the server.");
+				} else {
+					if (!selectOption.get('selected')) {
+						// Change dataset.
+						selectOption.set('selected', true);
+						initDataSet();
+					}
+				}
+			} else {
+				initDataSet();
+			}
+		}
+		
+		// Making the ajax query request is driven through the history.
+		// We listen for changes and update the results as appropriated.
+		history.on('change', function (e) {
+			if (e.src === Y.HistoryHash.SRC_HASH) {
+				updateSearchBoxes(e.newVal);
+			}
+			doQuery(e.newVal); 
+		});
+		
+		dataSource.sendRequest({
+			request : 'dataSetList?',
+			callback : {
+				success : function(e) {
+					dataSetNames = e.response.results;
+					for ( var i in dataSetNames) {
+						var dataSetName = dataSetNames[i];
+						Y.one("#dataset").append('<option value=\"' + dataSetName + '\">' + dataSetName + '</option>');
+					}
+					
+					updateSearchBoxes(history.get());
+					Y.one('#dataset').on('change', initDataSet);
+				},
+				failure : function(e) {
+					alert("Failed to load data set list : " + e.error.message);
+				}
+			}
+		});
+
+		// On submit, retrieve and display search results
+		Y.one('#search-by-class').on('submit', executeSearchByClass);
+
+		// On submit, retrieve and display search results
+		Y.one('#unifiedsearchform').on('submit', executeUnifiedSearch);
+
+		// Toggle ontology search box
+		Y.one('#toggleonto').on('click', function(e) {
+			var node = Y.one('#onto-hider');
+			var link = Y.one('#toggleonto');
+			if (link.getContent() == "hide") {
+				node.hide();
+				link.setContent("show");
+			} else {
+				node.show();
+				link.setContent("hide");
+			}
+		});
+
+		var tabview = new Y.TabView({
+			srcNode : '#resultContainer'
+		});
+		tabview.render();
+	}
+);

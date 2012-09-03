@@ -9,8 +9,6 @@
 <link rel="stylesheet" type="text/css" href="glimmer-red.css" />
 </head>
 <body>
-	<!-- Adding map capabilities -->
-	<script src="http://api.maps.nokia.com/2.2.1/jsl.js" type="text/javascript"	charset="utf-8"></script>
 	<script src="http://yui.yahooapis.com/3.4.1/build/yui/yui-min.js"></script>
 	<script type="text/javascript" src="search.js"></script>
 	<div id="container" class="container">
@@ -20,7 +18,7 @@
 		<div id="selectionbar"></div>
 		<div id="mainContent">
 			<div id="statisticsTree">
-				<div id="statistics-loader">
+				<div id="statistics-loader" style="visibility:hidden;">
 					<div>Loading...</div>
 					<img src="http://ontologyonline.org/img/ajax-loader.gif"
 						alt="Loading Image" />
@@ -51,13 +49,6 @@
 								personName:(barack obama) birthDate:(1961)</label> <br> <input
 								id="ac-input" type="text"> <input type="submit"
 								class="button" value="Search">
-						</form>
-					</div>
-					<div id="idsearch" class="hidden">
-						<h2>Search by ID</h2>
-						<form id="search-by-id" action="javascript:void(0);">
-							<input id="id-text" type="text" size="36"></input> <br /> <input
-								type="submit" class="button" value="Search">
 						</form>
 					</div>
 

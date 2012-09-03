@@ -130,6 +130,7 @@ public class Querier {
 		sb.append(nonWord);
 	    }
 	}
+	r.close();
 	parseRelation(index, sb, item, lookupObjectLabels);
 	doc.close();
 
