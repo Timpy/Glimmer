@@ -67,17 +67,15 @@ YUI({
 	'node',
 	'datatable-scroll',
 	'event',
-	'datasource',
+	'io-base',
+	'json-parse',
+	'json-stringify',
 	'querystring-parse-simple',
 	'autocomplete',
 	'autocomplete-filters',
 	'autocomplete-highlighters',
 	
 	function(Y) {
-		var dataSource = new Y.DataSource.Get({
-			source : webapp + "ajax/"
-		});
-		
 		Y.HistoryHash.hashPrefix = '!';
 		var history = new Y.HistoryHash();
 
@@ -92,11 +90,13 @@ YUI({
 			Y.one("#statistics-tree").setContent("");
 			Y.one("#statistics-loader").show();
 
-			dataSource.sendRequest({
-				request : 'indexStatistics?index=' + Y.one("#dataset").get('value'),
-				callback : {
-					success : function(e) {
-						stats = e.response.results[0];
+			var indexStatisticsConfig = {
+				data: {
+					'index': Y.one("#dataset").get('value')
+				},
+				on: {
+					success : function(transactionid, response, arguments) {
+						var stats = Y.JSON.parse(response.response);
 
 						Y.one("#class-loader").hide();
 						Y.one("#class-message").setContent("");
@@ -197,15 +197,15 @@ YUI({
 						 * dtScrollingY.plug(Y.Plugin.DataTableScroll, { height :
 						 * "400px" }); dtScrollingY.render("#statistics");
 						 */
-
-						doQuery(history.get());
 					},
-					failure : function(e) {
+					failure : function(transactionid, response, arguments) {
 						Y.one("#statistics-loader").hide();
-						alert("Failed to preload fields : " + e.error.message);
+						alert("Failed to get index stats from server. " + response);
 					}
 				}
-			});
+			}
+			
+			Y.io('ajax/indexStatistics', indexStatisticsConfig);
 		}
 
 		function getDocumentByIdOrSubject(idOrSubject) {
@@ -242,21 +242,16 @@ YUI({
 
 		function doQuery(paramsMap) {
 			if (paramsMap['index'] == undefined || paramsMap['query'] == undefined) { // || paramsMap['query'].length == 0) {
+				Y.one("#result-loader").hide();
+				Y.one("#resultContainer").hide();
 				return;
 			}
-			var paramsArgs = "";
-			for (key in paramsMap) {
-				if (paramsArgs.length > 0) {
-					paramsArgs += '&';
-				}
-				paramsArgs += key + '=' + paramsMap[key];
-			}
 			
-			dataSource.sendRequest({
-				request : 'query?' + paramsArgs,
-				callback : {
-					success : function(e) {
-						var result = e.response.results[0];
+			var doQueryConfig = {
+				data: paramsMap,
+				on: {
+					success : function(transactionid, response, arguments) {
+						var result = Y.JSON.parse(response.response);
 						
 						Y.one("#result-loader").hide();
 						Y.one("#resultContainer").show();
@@ -271,11 +266,15 @@ YUI({
 
 						Y.one("#results").setContent("").append(ol);
 					},
-					failure : function(e) {
-						alert(e.error.message);
+					failure : function(transactionid, response, arguments) {
+						var message = Y.JSON.parse(response.response);
+						alert("Failed to get results from server. " + message);
+						Y.one("#result-loader").hide();
+						Y.one("#resultContainer").hide();
 					}
 				}
-			});
+			}
+			Y.io('ajax/query', doQueryConfig);
 		}
 
 		function renderResult(result, node) {
@@ -423,16 +422,13 @@ YUI({
 				});
 				
 				if (selectOption == undefined) {
-					alert("The given index " + paramsMap['index'] + " was not found on the server.");
+					alert("The given index named " + paramsMap['index'] + " was not found on the server.");
 				} else {
 					if (!selectOption.get('selected')) {
 						// Change dataset.
 						selectOption.set('selected', true);
-						initDataSet();
 					}
 				}
-			} else {
-				initDataSet();
 			}
 		}
 		
@@ -445,24 +441,29 @@ YUI({
 			doQuery(e.newVal); 
 		});
 		
-		dataSource.sendRequest({
-			request : 'dataSetList?',
-			callback : {
-				success : function(e) {
-					dataSetNames = e.response.results;
-					for ( var i in dataSetNames) {
+		var dataSetListConfig = {
+			on: {
+				success: function(transactionid, response, arguments) {
+					var dataSetNames = Y.JSON.parse(response.response);
+					for (var i in dataSetNames) {
 						var dataSetName = dataSetNames[i];
 						Y.one("#dataset").append('<option value=\"' + dataSetName + '\">' + dataSetName + '</option>');
 					}
 					
 					updateSearchBoxes(history.get());
+					
+					initDataSet();
 					Y.one('#dataset').on('change', initDataSet);
+					
+					doQuery(history.get());
 				},
-				failure : function(e) {
-					alert("Failed to load data set list : " + e.error.message);
+				failure: function(transactionid, response, arguments) {
+					alert("Failed to load data set list.");
 				}
 			}
-		});
+		}
+		
+		Y.io('ajax/dataSetList', dataSetListConfig);
 
 		// On submit, retrieve and display search results
 		Y.one('#search-by-class').on('submit', executeSearchByClass);

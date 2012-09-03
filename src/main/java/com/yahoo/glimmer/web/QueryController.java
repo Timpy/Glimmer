@@ -132,15 +132,7 @@ public class QueryController {
     @ExceptionHandler(Exception.class)
     public Map<String, ?> handleException(Exception ex, HttpServletResponse response) {
 	response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-	return Collections.singletonMap(OBJECT_KEY, new AjaxFailureResponse(ex.getMessage()));
-    }
-    
-    public static class AjaxFailureResponse {
-	public final boolean success = false;
-	public final String message;
-	public AjaxFailureResponse(String message) {
-	    this.message = message;
-	}
+	return Collections.singletonMap(OBJECT_KEY, ex.getMessage());
     }
 
     private static String decodeEntities(String query) {
