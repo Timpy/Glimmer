@@ -230,8 +230,6 @@ YUI({
 		}
 
 		function loadResults(query) {
-			Y.one("#result-loader").show();
-			
 			history.add({
 				'index': Y.one("#dataset").get('value'),
 				'query': query,
@@ -246,6 +244,8 @@ YUI({
 				Y.one("#resultContainer").hide();
 				return;
 			}
+			
+			Y.one("#result-loader").show();
 			
 			var doQueryConfig = {
 				data: paramsMap,
@@ -432,7 +432,7 @@ YUI({
 			}
 		}
 		
-		// Making the ajax query request is driven through the history.
+		// The ajax query requests are driven through the history object.
 		// We listen for changes and update the results as appropriated.
 		history.on('change', function (e) {
 			if (e.src === Y.HistoryHash.SRC_HASH) {
