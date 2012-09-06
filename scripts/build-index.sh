@@ -28,8 +28,10 @@ fi
 
 # Set to "-C" to exclude context from processing. 
 EXCLUDE_CONTEXTS=""
-# Set PrepTool's -s -p -o -c -a options here to exclude tuples not matching the given regexes.
-PREP_FILTERS=""
+# Optionally set PrepTool's tuple filter definition file.  This is a file containing an XStream serialized instance of a TupleFilter.
+# See SchemaDotOrgRegexTupleFilter.xml as an example and http://xstream.codehaus.org/converters.html.
+#PREP_FILTER_FILE="SchemaDotOrgTupleFilter.xml"
+PREP_FILTER_FILE=""
 
 # Number of predicates to use when building vertical indexes.  
 # The occurrences of predicates found in the source tuples are counted and then sorted by occurrence count.
@@ -149,6 +151,12 @@ function groupBySubject () {
 	local REDUCER_TASKS=${3}
 	echo Processing tuples from file ${INPUT_FILE}...
 	echo
+	
+	HADOOP_FILES=""
+	if [ ! -z ${PREP_FILTER_FILE} ] ; then
+		HADOOP_FILES="-files ${PREP_FILTER_FILE}#FilterXml"
+	fi
+	
 	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.PrepTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapred.map.tasks.speculative.execution=true \
@@ -159,7 +167,8 @@ function groupBySubject () {
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=false \
 		-Dmapred.job.queue.name=${QUEUE} \
-		${PREP_FILTERS} ${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${PREP_DIR}"
+		${HADOOP_FILES} \
+		${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${PREP_DIR}"
 	echo ${CMD}
 	${CMD}
 		
@@ -175,24 +184,6 @@ function groupBySubject () {
 	
 	${HADOOP_CMD} fs -cat ${PREP_DIR}/predicates | sort -nr | cut -f 2 | head -${N_VERTICAL_PREDICATES} > ${LOCAL_BUILD_DIR}/topPredicates
 	${HADOOP_CMD} fs -put ${LOCAL_BUILD_DIR}/topPredicates ${PREP_DIR}
-	
-	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.util.MergeSortTool \
-		-Dio.compression.codecs=${COMPRESSION_CODECS} \
-		-Dmapred.child.java.opts=-Xmx800m \
-		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
-		-Dmapred.output.compress=true \
-		-i ${PREP_DIR}/part-r-?????/all.bz2 -o ${PREP_DIR}/all.bz2 -c all.count"
-#	echo ${CMD}
-#	${CMD}
-	
-	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.util.MergeSortTool \
-		-Dio.compression.codecs=${COMPRESSION_CODECS} \
-		-Dmapred.child.java.opts=-Xmx800m \
-		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
-		-Dmapred.output.compress=true \
-		-i ${PREP_DIR}/part-r-?????/predicates.bz2 -o ${PREP_DIR}/predicates.bz2 -c predicates.count"
-#	echo ${CMD}
-#	${CMD}
 }
 
 function computeHashes () {

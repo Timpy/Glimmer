@@ -28,6 +28,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 
 import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper;
+import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.Counters;
 
 public class TuplesToResourcesMapperTest {
     private Mockery context;
@@ -107,7 +108,7 @@ public class TuplesToResourcesMapperTest {
 	    allowing(mrContext).getInputSplit();
 	    will(returnValue(inputSplit));
 	    
-	    one(mrContext).getCounter(TuplesToResourcesMapper.Counters.NX_PARSER_EXCEPTION);
+	    one(mrContext).getCounter(Counters.NX_PARSER_EXCEPTION);
 	    will(returnValue(nxParserExceptionCounter));
 	    one(nxParserExceptionCounter).increment(1l);
 	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/age")), with(new TextMatcher("PREDICATE")));
@@ -172,11 +173,14 @@ public class TuplesToResourcesMapperTest {
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
 	
-	// We should get the 2nd, 3rd and 5th tuple only.
-	mapper.setSubjectRegex("^<http://s3");
-	mapper.setObjectRegex("s3>$");
+	RegexTupleFilter regexTupleFilter = new RegexTupleFilter();
+	regexTupleFilter.setSubjectRegex("^<http://s3");
+	regexTupleFilter.setObjectRegex("s3>$");
 	// Use OR
-	mapper.setAndNotOrConjunction(false);
+	regexTupleFilter.setAndNotOrConjunction(false);
+	
+	// We should get the 2nd, 3rd and 5th tuple only.
+	mapper.setFilter(regexTupleFilter);
 	
 	mapper.map(new LongWritable(5l), new Text(
 		"<http://s1> <http://p1> <http://s2> <http://context/> ."), mrContext);
@@ -209,11 +213,14 @@ public class TuplesToResourcesMapperTest {
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
 	
+	RegexTupleFilter filter = new RegexTupleFilter();
 	// We should get the 2nd and 5th tuple only.
-	mapper.setSubjectRegex("s1|s3");
-	mapper.setObjectRegex("(s3|o5)");
+	filter.setSubjectRegex("s1|s3");
+	filter.setObjectRegex("(s3|o5)");
 	// Use AND
-	mapper.setAndNotOrConjunction(true);
+	filter.setAndNotOrConjunction(true);
+	
+	mapper.setFilter(filter);
 	
 	mapper.map(new LongWritable(5l), new Text(
 		"<http://s1> <http://p1> <http://s2> <http://context/> ."), mrContext);
@@ -248,7 +255,9 @@ public class TuplesToResourcesMapperTest {
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
 	
-	mapper.setPredicateRegex("schema\\.org");
+	RegexTupleFilter filter = new RegexTupleFilter();
+	filter.setPredicateRegex("schema\\.org");
+	mapper.setFilter(filter);
 	
 	mapper.map(new LongWritable(5l), new Text(
 		"<http://s1> <http://schema.org/p1> \"o1\" <http://context/1> ."), mrContext);

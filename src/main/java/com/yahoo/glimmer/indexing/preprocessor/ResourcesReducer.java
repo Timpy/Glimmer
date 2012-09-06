@@ -18,7 +18,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OutputCount;
-import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.TUPLE_ELEMENTS;
+import com.yahoo.glimmer.indexing.preprocessor.TuplesToResourcesMapper.TupleElementName;
 import com.yahoo.glimmer.util.BySubjectRecord;
 
 /**
@@ -59,11 +59,11 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 	for (Text value : values) {
 	    String valueString = value.toString();
 
-	    if (TUPLE_ELEMENTS.PREDICATE.name().equals(valueString)) {
+	    if (TupleElementName.PREDICATE.name().equals(valueString)) {
 		keyPredicateCount++;
-	    } else if (TUPLE_ELEMENTS.OBJECT.name().equals(valueString)) {
+	    } else if (TupleElementName.OBJECT.name().equals(valueString)) {
 		keyObjectCount++;
-	    } else if (TUPLE_ELEMENTS.CONTEXT.name().equals(valueString)) {
+	    } else if (TupleElementName.CONTEXT.name().equals(valueString)) {
 		keyContextCount++;
 	    } else {
 		bySubjectRecord.addRelation(valueString);

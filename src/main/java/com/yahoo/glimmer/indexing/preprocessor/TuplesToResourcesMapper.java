@@ -13,8 +13,6 @@ package com.yahoo.glimmer.indexing.preprocessor;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -24,9 +22,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
-import org.semanticweb.yars.nx.BNode;
 import org.semanticweb.yars.nx.Node;
-import org.semanticweb.yars.nx.Resource;
 import org.semanticweb.yars.nx.parser.NxParser;
 import org.semanticweb.yars.nx.parser.ParseException;
 
@@ -53,69 +49,40 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 					    // used.
 
     public static final String INCLUDE_CONTEXTS_KEY = "includeContexts";
-    public static final String SUBJECT_REGEX_KEY = "subjectRegex";
-    public static final String PREDICATE_REGEX_KEY = "predicateRegex";
-    public static final String OBJECT_REGEX_KEY = "objectRegex";
-    public static final String CONTEXT_REGEX_KEY = "contextRegex";
-    public static final String FILTER_CONJUNCTION_KEY = "andNotOrConjunction";
 
-    public static enum TUPLE_ELEMENTS {
-	SUBJECT, PREDICATE, OBJECT, CONTEXT;
+    enum Counters {
+	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE, UNEXPECTED_SUBJECT_TYPE, UNEXPECTED_PREDICATE_TYPE, UNEXPECTED_CONTEXT_TYPE
     }
 
-    static enum Counters {
-	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE, UNEXPECTED_SUBJECT_TYPE, UNEXPECTED_PREDICATE_TYPE, UNEXPECTED_CONTEXT_TYPE
+    public static enum TupleElementName {
+	SUBJECT, PREDICATE, OBJECT, CONTEXT;
     }
 
     private boolean includeContexts = true;
     private StringBuilder predicateObjectContextDot = new StringBuilder();
-    private String[] nodesAsN3 = new String[MAX_NODES];
-    private Pattern[] patterns = new Pattern[MAX_NODES];
-    private boolean andNotOrConjunction; // Default is OR
+    private Tuple tuple = new Tuple();
+    private TupleFilter filter;
 
     private InputSplit lastInputSplit;
+
+    public void setFilter(TupleFilter filter) {
+	this.filter = filter;
+    }
 
     protected void setup(Mapper<LongWritable, Text, Text, Object>.Context context) throws java.io.IOException, InterruptedException {
 	Configuration conf = context.getConfiguration();
 	boolean includeContexts = conf.getBoolean(INCLUDE_CONTEXTS_KEY, true);
 	setIncludeContexts(includeContexts);
 
-	setSubjectRegex(conf.get(SUBJECT_REGEX_KEY));
-	setPredicateRegex(conf.get(PREDICATE_REGEX_KEY));
-	setObjectRegex(conf.get(OBJECT_REGEX_KEY));
-	setContextRegex(conf.get(CONTEXT_REGEX_KEY));
-	setAndNotOrConjunction(conf.getBoolean(FILTER_CONJUNCTION_KEY, andNotOrConjunction));
+	TupleFilter filter = TupleFilterSerializer.deserialize(conf);
+	if (filter != null) {
+	    LOG.info("Using TupleFilter:\n" + filter.toString());
+	    setFilter(filter);
+	}
     };
 
     public void setIncludeContexts(boolean includeContexts) {
 	this.includeContexts = includeContexts;
-    }
-
-    public void setSubjectRegex(String regex) {
-	patterns[TUPLE_ELEMENTS.SUBJECT.ordinal()] = checkRegex(regex);
-    }
-
-    public void setPredicateRegex(String regex) {
-	patterns[TUPLE_ELEMENTS.PREDICATE.ordinal()] = checkRegex(regex);
-    }
-
-    public void setObjectRegex(String regex) {
-	patterns[TUPLE_ELEMENTS.OBJECT.ordinal()] = checkRegex(regex);
-    }
-
-    public void setContextRegex(String regex) {
-	patterns[TUPLE_ELEMENTS.CONTEXT.ordinal()] = checkRegex(regex);
-    }
-
-    private static Pattern checkRegex(String regex) {
-	if (regex == null || regex.isEmpty()) {
-	    return null;
-	}
-	return Pattern.compile(regex);
-    }
-
-    public void setAndNotOrConjunction(boolean andNotOrConjunction) {
-	this.andNotOrConjunction = andNotOrConjunction;
     }
 
     @Override
@@ -166,91 +133,71 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	    return;
 	}
 
-	int nodeCount = 0;
+	for (TupleElementName name : TupleElementName.values()) {
+	    TupleElement element = tuple.getElement(name);
 
-	// Skip relations that have long elements or don't match the given
-	// patterns
-	int patternsTried = 0;
-	int patternsMatched = 0;
-	for (Node node : nodes) {
-	    String n3 = node.toN3();
+	    if (nodes.length > name.ordinal()) {
+		Node node = nodes[name.ordinal()];
 
-	    if (n3.length() > 5000) {
-		String elementName;
-		if (nodeCount < TUPLE_ELEMENTS.values().length) {
-		    elementName = TUPLE_ELEMENTS.values()[nodeCount].name();
-		} else {
-		    elementName = Integer.toString(nodeCount);
-		}
-		System.out.println("Long tuple element " + elementName + ". Length:" + n3.length() + " starting with " + n3.substring(0, 100));
-		context.getCounter(Counters.LONG_TUPLE_ELEMENT).increment(1);
-		return;
-	    }
-
-	    if (patterns[nodeCount] != null) {
-		Matcher matcher = patterns[nodeCount].matcher(n3);
-		if (matcher.find()) {
-		    patternsMatched++;
-		}
-		patternsTried++;
-	    }
-	    nodesAsN3[nodeCount++] = n3;
-	}
-
-	if (andNotOrConjunction) {
-	    // AND. tried should equal matched
-	    if (patternsTried != patternsMatched) {
-		return;
-	    }
-	} else {
-	    // OR. If any patterns where tried at least one should have matched.
-	    if (patternsTried > 0 && patternsMatched == 0) {
-		return;
-	    }
-	}
-
-	for (Node node : nodes) {
-	    if (node instanceof Resource) {
-		try {
-		    new URI(node.toString());
-		} catch (URISyntaxException e) {
-		    context.getCounter(Counters.INVALID_RESOURCE).increment(1l);
-		    LOG.info("Bad resource near position " + key.toString());
+		String text = node.toString();
+		if (text.length() > 5000) {
+		    System.out.println("Long tuple element " + name.name() + ". Length:" + text.length() + " starting with " + text.substring(0, 100));
+		    context.getCounter(Counters.LONG_TUPLE_ELEMENT).increment(1);
 		    return;
 		}
+
+		element.type = TupleElement.Type.valueOf(node.getClass().getSimpleName().toUpperCase());
+		if (element.type == TupleElement.Type.RESOURCE) {
+		    try {
+			new URI(text);
+		    } catch (URISyntaxException e) {
+			context.getCounter(Counters.INVALID_RESOURCE).increment(1l);
+			LOG.info("Bad resource near position " + key.toString());
+			return;
+		    }
+		}
+		element.text = text;
+		element.n3 = node.toN3();
+	    } else {
+		element.type = null;
+		element.text = null;
+		element.n3 = null;
+	    }
+	}
+
+	if (filter != null) {
+	    if (!filter.filter(tuple)) {
+		// Skip tuple.
+		return;
 	    }
 	}
 
 	predicateObjectContextDot.setLength(0);
 
-	Node node = nodes[TUPLE_ELEMENTS.SUBJECT.ordinal()];
-	if (!(node instanceof Resource || node instanceof BNode)) {
+	if (!tuple.subject.isOfType(TupleElement.Type.RESOURCE, TupleElement.Type.BNODE)) {
 	    context.getCounter(Counters.UNEXPECTED_SUBJECT_TYPE).increment(1l);
 	    return;
 	}
-	Text subject = new Text(node.toString());
+	Text subject = new Text(tuple.subject.text);
 
-	node = nodes[TUPLE_ELEMENTS.PREDICATE.ordinal()];
-	if (!(node instanceof Resource)) {
+	if (!tuple.predicate.isOfType(TupleElement.Type.RESOURCE)) {
 	    context.getCounter(Counters.UNEXPECTED_PREDICATE_TYPE).increment(1l);
 	    return;
 	}
-	context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.PREDICATE.name()));
-	predicateObjectContextDot.append(nodesAsN3[TUPLE_ELEMENTS.PREDICATE.ordinal()]);
+	context.write(new Text(tuple.predicate.text), new Text(TupleElementName.PREDICATE.name()));
+	predicateObjectContextDot.append(tuple.predicate.n3);
 
-	node = nodes[TUPLE_ELEMENTS.OBJECT.ordinal()];
-	if (node instanceof Resource || node instanceof BNode) {
-	    context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.OBJECT.name()));
+	if (tuple.object.isOfType(TupleElement.Type.RESOURCE, TupleElement.Type.BNODE)) {
+	    context.write(new Text(tuple.object.text), new Text(TupleElementName.OBJECT.name()));
 	}
 	predicateObjectContextDot.append(' ');
-	predicateObjectContextDot.append(nodesAsN3[TUPLE_ELEMENTS.OBJECT.ordinal()]);
+	predicateObjectContextDot.append(tuple.object.n3);
 
-	if (includeContexts && nodeCount > TUPLE_ELEMENTS.CONTEXT.ordinal()) {
-	    node = nodes[TUPLE_ELEMENTS.CONTEXT.ordinal()];
-	    if (node instanceof Resource) {
-		context.write(new Text(node.toString()), new Text(TUPLE_ELEMENTS.CONTEXT.name()));
+	if (includeContexts && tuple.context.text != null) {
+	    if (tuple.context.isOfType(TupleElement.Type.RESOURCE)) {
+		context.write(new Text(tuple.context.text), new Text(TupleElementName.CONTEXT.name()));
 		predicateObjectContextDot.append(' ');
-		predicateObjectContextDot.append(nodesAsN3[TUPLE_ELEMENTS.CONTEXT.ordinal()]);
+		predicateObjectContextDot.append(tuple.context.n3);
 	    } else {
 		context.getCounter(Counters.UNEXPECTED_CONTEXT_TYPE).increment(1l);
 	    }
@@ -264,5 +211,5 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	    // Write subject with object, predicate, object, context as value
 	    context.write(subject, new Text(predicateObjectContextDot.toString()));
 	}
-    };
+    }
 }
