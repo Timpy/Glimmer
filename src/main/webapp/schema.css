@@ -12,13 +12,9 @@
 }
 
 #mainContent { /*margin: 15px 50px 15px 50px; */
-	padding: 5px;
-	border-bottom: solid 1px #CCCCCC;
 	margin: 15px auto !important;
 	max-width: 960px;
 	min-width: 350px;
-	padding: 10px 10px 10px 0px;
-	background: #fff;
 }
 
 #topContent {

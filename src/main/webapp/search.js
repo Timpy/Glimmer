@@ -9,7 +9,6 @@ var store = {};
 var ns;
 var webapp = "";
 var RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
-var ONTOLOGY_ROOT = "http://www.w3.org/2002/07/owl#Thing";
 var contextsToColour = []; // TODO populate from server.
 
 var argString = window.location.href.split('?')[1];
@@ -121,7 +120,7 @@ YUI({
 						});
 
 						// Display class selection dropdown
-						if (stats.classes.lenght > 0) {
+						if (stats.classes != undefined) {
 							var frag = '<select>';
 							var keys = [];
 							for ( var key in stats.classes) {
@@ -135,54 +134,63 @@ YUI({
 							frag = frag + '</select>';
 							var fragNode = Y.Node.create(frag);
 							Y.one('#class-select').append("I'm looking for a").append(fragNode).append("where");
-							changeProperties(keys[0]);
+							changeProperties(keys[0].properties);
 							fragNode.on('change', function(e) {
-								changeProperties(e.target.get('value'));
+								changeProperties(e.target.get('value').properties);
 							});
-						}
 
-						var tree = [];
-						function addClass(clazz) {
-							var sub = [];
-							var count = 0;
-							if (stats.classes[clazz] != undefined) {
-								count = stats.classes[clazz].count;
-								for (uri in stats.classes[clazz].children) {
-									var child = stats.classes[clazz].children[uri];
-									if (stats.classes[child] != undefined)
-										sub.push(addClass(child));
+							var tree = [];
+							function addClass(clazz) {
+								var rt = {};
+								if (stats.classes[clazz] != undefined) {
+									var stat = stats.classes[clazz];
+									rt['label'] = getLocalName(clazz) + " " + stat.inheritedCount;
+									if (stat.inheritedCount != stat.count) {
+										rt['label'] +=  "(" + stat.count + ")";
+									}
+									
+									var children = [];
+									for (uri in stats.classes[clazz].children) {
+										var child = stats.classes[clazz].children[uri];
+										if (stats.classes[child] != undefined) {
+											children.push(addClass(child));
+										}
+									}
+									if (children.length > 0) {
+										rt['type'] = 'TreeView';
+										rt['children'] = children
+									}
 								}
-							} else {
-								// Class appears in the
-								// ontology but no instances
-								return [];
+								return rt;
+								if (sub.length > 0) {
+									return {
+										label : getLocalName(clazz) + " (" + count + ") ",
+										type : "TreeView",
+										children : sub
+									};
+								} else {
+									return {
+										label : getLocalName(clazz) + " (" + count + ") "
+									};
+								}
 							}
-							if (sub.length > 0) {
-								return {
-									label : getLocalName(clazz) + " (" + count + ") ",
-									type : "TreeView",
-									children : sub
-								};
-							} else {
-								return {
-									label : getLocalName(clazz) + " (" + count + ") "
-								};
+	
+							// Render TreeView
+							Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
+							for (i in stats.rootClasses) {
+								tree.push(addClass(stats.rootClasses[i]));
 							}
+							var treeview = new Y.TreeView({
+								srcNode : '#statisticsTreeList',
+								contentBox : null,
+								type : "TreeView",
+								children : tree
+							});
+	
+							treeview.render();
+							// Expand the top level of the tree
+							Y.one('#statistics-tree').removeClass('yui3-tree-collapsed');
 						}
-
-						// Render TreeView
-						Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
-						tree.push(addClass(ONTOLOGY_ROOT));
-						var treeview = new Y.TreeView({
-							srcNode : '#statisticsTreeList',
-							contentBox : null,
-							type : "TreeView",
-							children : tree
-						});
-
-						treeview.render();
-						// Expand the top level of the tree
-						var statisticsTree = Y.one('#statistics-tree').removeClass('yui3-tree-collapsed');
 
 						// Render statistics box
 						/*
@@ -389,13 +397,15 @@ YUI({
 			return value;
 		}
 
-		function changeProperties(clazz) {
+		function changeProperties(properties) {
 			Y.one('#class-properties').setContent('');
 			var frag = '<table>';
-			for ( var i in stats.classes[clazz].properties) {
-				frag = frag + '<tr><td>' + getLocalName(stats.classes[clazz].properties[i])
-						+ '</td><td><input class="class-property yui3-hastooltip" type="text" title="' + /* TODO */'" name="'
-						+ getLocalName(stats.classes[clazz].properties[i]) + '"/></td></tr>';
+			if (properties != undefined) {
+				for ( var i in properties) {
+					frag = frag + '<tr><td>' + getLocalName(properties[i])
+							+ '</td><td><input class="class-property yui3-hastooltip" type="text" title="' + /* TODO */'" name="'
+							+ getLocalName(properties[i]) + '"/></td></tr>';
+				}
 			}
 			frag = frag + '</table>';
 			Y.one('#class-properties').append(Y.Node.create(frag)).show();

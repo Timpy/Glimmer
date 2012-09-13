@@ -11,9 +11,13 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 
 /**
@@ -24,15 +28,23 @@ import java.util.Map;
 public class RDFIndexStatistics {
     public static class ClassStat {
 	private final int count;
+	private int inheritedCount;
 	private String label;
 	private List<String> properties;
-	private List<String> children;
+	private Set<String> children;
 	
 	public ClassStat(int count) {
 	    this.count = count;
+	    inheritedCount = count;
 	}
 	public int getCount() {
 	    return count;
+	}
+	public int getInheritedCount() {
+	    return inheritedCount;
+	}
+	public void addToInheritedCount(int delta) {
+	    inheritedCount += delta;
 	}
 	public String getLabel() {
 	    return label;
@@ -44,20 +56,27 @@ public class RDFIndexStatistics {
 	    return properties;
 	}
 	public void addProperty(String property) {
+	    if (properties == null) {
+		properties = new ArrayList<String>();
+	    }
 	    properties.add(property);
 	}
-	public List<String> getChildren() {
+	public Set<String> getChildren() {
 	    return children;
 	}
-	public void addChild(String child) {
-	    children.add(child);
+	public boolean addChild(String child) {
+	    if (children == null) {
+		children = new TreeSet<String>();
+	    }
+	    return children.add(child);
 	}
     }
     
     private String nameSpace;
     private Map<String, String> fields;
-    private final Map<String, ClassStat> classes = new HashMap<String, ClassStat>();
-    private final Map<String, Integer> properties = new HashMap<String, Integer>();
+    private Collection<String> rootClasses;
+    private Map<String, ClassStat> classes;
+    private Map<String, Integer> properties;
     
     public String getNameSpace() {
         return nameSpace;
@@ -71,16 +90,31 @@ public class RDFIndexStatistics {
     public void setFields(Map<String, String> fields) {
         this.fields = fields;
     }
+    public Collection<String> getRootClasses() {
+	return rootClasses;
+    }
+    public void addRootClass(String rootClass) {
+	if (rootClasses == null) {
+	    rootClasses = new ArrayList<String>();
+	}
+	rootClasses.add(rootClass);
+    }
     public Map<String, ClassStat> getClasses() {
         return classes;
     }
     public void addClassStat(String name, ClassStat stat) {
+	if (classes == null) {
+	    classes = new HashMap<String, ClassStat>();
+	}
         classes.put(name, stat);
     }
     public Map<String, Integer> getProperties() {
         return properties;
     }
     public void addPropertyStat(String name, Integer count) {
+	if (properties == null) {
+	    properties = new HashMap<String, Integer>();
+	}
         properties.put(name, count);
     }
 }

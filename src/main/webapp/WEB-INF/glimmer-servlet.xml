@@ -11,7 +11,7 @@
 	<context:component-scan base-package="com.yahoo.glimmer.web" />
 
 	<bean id="indexMap" class="com.yahoo.glimmer.web.IndexMap">
-		<property name="configFilename" value="config-generic.properties" />
+		<property name="configFilename" value="exampleContext.properties" />
 	</bean>
 	<bean id="querier" class="com.yahoo.glimmer.web.Querier" />
 

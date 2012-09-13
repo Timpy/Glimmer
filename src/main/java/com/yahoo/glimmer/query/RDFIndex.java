@@ -51,6 +51,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -70,7 +71,7 @@ import com.yahoo.glimmer.util.Util;
 
 public class RDFIndex {
     private final static Logger LOGGER = Logger.getLogger(RDFIndex.class);
-    private final static String TYPE_INDEX = "type";
+    private final static String TYPE_INDEX = "http_www_w3_org_1999_02_22_rdf_syntax_ns_type";
     public final static int MAX_STEMMING = 1024;
 
     private final static String BASENAME_INDEX_PROPERTY_KEY = "basename";
@@ -290,7 +291,7 @@ public class RDFIndex {
 	    if (typeField == null) {
 		typeTermDistribution = Collections.emptyMap();
 	    } else {
-		typeTermDistribution = Collections.unmodifiableMap(getTermDistribution(typeField, true));
+		typeTermDistribution = Collections.unmodifiableMap(getTermDistribution(typeField, false));
 	    }
 	} catch (IOException e) {
 	    throw new RDFIndexException(e);
@@ -331,15 +332,26 @@ public class RDFIndex {
 	    fieldNameSuffixToFieldNameOrderedMap.put(suffix, fullName);
 	}
 	
-	stats = RDFIndexStatisticsBuilder.create(fieldNameSuffixToFieldNameOrderedMap, typeTermDistribution);
+	RDFIndexStatisticsBuilder statsBuilder = new RDFIndexStatisticsBuilder();
+	statsBuilder.setSortedPredicates(fieldNameSuffixToFieldNameOrderedMap);
+	statsBuilder.setTypeTermDistribution(typeTermDistribution);
+	
 	// Load the ontology if provided
 	if (context.getOntoPath() != null) {
 	    try {
-		RDFIndexStatisticsBuilder.addOntology(stats, context.getOntoPath(), predicateDistribution);
+		InputStream owlOntologgyInputStream = RDFIndexStatisticsBuilder.class.getClassLoader().getResourceAsStream(context.getOntoPath().getPath());
+		if (owlOntologgyInputStream == null) {
+		    throw new FileNotFoundException("Can open ontology file " + owlOntologgyInputStream);
+		}
+		statsBuilder.setOwlOntologyInputStream(owlOntologgyInputStream);
+		statsBuilder.setPredicateTermDistribution(predicateDistribution);
 	    } catch (FileNotFoundException e) {
 		throw new RDFIndexException("Ontology file not found:" + context.getOntoPath());
-	    }
+	    } catch (IOException e) {
+		throw new RDFIndexException("Reading file " + context.getOntoPath(), e);
+	    } 
 	}
+	stats = statsBuilder.build();
 
 	// This is empty for non-payload indices
 	Reference2ReferenceMap<Index, Object> index2Parser = new Reference2ReferenceOpenHashMap<Index, Object>();

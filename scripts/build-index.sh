@@ -182,7 +182,8 @@ function groupBySubject () {
 	echo ${CMD}
 	${CMD}
 	
-	${HADOOP_CMD} fs -cat ${PREP_DIR}/predicates | sort -nr | cut -f 2 | head -${N_VERTICAL_PREDICATES} > ${LOCAL_BUILD_DIR}/topPredicates
+	${HADOOP_CMD} fs -cat ${PREP_DIR}/predicates | sort -nr | cut -f 2 > ${LOCAL_BUILD_DIR}/allPredicates
+	head -${N_VERTICAL_PREDICATES} ${LOCAL_BUILD_DIR}/allPredicates > ${LOCAL_BUILD_DIR}/topPredicates
 	${HADOOP_CMD} fs -put ${LOCAL_BUILD_DIR}/topPredicates ${PREP_DIR}
 }
 
@@ -474,7 +475,6 @@ buildCollection ${DFS_BUILD_DIR}/prep
 
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.smap" "${LOCAL_BUILD_DIR}"
-${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/topPredicates" "${LOCAL_BUILD_DIR}/predicates.txt"
 
 echo Done. Index files are here ${LOCAL_BUILD_DIR}
 

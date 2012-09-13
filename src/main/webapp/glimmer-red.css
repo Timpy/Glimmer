@@ -34,11 +34,6 @@
 	float: right;
 }
 
-#statisticsTree {
-	margin-top: 10px;
-	float: right;
-}
-
 #resultContainer {
 	position: relative;
 	clear: both;
@@ -107,6 +102,12 @@ form {
 
 #statisticsTree {
 	line-height: 150%;
+	margin-top: 10px;
+	float: right;
+	width: 370px;
+	height: 400px;
+	overflow: auto;
+	border-left: 1px solid #900;
 }
 
 #statisticsTree ul {
