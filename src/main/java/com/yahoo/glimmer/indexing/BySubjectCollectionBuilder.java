@@ -37,17 +37,22 @@ import org.apache.hadoop.util.ToolRunner;
 import com.yahoo.glimmer.util.BySubjectRecord;
 
 public class BySubjectCollectionBuilder extends Configured implements Tool {
+    // Sequence that isn't possible as a Resource or word/nonWord tokenization.
+    protected static final MutableString COMMAND_KEY = new MutableString("A!");
+    protected static final MutableString END_DOC_VALUE = new MutableString("END");
+    protected static final MutableString EMPTY_DOC_VALUE = new MutableString("EMPTY");
+    
     public static class MapClass extends Mapper<LongWritable, Text, MutableString, MutableString> {
 	
-	private final MutableString word = new MutableString();
-	private final MutableString nonWord = new MutableString();
-	private BySubjectRecord bySubjectParser = new BySubjectRecord();
+	private final MutableString keyOut = new MutableString();
+	private final MutableString valueOut = new MutableString();
+	private BySubjectRecord bySubjectRecord = new BySubjectRecord();
 	FastBufferedReader fbr = new FastBufferedReader();
 	private static int count;
-	private int docId;
+	private int docId = -1;
 
 	@Override
-	public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
+	public void map(LongWritable keyIn, Text valueIn, Context context) throws IOException, InterruptedException {
 	    if (count++ % 100000 == 0) {
 		System.out.println("Processed " + count + " lines.");
 
@@ -69,26 +74,31 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 
 	    }
 	    
-	    bySubjectParser.parse(value);
+	    bySubjectRecord.parse(valueIn);
 	    
 	    // Start new doc.  
 	    // As the doc id's must me the same as the values from the ALL resources hash they are not consecutive.
 	    // We need to create 'empty docs' for the ALL resource hash values that aren't subjects.
-	    while (docId < bySubjectParser.getId()) {
-		context.write(word, word);
+	    if (docId == -1) {
+		// As the BySubject input is split.  Each split ends up as a sub collection.
+		// The doc id's per sub collection start at 0.  So for the first record we 'skip' to that doc id.
+		docId = bySubjectRecord.getId();
+	    }
+	    while (docId < bySubjectRecord.getId()) {
+		context.write(COMMAND_KEY, EMPTY_DOC_VALUE);
 		docId++;
 	    }
-	    word.append(bySubjectParser.getSubject());
-	    context.write(word, word);
+	    keyOut.setLength(0);
+	    keyOut.append(bySubjectRecord.getSubject());
+	    context.write(keyOut, keyOut);
 
-	    fbr.setReader(bySubjectParser.getRelationsReader());
-	    while (fbr.next(word, nonWord)) {
-		context.write(word, nonWord);
+	    fbr.setReader(bySubjectRecord.getRelationsReader());
+	    while (fbr.next(keyOut, valueOut)) {
+		context.write(keyOut, valueOut);
 	    }
 
 	    // End Doc.
-	    word.setLength(0);
-	    context.write(word, word);
+	    context.write(COMMAND_KEY, END_DOC_VALUE);
 	    docId++;
 	}
     }
@@ -106,12 +116,12 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 
 	@Override
 	public void write(MutableString key, MutableString value) throws IOException, InterruptedException {
-	    if (key.length() == 0 && value.length() == 0) {
-		if (newDoc) {
+	    if (COMMAND_KEY.equals(key)) {
+		if (EMPTY_DOC_VALUE.equals(value)) {
 		    // Empty doc.
 		    builder.startDocument("","");
 		    builder.endDocument();
-		} else {
+		} else if (END_DOC_VALUE.equals(value)){
 		    // End last doc.
 		    builder.endTextField();
 		    builder.endDocument();
