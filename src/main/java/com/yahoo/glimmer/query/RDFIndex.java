@@ -201,7 +201,12 @@ public class RDFIndex {
 		    for (int i = 0; i < fileNames.length; i++) {
 			File file = new File(collectionFile, fileNames[i]);
 			names[i] = file.getPath();
-			collections[i] = loadDocumentCollection(file);
+			try {
+			    collections[i] = loadDocumentCollection(file);
+			} catch (Error e) {
+			    LOGGER.fatal("Exception loading sub collection " + (i + 1) + " of " + fileNames.length);
+			    throw(e);
+			}
 		    }
 		    documentCollection = new InstantiatableConcatenatedDocumentCollection(names, collections);
 		}

@@ -134,7 +134,7 @@ YUI({
 							frag = frag + '</select>';
 							var fragNode = Y.Node.create(frag);
 							Y.one('#class-select').append("I'm looking for a").append(fragNode).append("where");
-							changeProperties(keys[0].properties);
+							changeProperties(keys[0]);
 							fragNode.on('change', function(e) {
 								changeProperties(e.target.get('value').properties);
 							});

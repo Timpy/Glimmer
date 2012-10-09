@@ -53,7 +53,7 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 
 	@Override
 	public void map(LongWritable keyIn, Text valueIn, Context context) throws IOException, InterruptedException {
-	    if (count++ % 100000 == 0) {
+	    if (count % 100000 == 0) {
 		System.out.println("Processed " + count + " lines.");
 
 		// Get current size of heap in bytes
@@ -73,6 +73,7 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 		System.out.println("Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
 
 	    }
+	    count++;
 	    
 	    bySubjectRecord.parse(valueIn);
 	    
@@ -106,6 +107,7 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
     private static class BuilderOutputWriter extends RecordWriter<MutableString, MutableString> {
 	private final HdfsSimpleCompressedDocumentCollectionBuilder builder;
 	private boolean newDoc = true;
+	private int docCount;
 
 	public BuilderOutputWriter(TaskAttemptContext job, Path taskWorkPath) throws IllegalArgumentException, IOException {
 	    FileSystem fs = FileSystem.get(job.getConfiguration());
@@ -126,6 +128,10 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 		    builder.endTextField();
 		    builder.endDocument();
 		    newDoc = true;
+		    docCount++;
+		    if (docCount % 100000 == 0) {
+			System.out.println("Builder: terms=" + builder.getTerms().size() + " nonTerms:" + builder.getNonTerms().size());
+		    }
 		}
 	    } else if (newDoc) {
 		newDoc = false;
