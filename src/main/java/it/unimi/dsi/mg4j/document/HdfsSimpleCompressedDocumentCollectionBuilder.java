@@ -385,9 +385,11 @@ public class HdfsSimpleCompressedDocumentCollectionBuilder implements DocumentCo
 	    nonTextZipDataOutputStream.close();
 	}
 
-	// This class is in the same package as MG4J's SimpleCompressedDocumentCollection to get access to it's protected constructor.
-	final SimpleCompressedDocumentCollection simpleCompressedDocumentCollection = new SimpleCompressedDocumentCollection(basenameSuffix,
-		documents, terms.size(), nonTerms != null ? nonTerms.size() : -1, exact, factory);
+	// This class is in the same package as MG4J's
+	// SimpleCompressedDocumentCollection to get access to it's protected
+	// constructor.
+	final SimpleCompressedDocumentCollection simpleCompressedDocumentCollection = new SimpleCompressedDocumentCollection(basenameSuffix, documents,
+		terms.size(), nonTerms != null ? nonTerms.size() : -1, exact, factory);
 	Path objectPath = new Path(hdfsPath, basenameSuffix + DocumentCollection.DEFAULT_EXTENSION);
 	FSDataOutputStream collectionOutputStream = fs.create(objectPath, true);
 	BinIO.storeObject(simpleCompressedDocumentCollection, collectionOutputStream);
@@ -514,5 +516,13 @@ public class HdfsSimpleCompressedDocumentCollectionBuilder implements DocumentCo
 	}
 	docIt.close();
 	close();
+    }
+
+    public Object2IntOpenHashMap<MutableString> getTerms() {
+	return terms;
+    }
+
+    public Object2IntOpenHashMap<MutableString> getNonTerms() {
+	return nonTerms;
     }
 }
