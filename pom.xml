@@ -83,9 +83,9 @@
 			<version>1.2.3-SNAPSHOT</version>
 		</dependency>
 		<dependency>
-			<groupId>it.unimi.dsi</groupId>
+			<groupId>it.unimi.di</groupId>
 			<artifactId>mg4j</artifactId>
-			<version>4.0.3</version>
+			<version>5.0.1</version>
 			<exclusions>
 				<exclusion>
 					<artifactId>jetty</artifactId>
@@ -96,6 +96,11 @@
 					<groupId>javax.servlet</groupId>
 				</exclusion>
 			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>com.yahoo.mg4hadoop</groupId>
+			<artifactId>MG4Hadoop</artifactId>
+			<version>0.0.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<artifactId>servlet-api</artifactId>

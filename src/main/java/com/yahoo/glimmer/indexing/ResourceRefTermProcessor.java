@@ -12,7 +12,7 @@ package com.yahoo.glimmer.indexing;
  */
 
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.index.TermProcessor;
+import it.unimi.di.mg4j.index.TermProcessor;
 
 /**
  * A term processor that returns true if the term looks like a Resource

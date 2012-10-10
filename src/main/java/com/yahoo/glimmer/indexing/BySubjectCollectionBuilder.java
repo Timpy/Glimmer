@@ -11,10 +11,11 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.di.mg4j.document.DocumentCollectionBuilder;
+import it.unimi.di.mg4j.document.HdfsSimpleCompressedDocumentCollectionBuilder;
+import it.unimi.di.mg4j.document.IdentityDocumentFactory;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.document.HdfsSimpleCompressedDocumentCollectionBuilder;
-import it.unimi.dsi.mg4j.document.IdentityDocumentFactory;
 
 import java.io.IOException;
 
@@ -105,9 +106,8 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
     }
 
     private static class BuilderOutputWriter extends RecordWriter<MutableString, MutableString> {
-	private final HdfsSimpleCompressedDocumentCollectionBuilder builder;
+	private final DocumentCollectionBuilder builder;
 	private boolean newDoc = true;
-	private int docCount;
 
 	public BuilderOutputWriter(TaskAttemptContext job, Path taskWorkPath) throws IllegalArgumentException, IOException {
 	    FileSystem fs = FileSystem.get(job.getConfiguration());
@@ -128,10 +128,6 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 		    builder.endTextField();
 		    builder.endDocument();
 		    newDoc = true;
-		    docCount++;
-		    if (docCount % 100000 == 0) {
-			System.out.println("Builder: terms=" + builder.getTerms().size() + " nonTerms:" + builder.getNonTerms().size());
-		    }
 		}
 	    } else if (newDoc) {
 		newDoc = false;

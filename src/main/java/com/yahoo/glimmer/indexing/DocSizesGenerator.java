@@ -14,7 +14,7 @@ package com.yahoo.glimmer.indexing;
 import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.index.DiskBasedIndex;
+import it.unimi.di.mg4j.index.DiskBasedIndex;
 
 import java.io.DataInput;
 import java.io.DataOutput;

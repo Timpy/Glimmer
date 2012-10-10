@@ -15,12 +15,12 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.document.Document;
-import it.unimi.dsi.mg4j.index.Index;
-import it.unimi.dsi.mg4j.query.SelectedInterval;
-import it.unimi.dsi.mg4j.query.nodes.Query;
-import it.unimi.dsi.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.dsi.mg4j.search.score.DocumentScoreInfo;
+import it.unimi.di.mg4j.document.Document;
+import it.unimi.di.mg4j.index.Index;
+import it.unimi.di.mg4j.query.SelectedInterval;
+import it.unimi.di.mg4j.query.nodes.Query;
+import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.mg4j.search.score.DocumentScoreInfo;
 
 import java.io.IOException;
 import java.io.Reader;
