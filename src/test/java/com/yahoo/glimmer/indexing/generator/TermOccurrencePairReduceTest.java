@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Reducer.Context;
 import org.hamcrest.BaseMatcher;
@@ -27,7 +28,7 @@ import org.junit.Test;
 
 public class TermOccurrencePairReduceTest {
     private Mockery context;
-    private Reducer<TermOccurrencePair, Occurrence, TermOccurrencePair, TermOccurrences>.Context reducerContext;
+    private Reducer<TermOccurrencePair, Occurrence, IntWritable, IndexRecordWriterValue>.Context reducerContext;
 
     @SuppressWarnings("unchecked")
     @Before
@@ -42,32 +43,41 @@ public class TermOccurrencePairReduceTest {
 	context.checking(new Expectations() {{
 	    allowing(reducerContext).setStatus(with(any(String.class)));
 	    one(reducerContext).write(
-		    with(new TermOccurrencePairMatcher(0, "term1")),
-		    with(new TermOccurrencesMatcher(3)));
+		    with(new IntWritable(0)),
+		    with(new IndexRecordWriterTermValueMatcher("term1", 3, 6, 15 + 12 + 18)));
 	    one(reducerContext).write(
-		    with(new TermOccurrencePairMatcher(0, "term1")),
-		    with(new TermOccurrencesMatcher(3, 11, 15)));
+		    with(new IntWritable(0)),
+		    with(new IndexRecordWriterDocValueMatcher(3, 11, 15)));
 	    one(reducerContext).write(
-		    with(new TermOccurrencePairMatcher(0, "term1")),
-		    with(new TermOccurrencesMatcher(4, 12)));
+		    with(new IntWritable(0)),
+		    with(new IndexRecordWriterDocValueMatcher(4, 12)));
 	    one(reducerContext).write(
-		    with(new TermOccurrencePairMatcher(0, "term1")),
-		    with(new TermOccurrencesMatcher(7, 14, 17, 18)));
+		    with(new IntWritable(0)),
+		    with(new IndexRecordWriterDocValueMatcher(7, 14, 17, 18)));
+	    // Alignement. without counts or positions..
 	    one(reducerContext).write(
-		    with(new TermOccurrencePairMatcher(0, "term2")),
-		    with(new TermOccurrencesMatcher(2)));
+		    with(new IntWritable(-1)),
+		    with(new IndexRecordWriterTermValueMatcher("term1", 1, 0, 0)));
 	    one(reducerContext).write(
-		    with(new TermOccurrencePairMatcher(0, "term2")),
-		    with(new TermOccurrencesMatcher(1, 10, 19)));
+		    with(new IntWritable(-1)),
+		    with(new IndexRecordWriterDocValueMatcher(0)));
+	    
 	    one(reducerContext).write(
-		    with(new TermOccurrencePairMatcher(0, "term2")),
-		    with(new TermOccurrencesMatcher(7, 13, 16)));
+		    with(new IntWritable(0)),
+		    with(new IndexRecordWriterTermValueMatcher("term2", 2, 4, 35)));
 	    one(reducerContext).write(
-		    with(new TermOccurrencePairMatcher(1, "term3")),
-		    with(new TermOccurrencesMatcher(1)));
+		    with(new IntWritable(0)),
+		    with(new IndexRecordWriterDocValueMatcher(1, 10, 19)));
 	    one(reducerContext).write(
-		    with(new TermOccurrencePairMatcher(1, "term3")),
-		    with(new TermOccurrencesMatcher(2, 10, 11)));
+		    with(new IntWritable(0)),
+		    with(new IndexRecordWriterDocValueMatcher(7, 13, 16)));
+	    
+	    one(reducerContext).write(
+		    with(new IntWritable(1)),
+		    with(new IndexRecordWriterTermValueMatcher("term3", 1, 2, 11)));
+	    one(reducerContext).write(
+		    with(new IntWritable(1)),
+		    with(new IndexRecordWriterDocValueMatcher(2, 10, 11)));
 	}});
 	
 	TermOccurrencePairReduce reducer = new TermOccurrencePairReduce();
@@ -78,15 +88,22 @@ public class TermOccurrencePairReduceTest {
 	values.add(new Occurrence(null, 3));
 	values.add(new Occurrence(null, 4));
 	values.add(new Occurrence(null, 7));
-	values.add(new Occurrence(3, null));
 	values.add(new Occurrence(3, 11));
 	values.add(new Occurrence(3, 15));
-	values.add(new Occurrence(4, null));
 	values.add(new Occurrence(4, 12));
-	values.add(new Occurrence(7, null));
 	values.add(new Occurrence(7, 14));
 	values.add(new Occurrence(7, 17));
 	values.add(new Occurrence(7, 18));
+	reducer.reduce(key, values, reducerContext);
+	// Alignment
+	key = new TermOccurrencePair("term1", -1, null);
+	values.clear();
+	values.add(new Occurrence(null, 0));
+	values.add(new Occurrence(null, 0));
+	values.add(new Occurrence(null, 0));
+	values.add(new Occurrence(0, null));
+	values.add(new Occurrence(0, null));
+	values.add(new Occurrence(0, null));
 	reducer.reduce(key, values, reducerContext);
 	
 	key = new TermOccurrencePair("term2", 0, null);
@@ -101,6 +118,8 @@ public class TermOccurrencePairReduceTest {
 	values.add(new Occurrence(7, 16));
 	reducer.reduce(key, values, reducerContext);
 	
+	
+	
 	key = new TermOccurrencePair("term3", 1, null);
 	values.clear();
 	values.add(new Occurrence(null, 2));
@@ -112,29 +131,47 @@ public class TermOccurrencePairReduceTest {
 	context.assertIsSatisfied();
     }
     
-    private static class TermOccurrencesMatcher extends BaseMatcher<TermOccurrences> {
-	private final TermOccurrences termOccurrences;
-	
-	public TermOccurrencesMatcher(int termFrequency) {
-	    termOccurrences = new TermOccurrences(0);
-	    termOccurrences.setTermFrequency(termFrequency);
+    private static class IndexRecordWriterTermValueMatcher extends BaseMatcher<IndexRecordWriterTermValue> {
+	private final IndexRecordWriterTermValue termValue;
+
+	public IndexRecordWriterTermValueMatcher(String term, int termFrequency, int occurrenceCount, long sumOfMaxTermPositions) {
+	    termValue = new IndexRecordWriterTermValue();
+	    termValue.setTerm(term);
+	    termValue.setTermFrequency(termFrequency);
+	    termValue.setOccurrenceCount(occurrenceCount);
+	    termValue.setSumOfMaxTermPositions(sumOfMaxTermPositions);
 	}
-	public TermOccurrencesMatcher(int document, int ... occurrences) {
-	    termOccurrences = new TermOccurrences(occurrences.length);
-	    termOccurrences.setDocument(document);
+	
+	
+	@Override
+	public boolean matches(Object object) {
+	    return termValue.equals(object);
+	}
+	
+	@Override
+	public void describeTo(Description description) {
+	    description.appendText(termValue.toString());
+	}
+    }
+    private static class IndexRecordWriterDocValueMatcher extends BaseMatcher<IndexRecordWriterDocValue> {
+	private final IndexRecordWriterDocValue docValue;
+	
+	public IndexRecordWriterDocValueMatcher(int document, int ... occurrences) {
+	    docValue = new IndexRecordWriterDocValue(16);
+	    docValue.setDocument(document);
 	    for (int i = 0 ; i < occurrences.length ; i++) {
-		termOccurrences.addOccurrence(occurrences[i]);
+		docValue.addOccurrence(occurrences[i]);
 	    }
 	}
 	
 	@Override
 	public boolean matches(Object object) {
-	    return termOccurrences.equals(object);
+	    return docValue.equals(object);
 	}
 	
 	@Override
 	public void describeTo(Description description) {
-	    description.appendText(termOccurrences.toString());
+	    description.appendText(docValue.toString());
 	}
     }
 }

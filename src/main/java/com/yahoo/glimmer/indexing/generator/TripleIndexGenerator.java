@@ -14,6 +14,7 @@ package com.yahoo.glimmer.indexing.generator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -98,8 +99,8 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.setGroupingComparatorClass(TermOccurrencePair.FirstGroupingComparator.class);
 
 	job.setReducerClass(TermOccurrencePairReduce.class);
-	job.setOutputKeyClass(TermOccurrencePair.class);
-	job.setOutputValueClass(TermOccurrences.class);
+	job.setOutputKeyClass(IntWritable.class);
+	job.setOutputValueClass(IndexRecordWriterValue.class);
 	job.setOutputFormatClass(IndexRecordWriter.OutputFormat.class);
 	FileOutputFormat.setOutputPath(job, new Path(jsapResult.getString("output")));
 

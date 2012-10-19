@@ -36,7 +36,7 @@ import org.apache.hadoop.fs.Path;
 
 import com.yahoo.glimmer.indexing.CombinedTermProcessor;
 import com.yahoo.glimmer.indexing.ResourceRefTermProcessor;
-import com.yahoo.mg4hadoop.HadoopIOFactory;
+import com.yahoo.mg4hadoop.HdfsIoFactory;
 
 public class Index {
     private PrintWriter terms;
@@ -76,7 +76,7 @@ public class Index {
 	    defaultStandardIndex.remove(CompressionFlags.Component.COUNTS);
 	}
 	
-	IOFactory ioFactory = new HadoopIOFactory(fs);
+	IOFactory ioFactory = new HdfsIoFactory(fs);
 	
 	indexWriter = new QuasiSuccinctIndexWriter(ioFactory, basename, numDocs, Fast.mostSignificantBit(QuasiSuccinctIndex.DEFAULT_QUANTUM), QuasiSuccinctIndexWriter.DEFAULT_CACHE_SIZE, CompressionFlags.DEFAULT_QUASI_SUCCINCT_INDEX, null);
     }

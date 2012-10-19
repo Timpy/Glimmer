@@ -1,0 +1,107 @@
+package com.yahoo.glimmer.indexing.generator;
+
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
+public class IndexRecordWriterDocValue implements IndexRecordWriterValue {
+    private int document;
+    private int[] occurrences;
+    private int occurrenceCount;
+
+    public IndexRecordWriterDocValue(int occurrencesBufferSize) {
+	occurrences = new int[occurrencesBufferSize];
+    }
+
+    public int getDocument() {
+	return document;
+    }
+    public void setDocument(int document) {
+	this.document = document;
+    }
+
+    /**
+     * @param occurrence
+     *            to add at next to end of list
+     * @return true if occurrence was added.
+     */
+    public boolean addOccurrence(int occurrence) {
+	if (occurrenceCount >= occurrences.length) {
+	    return false;
+	}
+	occurrences[occurrenceCount++] = occurrence;
+	return true;
+    }
+
+    public boolean hasOccurrence() {
+	return occurrenceCount > 0;
+    }
+
+    public int getOccurrenceCount() {
+	return occurrenceCount;
+    }
+
+    public int[] getOccurrences() {
+	return occurrences;
+    }
+    
+    public void clearOccerrences() {
+	occurrenceCount = 0;
+    }
+
+    @Override
+    public void readFields(DataInput in) throws IOException {
+	throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void write(DataOutput out) throws IOException {
+	throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+	if (o instanceof IndexRecordWriterDocValue) {
+	    IndexRecordWriterDocValue that = (IndexRecordWriterDocValue) o;
+	    if (document == that.document && occurrenceCount == that.occurrenceCount) {
+		for (int i = 0; i < occurrenceCount; i++) {
+		    if (occurrences[i] != that.occurrences[i]) {
+			return false;
+		    }
+		}
+		return true;
+	    }
+	}
+	return false;
+    }
+
+    @Override
+    public int hashCode() {
+	int hash = 7;
+	hash = 31 * hash + document;
+	hash = 31 * hash + occurrenceCount;
+	for (int i = 0; i < occurrenceCount; i++) {
+	    hash = 31 * hash + occurrences[i];
+	}
+	return hash;
+    }
+
+    @Override
+    public int compareTo(IndexRecordWriterValue o) {
+	throw new UnsupportedOperationException();
+    }
+
+    public String toString() {
+	StringBuilder sb = new StringBuilder();
+	sb.append(document);
+	sb.append(" (");
+	for (int i = 0; i < occurrenceCount; i++) {
+	    if (i > 0) {
+		sb.append(',');
+	    }
+	    sb.append(occurrences[i]);
+	}
+	sb.append(')');
+	return sb.toString();
+    }
+}

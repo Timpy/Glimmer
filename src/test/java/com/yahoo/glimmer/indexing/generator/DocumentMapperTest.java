@@ -106,6 +106,7 @@ public class DocumentMapperTest {
 	    will(returnValue(new DelimitedWordReader("1 literal 3".toCharArray(), DELIMITER)));
 	    allowing(doc).getIndexType();
 	    will(returnValue(IndexType.VERTICAL));
+	    
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(0, "1", 10, 0)), with(new OccurrenceMatcher(10, 0)));
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(0, "literal", 10, 1)), with(new OccurrenceMatcher(10, 1)));
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(0, "3", 10, 2)), with(new OccurrenceMatcher(10, 2)));
@@ -113,6 +114,10 @@ public class DocumentMapperTest {
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(0, "1", null, 10)), with(new OccurrenceMatcher(null, 10)));
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(0, "literal", null, 10)), with(new OccurrenceMatcher(null, 10)));
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(0, "3", null, 10)), with(new OccurrenceMatcher(null, 10)));
+	    // Last positions of terms.
+	    one(mapperContext).write(with(new TermOccurrencePairMatcher(0, "1", 10, -1)), with(new OccurrenceMatcher(10, -1)));
+	    one(mapperContext).write(with(new TermOccurrencePairMatcher(0, "literal", 10, -2)), with(new OccurrenceMatcher(10, -2)));
+	    one(mapperContext).write(with(new TermOccurrencePairMatcher(0, "3", 10, -3)), with(new OccurrenceMatcher(10, -3)));
 	    
 	    allowing(doc).content(1);
 	    will(returnValue(new DelimitedWordReader("4 5".toCharArray(), DELIMITER)));
@@ -121,6 +126,9 @@ public class DocumentMapperTest {
 	    // for counting # of docs per term
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(1, "4", null, 10)), with(new OccurrenceMatcher(null, 10)));
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(1, "5", null, 10)), with(new OccurrenceMatcher(null, 10)));
+	    // Last positions of terms.
+	    one(mapperContext).write(with(new TermOccurrencePairMatcher(1, "4", 10, -1)), with(new OccurrenceMatcher(10, -1)));
+	    one(mapperContext).write(with(new TermOccurrencePairMatcher(1, "5", 10, -2)), with(new OccurrenceMatcher(10, -2)));
 	    
 	    allowing(doc).content(2);
 	    will(returnValue(new DelimitedWordReader("A B C".toCharArray(), DELIMITER)));
@@ -131,6 +139,10 @@ public class DocumentMapperTest {
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(2, "A", null, 10)), with(new OccurrenceMatcher(null, 10)));
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(2, "B", null, 10)), with(new OccurrenceMatcher(null, 10)));
 	    one(mapperContext).write(with(new TermOccurrencePairMatcher(2, "C", null, 10)), with(new OccurrenceMatcher(null, 10)));
+	    // Last positions of terms.
+	    one(mapperContext).write(with(new TermOccurrencePairMatcher(2, "A", 10, -1)), with(new OccurrenceMatcher(10, -1)));
+	    one(mapperContext).write(with(new TermOccurrencePairMatcher(2, "B", 10, -2)), with(new OccurrenceMatcher(10, -2)));
+	    one(mapperContext).write(with(new TermOccurrencePairMatcher(2, "C", 10, -3)), with(new OccurrenceMatcher(10, -3)));
 	
 	    // The ALIGNMENT_INDEX is created for Vertical indexes only.
 	    //

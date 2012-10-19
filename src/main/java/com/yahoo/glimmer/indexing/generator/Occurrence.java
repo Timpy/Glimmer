@@ -17,44 +17,55 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.WritableComparable;
 
+/**
+ * The value that is passed between the mapper and reducer.
+ * 
+ * Can represent different thing depending on how the document and position are
+ * set.
+ * 
+ * If both document and position are set and are positive - The Occurrence is
+ * the occurrence of keys term in the given document at the given position.
+ * 
+ * If both document and position are set but the position is negative - The
+ * Occurrence represents the last position the term occurs at. Where the
+ * position is the absolute value minus 1.
+ * 
+ * If document is not set, and the index is not the alignment index - The
+ * position is the doc id. This is used to compute the term frequency(Document
+ * containing this term).
+ * 
+ * If document is not set, and the index is the alignment index - The position
+ * is index/predicate id.
+ * 
+ * 
+ * 
+ * @author tep
+ * 
+ */
 public class Occurrence implements WritableComparable<Occurrence>, Cloneable {
-    private static final int NO_DOC = -14;
-    private static final int NO_POSITION = -13;
-    private int document;
-    private int position;
-
-    // Hadoop needs this
-    public Occurrence() {
-	document = NO_DOC;
-	position = NO_POSITION;
-    }
+    private Integer document;
+    private Integer position;
 
     public Occurrence(Integer document, Integer position) {
-	if (document == null) {
-	    this.document = NO_DOC;
-	} else if (document >= 0) {
-	    this.document = document;
-	} else {
+	if (document != null && document < 0) {
 	    throw new IllegalArgumentException("Document can not be less than 0.");
 	}
-	
-	if (position == null) {
-	    this.position = NO_POSITION;
-	} else if (position >= 0) {
-	    this.position = position;
-	} else {
-	    throw new IllegalArgumentException("Position can not be less than 0.");
-	}
+	this.document = document;
+	this.position = position;
+    }
+
+    public Occurrence() {
     }
 
     public Occurrence(Occurrence p) {
 	this.document = p.document;
 	this.position = p.position;
     }
-    
+
     public boolean isDocSet() {
-	return document != NO_DOC;
+	return document != null;
     }
+
     public int getDocument() {
 	if (isDocSet()) {
 	    return document;
@@ -63,8 +74,9 @@ public class Occurrence implements WritableComparable<Occurrence>, Cloneable {
     }
 
     public boolean isPositionSet() {
-	return position != NO_POSITION;
+	return position != null;
     }
+
     public int getPosition() {
 	if (isPositionSet()) {
 	    return position;
@@ -76,15 +88,31 @@ public class Occurrence implements WritableComparable<Occurrence>, Cloneable {
 	document = occ.document;
 	position = occ.position;
     }
-    
+
+    private static final int NOT_SET_SERIALIZATION_VALUE = Integer.MIN_VALUE;
+
     public void readFields(DataInput in) throws IOException {
 	document = in.readInt();
+	if (document == NOT_SET_SERIALIZATION_VALUE) {
+	    document = null;
+	}
 	position = in.readInt();
+	if (position == NOT_SET_SERIALIZATION_VALUE) {
+	    position = null;
+	}
     }
 
     public void write(DataOutput out) throws IOException {
-	out.writeInt(document);
-	out.writeInt(position);
+	if (isDocSet()) {
+	    out.writeInt(document);
+	} else {
+	    out.write(NOT_SET_SERIALIZATION_VALUE);
+	}
+	if (isPositionSet()) {
+	    out.writeInt(position);
+	} else {
+	    out.write(NOT_SET_SERIALIZATION_VALUE);
+	}
     }
 
     @Override
@@ -100,8 +128,12 @@ public class Occurrence implements WritableComparable<Occurrence>, Cloneable {
     @Override
     public int hashCode() {
 	int hash = 7;
-	hash = 31 * hash + document;
-	hash = 31 * hash + position;
+	if (isDocSet()) {
+	    hash = 31 * hash + document;
+	}
+	if (isPositionSet()) {
+	    hash = 31 * hash + position;
+	}
 	return hash;
     }
 
@@ -110,18 +142,22 @@ public class Occurrence implements WritableComparable<Occurrence>, Cloneable {
     }
 
     public int compareTo(Occurrence that) {
-	if (this.document < that.document) {
-	    return -1;
-	} else if (this.document > that.document) {
-	    return +1;
-	} else {
-	    // this.document == that.document
-	    if (this.position < that.position) {
-		return -1;
-	    } else if (this.position > that.position) {
-		return +1;
-	    }
+	int i = nullSafeCompareTo(this.document, that.document, true);
+	if (i != 0) {
+	    i = nullSafeCompareTo(this.position, that.position, true);
 	}
-	return 0;
+	return i;
+    }
+
+    private static <T extends Comparable<T>> int nullSafeCompareTo(T a, T b, boolean nullsFirst) {
+	if (a == null) {
+	    if (b == null) {
+		return 0;
+	    }
+	    return nullsFirst ? -1 : 1;
+	} else if (b == null) {
+	    return nullsFirst ? 1 : -1;
+	}
+	return a.compareTo(b);
     }
 }

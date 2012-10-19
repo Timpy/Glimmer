@@ -12,8 +12,8 @@ package com.yahoo.glimmer.indexing;
  */
 
 import it.unimi.di.mg4j.document.DocumentCollectionBuilder;
-import it.unimi.di.mg4j.document.HdfsSimpleCompressedDocumentCollectionBuilder;
 import it.unimi.di.mg4j.document.IdentityDocumentFactory;
+import it.unimi.di.mg4j.io.IOFactory;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.lang.MutableString;
 
@@ -36,6 +36,7 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import com.yahoo.glimmer.util.BySubjectRecord;
+import com.yahoo.mg4hadoop.HdfsIoFactory;
 
 public class BySubjectCollectionBuilder extends Configured implements Tool {
     // Sequence that isn't possible as a Resource or word/nonWord tokenization.
@@ -111,7 +112,8 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 
 	public BuilderOutputWriter(TaskAttemptContext job, Path taskWorkPath) throws IllegalArgumentException, IOException {
 	    FileSystem fs = FileSystem.get(job.getConfiguration());
-	    builder = new HdfsSimpleCompressedDocumentCollectionBuilder("collection-", new IdentityDocumentFactory(), true, fs, taskWorkPath);
+	    IOFactory ioFactory = new HdfsIoFactory(fs);
+	    builder = new StartOffsetDocumentCollectionBuilder("collection-", new IdentityDocumentFactory(), ioFactory);
 	    // Use the id for this task.  It's the same for all attempts of this task.
 	    builder.open(Integer.toString(job.getTaskAttemptID().getTaskID().getId()));
 	}

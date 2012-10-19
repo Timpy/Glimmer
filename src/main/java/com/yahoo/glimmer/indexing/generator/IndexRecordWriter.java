@@ -13,6 +13,7 @@ package com.yahoo.glimmer.indexing.generator;
 
 import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.di.mg4j.index.IndexWriter;
+import it.unimi.di.mg4j.index.QuasiSuccinctIndexWriter;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -29,10 +31,11 @@ import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.util.Util;
 
-public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccurrences> {
+public class IndexRecordWriter extends RecordWriter<IntWritable, IndexRecordWriterValue> {
     private Map<Integer, IndexWrapper> indices = new HashMap<Integer, IndexWrapper>();
 
-    public IndexRecordWriter(FileSystem fs, Path taskWorkPath, int numberOfDocs, RDFDocumentFactory.IndexType indexType, String hashValuePrefix, String ... fieldNames) throws IOException {
+    public IndexRecordWriter(FileSystem fs, Path taskWorkPath, int numberOfDocs, RDFDocumentFactory.IndexType indexType, String hashValuePrefix,
+	    String... fieldNames) throws IOException {
 	if (indexType == RDFDocumentFactory.IndexType.VERTICAL) {
 	    // Open the alignment index
 	    Index index = new Index(fs, taskWorkPath, TripleIndexGenerator.ALIGNMENT_INDEX_NAME, numberOfDocs, false, hashValuePrefix);
@@ -40,7 +43,6 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
 	    indices.put(DocumentMapper.ALIGNMENT_INDEX, new IndexWrapper(index));
 	}
 
-	
 	// Open one index per field
 	for (int i = 0; i < fieldNames.length; i++) {
 	    String name = Util.encodeFieldName(fieldNames[i]);
@@ -69,9 +71,9 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
     }
 
     @Override
-    public void write(TermOccurrencePair key, TermOccurrences value) throws IOException, InterruptedException {
-	IndexWrapper index = indices.get(key.getIndex());
-	index.write(key.getTerm(), value);
+    public void write(IntWritable key, IndexRecordWriterValue value) throws IOException, InterruptedException {
+	IndexWrapper index = indices.get(key.get());
+	index.write(value);
     }
 
     @Override
@@ -89,20 +91,28 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
 	    this.index = index;
 	}
 
-	public void write(String term, TermOccurrences value) throws IOException {
-	    if (value.getTermFrequency() > 0) {
-		index.getTermsWriter().println(term);
-		index.getIndexWriter().newInvertedList();
-		index.getIndexWriter().writeFrequency(value.getTermFrequency());
-	    } else {
-		IndexWriter indexWriter = index.getIndexWriter();
-		OutputBitStream out = indexWriter.newDocumentRecord();
-		indexWriter.writeDocumentPointer(out, value.getDocument());
-		if (index.hasPositions() && value.hasOccurrence()) {
-		    indexWriter.writePositionCount(out, value.getOccurrenceCount());
-		    indexWriter.writeDocumentPositions(out, value.getOccurrences(), 0, value.getOccurrenceCount(), -1);
+	public void write(IndexRecordWriterValue value) throws IOException {
+	    IndexWriter indexWriter = index.getIndexWriter();
+	    if (value instanceof IndexRecordWriterTermValue) {
+		IndexRecordWriterTermValue termValue = (IndexRecordWriterTermValue) value;
+		index.getTermsWriter().println(termValue.getTerm());
+		if (indexWriter instanceof QuasiSuccinctIndexWriter) {
+		    ((QuasiSuccinctIndexWriter) indexWriter).newInvertedList(termValue.getTermFrequency(), termValue.getOccurrenceCount(),
+			    termValue.getSumOfMaxTermPositions());
+		} else {
+		    indexWriter.newInvertedList();
+		    indexWriter.writeFrequency(termValue.getTermFrequency());
 		}
-		writtenOccurrenceCount += value.getOccurrenceCount();
+	    } else {
+		IndexRecordWriterDocValue docValue = (IndexRecordWriterDocValue) value;
+
+		OutputBitStream out = indexWriter.newDocumentRecord();
+		indexWriter.writeDocumentPointer(out, docValue.getDocument());
+		if (index.hasPositions() && docValue.hasOccurrence()) {
+		    indexWriter.writePositionCount(out, docValue.getOccurrenceCount());
+		    indexWriter.writeDocumentPositions(out, docValue.getOccurrences(), 0, docValue.getOccurrenceCount(), -1);
+		}
+		writtenOccurrenceCount += docValue.getOccurrenceCount();
 	    }
 	}
 
@@ -110,10 +120,10 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
 	    index.close(writtenOccurrenceCount);
 	}
     }
-    
-    public static class OutputFormat extends FileOutputFormat<TermOccurrencePair, TermOccurrences> {
+
+    public static class OutputFormat extends FileOutputFormat<IntWritable, IndexRecordWriterValue> {
 	@Override
-	public RecordWriter<TermOccurrencePair, TermOccurrences> getRecordWriter(TaskAttemptContext job) throws IOException, InterruptedException {
+	public RecordWriter<IntWritable, IndexRecordWriterValue> getRecordWriter(TaskAttemptContext job) throws IOException, InterruptedException {
 	    Configuration conf = job.getConfiguration();
 	    FileSystem fs = FileSystem.get(conf);
 

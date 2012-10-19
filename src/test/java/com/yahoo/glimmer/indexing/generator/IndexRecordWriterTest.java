@@ -14,6 +14,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskInputOutputContext;
@@ -70,80 +71,108 @@ public class IndexRecordWriterTest {
 	conf.setStrings("RdfFieldNames", "index0", "index1");
 	conf.setEnum("IndexType", RDFDocumentFactory.IndexType.VERTICAL);
 
-	RecordWriter<TermOccurrencePair, TermOccurrences> recordWriter = outputFormat.getRecordWriter(taskContext);
+	RecordWriter<IntWritable, IndexRecordWriterValue> recordWriter = outputFormat.getRecordWriter(taskContext);
 	
-	TermOccurrencePair alignmentKey = new TermOccurrencePair("term1", DocumentMapper.ALIGNMENT_INDEX, null);
-	TermOccurrences value = new TermOccurrences(16);
-	value.setTermFrequency(1);
-	recordWriter.write(alignmentKey, value);
-	value.setDocument(0); // term1 occurres in index 0
-	recordWriter.write(alignmentKey, value);
+	IntWritable key = new IntWritable();
+	IndexRecordWriterTermValue termValue = new IndexRecordWriterTermValue();
+	IndexRecordWriterDocValue docValue = new IndexRecordWriterDocValue(16);
 	
-	TermOccurrencePair key = new TermOccurrencePair("term1", 0, null);
-	value.setTermFrequency(3);
-	recordWriter.write(key, value);
-	value.setDocument(3);
-	value.clearOccerrences();
-	value.addOccurrence(11);
-	value.addOccurrence(15);
-	recordWriter.write(key, value);
-	value.setDocument(4);
-	value.clearOccerrences();
-	value.addOccurrence(12);
-	recordWriter.write(key, value);
-	value.setDocument(7);
-	value.clearOccerrences();
-	value.addOccurrence(14);
-	value.addOccurrence(17);
-	value.addOccurrence(18);
-	recordWriter.write(key, value);
+	// ALIGNEMENT_INDEX
+	key.set(DocumentMapper.ALIGNMENT_INDEX);
+	termValue.setTerm("term1");
+	termValue.setTermFrequency(1);
+	termValue.setOccurrenceCount(1);
+	termValue.setSumOfMaxTermPositions(1);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(0); // term1 occurres in index 0
+	recordWriter.write(key, docValue);
 	
-	value.setTermFrequency(2);
-	value.clearOccerrences();
-	recordWriter.write(alignmentKey, value);
-	value.setDocument(0); // term2 occurres in index 0 & 1
-	recordWriter.write(alignmentKey, value);
-	value.setDocument(1); // term2 occurres in index 0 & 1
-	recordWriter.write(alignmentKey, value);
+	// Index 0
+	key.set(0);
+	termValue.setTermFrequency(3);
+	termValue.setOccurrenceCount(6);
+	termValue.setSumOfMaxTermPositions(15 + 12 + 18);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(3);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(11);
+	docValue.addOccurrence(15);
+	recordWriter.write(key, docValue);
+	docValue.setDocument(4);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(12);
+	recordWriter.write(key, docValue);
+	docValue.setDocument(7);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(14);
+	docValue.addOccurrence(17);
+	docValue.addOccurrence(18);
+	recordWriter.write(key, docValue);
+
+	// ALIGNEMENT_INDEX
+	key.set(DocumentMapper.ALIGNMENT_INDEX);
+	termValue.setTerm("term2");
+	termValue.setTermFrequency(0);
+	termValue.setOccurrenceCount(0);
+	termValue.setSumOfMaxTermPositions(1);
+	recordWriter.write(key, termValue);
+	docValue.clearOccerrences();
+	docValue.setDocument(0); // term2 occurres in index 0 & 1
+	recordWriter.write(key, docValue);
+	docValue.setDocument(1); // term2 occurres in index 0 & 1
+	recordWriter.write(key, docValue);
 	
-	key = new TermOccurrencePair("term2", 0, null);
-	value.setTermFrequency(2);
-	recordWriter.write(key, value);
-	value.setDocument(1);
-	value.clearOccerrences();
-	value.addOccurrence(10);
-	value.addOccurrence(19);
-	recordWriter.write(key, value);
-	value.setDocument(7);
-	value.clearOccerrences();
-	value.addOccurrence(13);
-	value.addOccurrence(16);
-	recordWriter.write(key, value);
+	// Index 0
+	key.set(0);
+	termValue.setTermFrequency(2);
+	termValue.setOccurrenceCount(4);
+	termValue.setSumOfMaxTermPositions(19 + 16);
+	recordWriter.write(key, termValue);
 	
-	key = new TermOccurrencePair("term2", 1, null);
-	value.setTermFrequency(1);
-	recordWriter.write(key, value);
-	value.setDocument(1);
-	value.clearOccerrences();
-	value.addOccurrence(14);
-	recordWriter.write(key, value);
+	docValue.setDocument(1);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(10);
+	docValue.addOccurrence(19);
+	recordWriter.write(key, docValue);
+	docValue.setDocument(7);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(13);
+	docValue.addOccurrence(16);
+	recordWriter.write(key, docValue);
 	
-	value.setTermFrequency(1);
-	value.clearOccerrences();
-	recordWriter.write(alignmentKey, value);
-	value.setDocument(1); // term3 occurres in index 1
-	recordWriter.write(alignmentKey, value);
+	// Index 1
+	key.set(1);
+	termValue.setTermFrequency(1);
+	termValue.setOccurrenceCount(1);
+	termValue.setSumOfMaxTermPositions(14);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(1);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(14);
+	recordWriter.write(key, docValue);
 	
-	key = new TermOccurrencePair("term3", 1, null);
-	value.setTermFrequency(1);
-	recordWriter.write(key, value);
-	value.setDocument(3);
-	value.clearOccerrences();
-	value.addOccurrence(10);
-	value.addOccurrence(11);
-	recordWriter.write(key, value);
+	// ALIGNMENT_INDEX 
+	key.set(DocumentMapper.ALIGNMENT_INDEX);
+	termValue.setTerm("term3");
+	termValue.setTermFrequency(1);
+	termValue.setOccurrenceCount(1);
+	termValue.setSumOfMaxTermPositions(1);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(1); // term3 occurres in index 1
+	recordWriter.write(key, docValue);
+	docValue.clearOccerrences();
 	
-	
+	// Index 1
+	key.set(1);
+	termValue.setTermFrequency(1);
+	termValue.setOccurrenceCount(2);
+	termValue.setSumOfMaxTermPositions(11);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(3);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(10);
+	docValue.addOccurrence(11);
+	recordWriter.write(key, docValue);
 	
 	recordWriter.close(taskContext);
 
