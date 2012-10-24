@@ -24,8 +24,9 @@ import org.apache.hadoop.mapreduce.Mapper;
 
 import com.yahoo.glimmer.indexing.RDFDocument;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory;
+import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
-public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurrencePair, Occurrence> {
+public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, TermValue> {
     static final int ALIGNMENT_INDEX = -1; // special index for alignments
 
     enum Counters {
@@ -34,7 +35,7 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurr
 
     private String[] fields;
 
-    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, RDFDocument, TermOccurrencePair, Occurrence>.Context context) throws IOException,
+    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, RDFDocument, TermKey, TermValue>.Context context) throws IOException,
 	    InterruptedException {
 	Configuration conf = context.getConfiguration();
 	fields = RDFDocumentFactory.getFieldsFromConf(conf);
@@ -49,17 +50,13 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurr
 	    return;
 	}
 
-	// used for counting # of docs per term
-	Occurrence fakeDocOccurrrence = new Occurrence(null, doc.getId());
-
 	// This is used to write the position of the last occurrence and testing
 	// if the fakeDocOccurrrence for the term has already been written.
-	Map<String, Integer> termToLastOccurrenceMap = new HashMap<String, Integer>();
+	Map<String, OccurrenceInfo> termToOccurrenceInfoMap = new HashMap<String, OccurrenceInfo>();
 
 	// Iterate over all indices
 	for (int i = 0; i < fields.length; i++) {
-	    Occurrence fakePredicateOccurrrence = new Occurrence(null, i);
-	    Occurrence predicateOcc = new Occurrence(i, null);
+	    TermValue predicateIdValue = new TermValue(Type.PREDICATE_ID, i);
 
 	    String fieldName = fields[i];
 	    if (fieldName.startsWith("NOINDEX")) {
@@ -81,28 +78,37 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurr
 		    context.setStatus(fields[i] + "=" + term.substring(0, Math.min(term.length(), 50)));
 
 		    // Create an occurrence at the next position
-		    Occurrence occ = new Occurrence(doc.getId(), position);
-		    context.write(new TermOccurrencePair(termString, i, occ), occ);
+		    TermValue occurrenceValue = new TermValue(Type.OCCURRENCE, doc.getId(), position);
+		    context.write(new TermKey(termString, i, occurrenceValue), occurrenceValue);
 
-		    Integer lastOccurrence = termToLastOccurrenceMap.get(termString);
-		    if (lastOccurrence == null) {
-			// Create fake occurrences the first time we encounter
-			// each term (this will be
-			// used for counting # of docs per term
-			context.write(new TermOccurrencePair(termString, i, fakeDocOccurrrence), fakeDocOccurrrence);
+		    OccurrenceInfo occurrenceInfo = termToOccurrenceInfoMap.get(termString);
+		    if (occurrenceInfo == null) {
 			if (doc.getIndexType() == RDFDocumentFactory.IndexType.VERTICAL) {
-			    context.write(new TermOccurrencePair(termString, ALIGNMENT_INDEX, fakePredicateOccurrrence), fakePredicateOccurrrence);
+			    // For the Alignment Index, we write the predicate
+			    // id the first time we encounter a term.
+			    // The 'Alignment Index' is an index without counts
+			    // or positions. It's used for query optimization in
+			    // the query parse. The resulting 'alignment index'
+			    // is basically used as a map from term to
+			    // predicates that term occures in.
+			    context.write(new TermKey(termString, ALIGNMENT_INDEX, predicateIdValue), predicateIdValue);
 			}
+			occurrenceInfo = new OccurrenceInfo();
+			occurrenceInfo.last = position;
+			occurrenceInfo.count = 1;
+			termToOccurrenceInfoMap.put(termString, occurrenceInfo);
+		    } else {
+			occurrenceInfo.last = position;
+			occurrenceInfo.count++;
 		    }
 
-		    // Update last occurrence
-		    termToLastOccurrenceMap.put(termString, position);
-
-		    if (doc.getIndexType() == RDFDocumentFactory.IndexType.VERTICAL) {
-			// TODO Why not add to keySet? Is the number of writes
-			// important?
-			context.write(new TermOccurrencePair(termString, ALIGNMENT_INDEX, predicateOcc), predicateOcc);
-		    }
+		    // if (doc.getIndexType() ==
+		    // RDFDocumentFactory.IndexType.VERTICAL) {
+		    // TermValue predicateOccurrenceValue = new
+		    // TermValue(Type.PREDICATE_OCCURRENCE, i);
+		    // context.write(new TermKey(termString, ALIGNMENT_INDEX,
+		    // predicateOccurrenceValue), predicateOccurrenceValue);
+		    // }
 
 		    position++;
 		    context.getCounter(Counters.INDEXED_OCCURRENCES).increment(1);
@@ -110,15 +116,23 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurr
 		    System.out.println("Nextterm is null");
 		}
 	    }
-	    for (String termString : termToLastOccurrenceMap.keySet()) {
-		Integer lastOccurrence = termToLastOccurrenceMap.get(termString);
-		// Write the last occurrence as the negative positions.
-		Occurrence occ = new Occurrence(doc.getId(), -1 - lastOccurrence);
-		context.write(new TermOccurrencePair(termString, i, occ), occ);
+
+	    for (String termString : termToOccurrenceInfoMap.keySet()) {
+		OccurrenceInfo occurrenceInfo = termToOccurrenceInfoMap.get(termString);
+		TermValue occurrenceCountValue = new TermValue(Type.OCCURRENCE_COUNT, doc.getId(), occurrenceInfo.count);
+		context.write(new TermKey(termString, i, occurrenceCountValue), occurrenceCountValue);
+
+		TermValue lastOccurrenceValue = new TermValue(Type.LAST_OCCURRENCE, doc.getId(), occurrenceInfo.last);
+		context.write(new TermKey(termString, i, lastOccurrenceValue), lastOccurrenceValue);
 	    }
-	    termToLastOccurrenceMap.clear();
+	    termToOccurrenceInfoMap.clear();
 	}
 
 	context.getCounter(Counters.NUMBER_OF_RECORDS).increment(1);
+    }
+
+    private static class OccurrenceInfo {
+	int last;
+	int count;
     }
 }

@@ -3,8 +3,10 @@ package com.yahoo.glimmer.indexing.generator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import it.unimi.di.mg4j.index.DiskBasedIndex;
 import it.unimi.di.mg4j.index.FileIndex;
 import it.unimi.di.mg4j.index.IndexIterator;
+import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
 
 import java.io.IOException;
 import java.net.URI;
@@ -44,7 +46,7 @@ public class IndexRecordWriterTest {
 	conf = new Configuration();
 	
 	conf.set("mapred.output.dir", INDEX_TMP_DIR.toString());
-	conf.setInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, 7);
+	conf.setInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, 8);
 
 	fs.initialize(new URI("file:///"), new Configuration());
     }
@@ -84,7 +86,7 @@ public class IndexRecordWriterTest {
 	termValue.setOccurrenceCount(1);
 	termValue.setSumOfMaxTermPositions(1);
 	recordWriter.write(key, termValue);
-	docValue.setDocument(0); // term1 occurres in index 0
+	docValue.setDocument(0); // term1 occurs in index 0
 	recordWriter.write(key, docValue);
 	
 	// Index 0
@@ -112,14 +114,15 @@ public class IndexRecordWriterTest {
 	// ALIGNEMENT_INDEX
 	key.set(DocumentMapper.ALIGNMENT_INDEX);
 	termValue.setTerm("term2");
-	termValue.setTermFrequency(0);
+	termValue.setTermFrequency(2);
+	// The alignment index doesn't have positions/counts.
 	termValue.setOccurrenceCount(0);
-	termValue.setSumOfMaxTermPositions(1);
+	termValue.setSumOfMaxTermPositions(0);
 	recordWriter.write(key, termValue);
 	docValue.clearOccerrences();
-	docValue.setDocument(0); // term2 occurres in index 0 & 1
+	docValue.setDocument(0); // term2 occurs in index 0 & 1
 	recordWriter.write(key, docValue);
-	docValue.setDocument(1); // term2 occurres in index 0 & 1
+	docValue.setDocument(1); // term2 occurs in index 0 & 1
 	recordWriter.write(key, docValue);
 	
 	// Index 0
@@ -158,7 +161,7 @@ public class IndexRecordWriterTest {
 	termValue.setOccurrenceCount(1);
 	termValue.setSumOfMaxTermPositions(1);
 	recordWriter.write(key, termValue);
-	docValue.setDocument(1); // term3 occurres in index 1
+	docValue.setDocument(1); // term3 occurs in index 1
 	recordWriter.write(key, docValue);
 	docValue.clearOccerrences();
 	
@@ -180,9 +183,9 @@ public class IndexRecordWriterTest {
 	
 	Path workPath = outputFormat.getDefaultWorkFile(taskContext,"");
 	System.out.println("Default work file is " + workPath.toString());
-	
-	FileIndex index0 = (FileIndex) FileIndex.getInstance(workPath.toString() + "/index0", true);
-	assertEquals(7, index0.numberOfDocuments);
+	String dir = workPath.toUri().getPath();
+	QuasiSuccinctIndex index0 = (QuasiSuccinctIndex) DiskBasedIndex.getInstance(dir + "/index0", true);
+	assertEquals(8, index0.numberOfDocuments);
 	assertEquals(2, index0.numberOfTerms);
 	assertTrue(index0.hasPositions);
 	// term1
@@ -190,16 +193,16 @@ public class IndexRecordWriterTest {
 	// term2
 	checkOccurrences(index0.documents(1), 2, "(1:10,19) (7:13,16)");
 
-	FileIndex index1 = (FileIndex) FileIndex.getInstance(workPath.toString() + "/index1", true);
-	assertEquals(7, index1.numberOfDocuments);
+	QuasiSuccinctIndex index1 = (QuasiSuccinctIndex) DiskBasedIndex.getInstance(dir + "/index1", true);
+	assertEquals(8, index1.numberOfDocuments);
 	assertEquals(2, index1.numberOfTerms);
 	assertTrue(index0.hasPositions);
 	checkOccurrences(index1.documents(0), 1, "(1:14)");
 	// term3
 	checkOccurrences(index1.documents(1), 1, "(3:10,11)");
 	
-	FileIndex indexAlignment = (FileIndex) FileIndex.getInstance(workPath.toString() + "/alignment", true);
-	assertEquals(7, indexAlignment.numberOfDocuments);
+	QuasiSuccinctIndex indexAlignment = (QuasiSuccinctIndex) DiskBasedIndex.getInstance(dir + "/alignment", true);
+	assertEquals(8, indexAlignment.numberOfDocuments);
 	assertEquals(3, indexAlignment.numberOfTerms);
 	assertFalse(indexAlignment.hasPositions);
 	// term1

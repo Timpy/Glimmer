@@ -382,4 +382,16 @@ public class Util {
     public static String encodeFieldName(String name) {
         return name.replaceAll("[^a-zA-Z0-9]+", "_");
     }
+    
+    public static <T extends Comparable<T>> int nullSafeCompareTo(T a, T b, boolean nullsFirst) {
+	if (a == null) {
+	    if (b == null) {
+		return 0;
+	    }
+	    return nullsFirst ? -1 : 1;
+	} else if (b == null) {
+	    return nullsFirst ? 1 : -1;
+	}
+	return a.compareTo(b);
+    }
 }

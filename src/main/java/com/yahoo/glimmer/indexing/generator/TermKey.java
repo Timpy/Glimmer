@@ -28,21 +28,24 @@ import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
  * @author pmika
  * 
  */
-public class TermOccurrencePair implements WritableComparable<TermOccurrencePair> {
+public class TermKey implements WritableComparable<TermKey> {
     private int index;
     private String term;
-    private Occurrence occ = new Occurrence();
+    // We want hadoop to sort our values too. So the initial sort includes the
+    // value in the key. The FirstGroupingComparator is then used to group all
+    // values for each index/term pair.
+    private TermValue value = new TermValue();
 
     /*
      * Required for Hadoop
      */
-    public TermOccurrencePair() {
+    public TermKey() {
     }
 
-    public TermOccurrencePair(String term, int index, Occurrence occurrence) {
+    public TermKey(String term, int index, TermValue value) {
 	this.index = index;
 	this.term = term;
-	this.occ = occurrence;
+	this.value = value;
     }
 
     public String getTerm() {
@@ -52,57 +55,57 @@ public class TermOccurrencePair implements WritableComparable<TermOccurrencePair
     public int getIndex() {
 	return index;
     }
-    
-    public Occurrence getOccurrence() {
-	return occ;
+
+    public TermValue getValue() {
+	return value;
     }
 
     public void readFields(DataInput in) throws IOException {
-	occ.readFields(in);
+	value.readFields(in);
 	index = in.readInt();
 	term = Text.readString(in);
     }
 
     public void write(DataOutput out) throws IOException {
-	occ.write(out);
+	value.write(out);
 	out.writeInt(index);
 	Text.writeString(out, term);
     }
 
-    public int compareTo(TermOccurrencePair top) {
+    public int compareTo(TermKey top) {
 	if (!term.equals(top.term)) {
 	    return term.compareTo(top.term);
 	} else if (index != top.index) {
 	    return ((Integer) index).compareTo(top.index);
 	} else {
-	    return occ.compareTo(top.occ);
+	    return value.compareTo(top.value);
 	}
     }
 
     @Override
     public int hashCode() {
-	int hash = 31 * occ.hashCode() + index;
+	int hash = 31 * value.hashCode() + index;
 	return 31 * hash + term.hashCode();
     }
 
     @Override
     public boolean equals(Object right) {
-	if (right instanceof TermOccurrencePair) {
-	    TermOccurrencePair r = (TermOccurrencePair) right;
-	    return term.equals(r.term) && index == r.index && (occ == null ? r.occ == null : occ.equals(r.occ));
+	if (right instanceof TermKey) {
+	    TermKey r = (TermKey) right;
+	    return term.equals(r.term) && index == r.index && (value == null ? r.value == null : value.equals(r.value));
 	} else {
 	    return false;
 	}
     }
 
     public String toString() {
-	return Integer.toString(index) + ":" + term + ":" + (occ == null ? "null" : occ.toString());
+	return Integer.toString(index) + ":" + term + ":" + (value == null ? "null" : value.toString());
     }
 
-    /** A Comparator that compares serialized TermOccurrencePair. */
+    /** A Comparator that compares serialized TermKey objects. */
     public static class Comparator extends WritableComparator {
 	public Comparator() {
-	    super(TermOccurrencePair.class, true);
+	    super(TermKey.class, true);
 	}
 
 	public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
@@ -155,38 +158,39 @@ public class TermOccurrencePair implements WritableComparable<TermOccurrencePair
 	    return 0;
 	}
     }
-    
+
     /**
-     * Compare only the term and index of the pair, so that reduce is called once for
-     * each value of the first part.
+     * Compare only the term and index of the pair, so that reduce is called
+     * once for each value of the first part.
      * 
      * NOTE: first part (i.e. index and term) are serialized first
      */
-    public static class FirstGroupingComparator implements RawComparator<TermOccurrencePair> {
+    public static class FirstGroupingComparator implements RawComparator<TermKey> {
 
-        public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
-    	// Skip the first two integers
-    	int intsize = Integer.SIZE / 8;
-    	return WritableComparator.compareBytes(b1, s1 + intsize * 2, l1 - intsize * 2, b2, s2 + intsize * 2, l2 - intsize * 2);
-        }
+	public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
+	    // Skip the first two integers
+	    int intsize = Integer.SIZE / 8;
+	    return WritableComparator.compareBytes(b1, s1 + intsize * 2, l1 - intsize * 2, b2, s2 + intsize * 2, l2 - intsize * 2);
+	}
 
-        public int compare(TermOccurrencePair o1, TermOccurrencePair o2) {
-    	if (!o1.getTerm().equals(o2.getTerm())) {
-    	    return o1.getTerm().compareTo(o2.getTerm());
-    	} else if (o1.getIndex() != o2.getIndex()) {
-    	    return ((Integer) o1.getIndex()).compareTo(o2.getIndex());
-    	}
-    	return 0;
-        }
+	public int compare(TermKey o1, TermKey o2) {
+	    if (!o1.getTerm().equals(o2.getTerm())) {
+		return o1.getTerm().compareTo(o2.getTerm());
+	    } else if (o1.getIndex() != o2.getIndex()) {
+		return ((Integer) o1.getIndex()).compareTo(o2.getIndex());
+	    }
+	    return 0;
+	}
     }
-    
+
     /**
-     * Partition based only on the term. All occurrences of a term are processed by the same reducer instance. 
+     * Partition based only on the term. All occurrences of a term are processed
+     * by the same reducer instance.
      */
-    public static class FirstPartitioner extends HashPartitioner<TermOccurrencePair, Occurrence> {
-        @Override
-        public int getPartition(TermOccurrencePair key, Occurrence value, int numPartitions) {
-            return Math.abs(key.getTerm().hashCode() * 127) % numPartitions;
-        }
+    public static class FirstPartitioner extends HashPartitioner<TermKey, TermValue> {
+	@Override
+	public int getPartition(TermKey key, TermValue value, int numPartitions) {
+	    return Math.abs(key.getTerm().hashCode() * 127) % numPartitions;
+	}
     }
 }

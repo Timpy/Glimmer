@@ -53,7 +53,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
     private static final String RESOURCES_HASH_ARG = "RESOURCES_HASH";
 
     static { // register comparator
-	WritableComparator.define(TermOccurrencePair.class, new TermOccurrencePair.Comparator());
+	WritableComparator.define(TermKey.class, new TermKey.Comparator());
     }
 
     public int run(String[] args) throws Exception {
@@ -92,13 +92,13 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.setInputFormatClass(RDFInputFormat.class);
 
 	job.setMapperClass(DocumentMapper.class);
-	job.setMapOutputKeyClass(TermOccurrencePair.class);
-	job.setMapOutputValueClass(Occurrence.class);
+	job.setMapOutputKeyClass(TermKey.class);
+	job.setMapOutputValueClass(TermValue.class);
 
-	job.setPartitionerClass(TermOccurrencePair.FirstPartitioner.class);
-	job.setGroupingComparatorClass(TermOccurrencePair.FirstGroupingComparator.class);
+	job.setPartitionerClass(TermKey.FirstPartitioner.class);
+	job.setGroupingComparatorClass(TermKey.FirstGroupingComparator.class);
 
-	job.setReducerClass(TermOccurrencePairReduce.class);
+	job.setReducerClass(TermReduce.class);
 	job.setOutputKeyClass(IntWritable.class);
 	job.setOutputValueClass(IndexRecordWriterValue.class);
 	job.setOutputFormatClass(IndexRecordWriter.OutputFormat.class);
@@ -106,7 +106,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 
 	Configuration conf = job.getConfiguration();
 
-	conf.setClass("mapred.output.key.comparator.class", TermOccurrencePair.Comparator.class, WritableComparator.class);
+	conf.setClass("mapred.output.key.comparator.class", TermKey.Comparator.class, WritableComparator.class);
 	conf.set("mapreduce.user.classpath.first", "true");
 
 	conf.setInt(NUMBER_OF_DOCUMENTS, jsapResult.getInt("numdocs"));

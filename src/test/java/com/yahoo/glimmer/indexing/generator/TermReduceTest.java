@@ -26,9 +26,11 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 import org.junit.Test;
 
-public class TermOccurrencePairReduceTest {
+import com.yahoo.glimmer.indexing.generator.TermValue.Type;
+
+public class TermReduceTest {
     private Mockery context;
-    private Reducer<TermOccurrencePair, Occurrence, IntWritable, IndexRecordWriterValue>.Context reducerContext;
+    private Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue>.Context reducerContext;
 
     @SuppressWarnings("unchecked")
     @Before
@@ -57,75 +59,117 @@ public class TermOccurrencePairReduceTest {
 	    // Alignement. without counts or positions..
 	    one(reducerContext).write(
 		    with(new IntWritable(-1)),
-		    with(new IndexRecordWriterTermValueMatcher("term1", 1, 0, 0)));
+		    with(new IndexRecordWriterTermValueMatcher("term1", 0, 0, 0)));
 	    one(reducerContext).write(
 		    with(new IntWritable(-1)),
 		    with(new IndexRecordWriterDocValueMatcher(0)));
 	    
 	    one(reducerContext).write(
-		    with(new IntWritable(0)),
+		    with(new IntWritable(1)),
 		    with(new IndexRecordWriterTermValueMatcher("term2", 2, 4, 35)));
 	    one(reducerContext).write(
-		    with(new IntWritable(0)),
+		    with(new IntWritable(1)),
 		    with(new IndexRecordWriterDocValueMatcher(1, 10, 19)));
 	    one(reducerContext).write(
-		    with(new IntWritable(0)),
+		    with(new IntWritable(1)),
 		    with(new IndexRecordWriterDocValueMatcher(7, 13, 16)));
+	    // Alignement. without counts or positions..
+	    one(reducerContext).write(
+		    with(new IntWritable(-1)),
+		    with(new IndexRecordWriterTermValueMatcher("term2", 0, 0, 0)));
+	    one(reducerContext).write(
+		    with(new IntWritable(-1)),
+		    with(new IndexRecordWriterDocValueMatcher(1)));
 	    
+	    one(reducerContext).write(
+		    with(new IntWritable(0)),
+		    with(new IndexRecordWriterTermValueMatcher("term3", 1, 2, 7)));
+	    one(reducerContext).write(
+		    with(new IntWritable(0)),
+		    with(new IndexRecordWriterDocValueMatcher(2, 5, 7)));
 	    one(reducerContext).write(
 		    with(new IntWritable(1)),
 		    with(new IndexRecordWriterTermValueMatcher("term3", 1, 2, 11)));
 	    one(reducerContext).write(
 		    with(new IntWritable(1)),
 		    with(new IndexRecordWriterDocValueMatcher(2, 10, 11)));
+	    // Alignement. without counts or positions..
+	    one(reducerContext).write(
+		    with(new IntWritable(-1)),
+		    with(new IndexRecordWriterTermValueMatcher("term3", 0, 0, 0)));
+	    one(reducerContext).write(
+		    with(new IntWritable(-1)),
+		    with(new IndexRecordWriterDocValueMatcher(0)));
+	    one(reducerContext).write(
+		    with(new IntWritable(-1)),
+		    with(new IndexRecordWriterDocValueMatcher(1)));
 	}});
 	
-	TermOccurrencePairReduce reducer = new TermOccurrencePairReduce();
+	TermReduce reducer = new TermReduce();
 	reducer.setup(reducerContext);
 	
-	TermOccurrencePair key = new TermOccurrencePair("term1", 0, null);
-	ArrayList<Occurrence> values = new ArrayList<Occurrence>();
-	values.add(new Occurrence(null, 3));
-	values.add(new Occurrence(null, 4));
-	values.add(new Occurrence(null, 7));
-	values.add(new Occurrence(3, 11));
-	values.add(new Occurrence(3, 15));
-	values.add(new Occurrence(4, 12));
-	values.add(new Occurrence(7, 14));
-	values.add(new Occurrence(7, 17));
-	values.add(new Occurrence(7, 18));
+	TermKey key = new TermKey("term1", 0, null);
+	ArrayList<TermValue> values = new ArrayList<TermValue>();
+	values.add(new TermValue(Type.OCCURRENCE_COUNT, 3, 2));
+	values.add(new TermValue(Type.OCCURRENCE_COUNT, 4, 1));
+	values.add(new TermValue(Type.OCCURRENCE_COUNT, 7, 3));
+	values.add(new TermValue(Type.LAST_OCCURRENCE, 3, 15));
+	values.add(new TermValue(Type.LAST_OCCURRENCE, 4, 12));
+	values.add(new TermValue(Type.LAST_OCCURRENCE, 7, 18));
+	values.add(new TermValue(Type.OCCURRENCE, 3, 11));
+	values.add(new TermValue(Type.OCCURRENCE, 3, 15));
+	values.add(new TermValue(Type.OCCURRENCE, 4, 12));
+	values.add(new TermValue(Type.OCCURRENCE, 7, 14));
+	values.add(new TermValue(Type.OCCURRENCE, 7, 17));
+	values.add(new TermValue(Type.OCCURRENCE, 7, 18));
 	reducer.reduce(key, values, reducerContext);
-	// Alignment
-	key = new TermOccurrencePair("term1", -1, null);
+	// Alignment.  Term1 is indexed in predicate id(index id) 0.
+	key = new TermKey("term1", -1, null);
 	values.clear();
-	values.add(new Occurrence(null, 0));
-	values.add(new Occurrence(null, 0));
-	values.add(new Occurrence(null, 0));
-	values.add(new Occurrence(0, null));
-	values.add(new Occurrence(0, null));
-	values.add(new Occurrence(0, null));
-	reducer.reduce(key, values, reducerContext);
-	
-	key = new TermOccurrencePair("term2", 0, null);
-	values.clear();
-	values.add(new Occurrence(null, 1));
-	values.add(new Occurrence(null, 7));
-	values.add(new Occurrence(1, null));
-	values.add(new Occurrence(1, 10));
-	values.add(new Occurrence(1, 19));
-	values.add(new Occurrence(7, null));
-	values.add(new Occurrence(7, 13));
-	values.add(new Occurrence(7, 16));
+	values.add(new TermValue(Type.PREDICATE_ID, 0));
+	values.add(new TermValue(Type.PREDICATE_ID, 0));
+	values.add(new TermValue(Type.PREDICATE_ID, 0));
 	reducer.reduce(key, values, reducerContext);
 	
-	
-	
-	key = new TermOccurrencePair("term3", 1, null);
+	key = new TermKey("term2", 1, null);
 	values.clear();
-	values.add(new Occurrence(null, 2));
-	values.add(new Occurrence(2, null));
-	values.add(new Occurrence(2, 10));
-	values.add(new Occurrence(2, 11));
+	values.add(new TermValue(Type.OCCURRENCE_COUNT, 1, 2));
+	values.add(new TermValue(Type.OCCURRENCE_COUNT, 7, 2));
+	values.add(new TermValue(Type.LAST_OCCURRENCE, 1, 19));
+	values.add(new TermValue(Type.LAST_OCCURRENCE, 7, 16));
+	values.add(new TermValue(Type.OCCURRENCE, 1, 10));
+	values.add(new TermValue(Type.OCCURRENCE, 1, 19));
+	values.add(new TermValue(Type.OCCURRENCE, 7, 13));
+	values.add(new TermValue(Type.OCCURRENCE, 7, 16));
+	reducer.reduce(key, values, reducerContext);
+	// Alignment.  Term2 is indexed in predicate id(index id) 1.
+	key = new TermKey("term2", -1, null);
+	values.clear();
+	values.add(new TermValue(Type.PREDICATE_ID, 1));
+	values.add(new TermValue(Type.PREDICATE_ID, 1));
+	reducer.reduce(key, values, reducerContext);
+
+	key = new TermKey("term3", 0, null);
+	values.clear();
+	values.add(new TermValue(Type.OCCURRENCE_COUNT, 2, 2));
+	values.add(new TermValue(Type.LAST_OCCURRENCE, 2, 7));
+	values.add(new TermValue(Type.OCCURRENCE, 2, 5));
+	values.add(new TermValue(Type.OCCURRENCE, 2, 7));
+	reducer.reduce(key, values, reducerContext);
+	key = new TermKey("term3", 1, null);
+	values.clear();
+	values.add(new TermValue(Type.OCCURRENCE_COUNT, 2, 2));
+	values.add(new TermValue(Type.LAST_OCCURRENCE, 2, 11));
+	values.add(new TermValue(Type.OCCURRENCE, 2, 10));
+	values.add(new TermValue(Type.OCCURRENCE, 2, 11));
+	reducer.reduce(key, values, reducerContext);
+	// Alignment.  Term3 is indexed in predicate id(index id) 0 & 1.
+	key = new TermKey("term3", -1, null);
+	values.clear();
+	values.add(new TermValue(Type.PREDICATE_ID, 0));
+	values.add(new TermValue(Type.PREDICATE_ID, 0));
+	values.add(new TermValue(Type.PREDICATE_ID, 1));
+	values.add(new TermValue(Type.PREDICATE_ID, 1));
 	reducer.reduce(key, values, reducerContext);
 	
 	context.assertIsSatisfied();

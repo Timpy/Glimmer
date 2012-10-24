@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.nio.ByteOrder;
 import java.util.Map;
 
 import org.apache.commons.configuration.ConfigurationException;
@@ -70,15 +71,15 @@ public class Index {
 	Path propertiesPath = new Path(outputDir, indexName + DiskBasedIndex.PROPERTIES_EXTENSION);
 	properties = fs.create(propertiesPath, true);// overwrite
 
-	Map<Component, Coding> defaultStandardIndex = new Object2ObjectOpenHashMap<Component, Coding>(CompressionFlags.DEFAULT_STANDARD_INDEX);
+	Map<Component, Coding> defaultStandardIndexFlags = new Object2ObjectOpenHashMap<Component, Coding>(CompressionFlags.DEFAULT_STANDARD_INDEX);
 	if (!positions) {
-	    defaultStandardIndex.remove(CompressionFlags.Component.POSITIONS);
-	    defaultStandardIndex.remove(CompressionFlags.Component.COUNTS);
+	    defaultStandardIndexFlags.remove(CompressionFlags.Component.POSITIONS);
+	    defaultStandardIndexFlags.remove(CompressionFlags.Component.COUNTS); // Quasi Succinct Indexes can't not have counts.
 	}
 	
 	IOFactory ioFactory = new HdfsIoFactory(fs);
 	
-	indexWriter = new QuasiSuccinctIndexWriter(ioFactory, basename, numDocs, Fast.mostSignificantBit(QuasiSuccinctIndex.DEFAULT_QUANTUM), QuasiSuccinctIndexWriter.DEFAULT_CACHE_SIZE, CompressionFlags.DEFAULT_QUASI_SUCCINCT_INDEX, null);
+	indexWriter = new QuasiSuccinctIndexWriter(ioFactory, basename, numDocs, Fast.mostSignificantBit(QuasiSuccinctIndex.DEFAULT_QUANTUM), QuasiSuccinctIndexWriter.DEFAULT_CACHE_SIZE, defaultStandardIndexFlags, ByteOrder.nativeOrder());
     }
 
     public PrintWriter getTermsWriter() {

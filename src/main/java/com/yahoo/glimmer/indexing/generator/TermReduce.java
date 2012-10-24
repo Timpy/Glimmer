@@ -17,7 +17,9 @@ import java.util.Iterator;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
 
-public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurrence, IntWritable, IndexRecordWriterValue> {
+import com.yahoo.glimmer.indexing.generator.TermValue.Type;
+
+public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue> {
     private static final int MAX_INVERTEDLIST_SIZE = 50000000;
     private static final int MAX_POSITIONLIST_SIZE = 1000000;
 
@@ -30,8 +32,8 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
     }
 
     @Override
-    protected void setup(org.apache.hadoop.mapreduce.Reducer<TermOccurrencePair, Occurrence, IntWritable, IndexRecordWriterValue>.Context context)
-	    throws IOException, InterruptedException {
+    protected void setup(org.apache.hadoop.mapreduce.Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue>.Context context) throws IOException,
+	    InterruptedException {
 	// The objects we pass to the writer are reused for every call to
 	// context.write()
 	writerKey = new IntWritable();
@@ -40,31 +42,39 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
     };
 
     @Override
-    public void reduce(TermOccurrencePair key, Iterable<Occurrence> values, Context context) throws IOException, InterruptedException {
+    public void reduce(TermKey key, Iterable<TermValue> values, Context context) throws IOException, InterruptedException {
 	if (key == null || key.equals("")) {
 	    return;
 	}
 
 	context.setStatus(key.getIndex() + ":" + key.getTerm());
 
-	
 	int termFrequency = 0;
-	Occurrence occ = null;
-	Occurrence prevOcc = new Occurrence();
-	
-	Iterator<Occurrence> valuesIt = values.iterator();
-	while (valuesIt.hasNext()) {
-	    occ = valuesIt.next();
+	int termCount = 0;
+	int sumOfMaxTermPositions = 0;
+	TermValue value = null;
+	TermValue prevValue = new TermValue();
+
+	Iterator<TermValue> valuesIt = values.iterator();
+	boolean valueIsOccurrence = false;
+	while (!valueIsOccurrence && valuesIt.hasNext()) {
+	    value = valuesIt.next();
 	    // We shouldn't get duplicates.. should we?
-	    if (occ.equals(prevOcc)) {
-		throw new IllegalStateException("For index " + key.getIndex() + " term " + key.getTerm() + " more than one frequency value found for doc id "
-			+ occ.getPosition());
+	    if (value.equals(prevValue)) {
+		throw new IllegalStateException("For index " + key.getIndex() + " term " + key.getTerm());
 	    }
-	    prevOcc.set(occ);
-	    
-	    if (!occ.isDocSet()) {
+	    prevValue.set(value);
+
+	    switch (value.getType()) {
+	    case OCCURRENCE_COUNT:
 		termFrequency++;
-	    } else {
+		termCount += value.getV2();
+		break;
+	    case LAST_OCCURRENCE:
+		sumOfMaxTermPositions += value.getV2();
+		break;
+	    default:
+		valueIsOccurrence = true;
 		break;
 	    }
 	}
@@ -72,21 +82,25 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 	writerKey.set(key.getIndex());
 
 	writerTermValue.setTerm(key.getTerm());
-	// write the document frequency for this term.
 	writerTermValue.setOccurrenceCount(termCount);
 	writerTermValue.setTermFrequency(Math.min(termFrequency, MAX_INVERTEDLIST_SIZE));
 	writerTermValue.setSumOfMaxTermPositions(sumOfMaxTermPositions);
 
 	context.write(writerKey, writerTermValue);
-
-
+	
+	boolean tooManyOccurrences;
 	int writtenDocs = 0;
-	prevOcc.set(occ);
-	while (occ != null) {
-	    int docID = occ.getDocument();
-	    if (docID != prevOcc.getDocument()) {
+	prevValue.set(value);
+	while (value != null) {
+	    if (value.getType() != Type.OCCURRENCE && value.getType() != Type.PREDICATE_ID) {
+		throw new IllegalStateException("Got a " + value.getType() + " value when expecting only occurrences.");
+	    }
+	    tooManyOccurrences = false;
+	    
+	    int docID = value.getV1();
+	    if (docID != prevValue.getV1()) {
 		// New document, write out previous postings
-		writerDocValue.setDocument(prevOcc.getDocument());
+		writerDocValue.setDocument(prevValue.getV1());
 		context.write(writerKey, writerDocValue);
 		writerDocValue.clearOccerrences();
 		writtenDocs++;
@@ -96,26 +110,27 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 		    System.err.println("More than " + MAX_INVERTEDLIST_SIZE + " documents for term " + key.getTerm());
 		    break;
 		}
-		if (occ.isPositionSet()) {
-		    writerDocValue.addOccurrence(occ.getPosition());
+		if (value.getType() == Type.OCCURRENCE) {
+		    writerDocValue.addOccurrence(value.getV2());
 		}
-	    } else if (occ.isPositionSet()) {
-		if (!writerDocValue.addOccurrence(occ.getPosition())) {
+	    } else if (value.getType() == Type.OCCURRENCE) {
+		if (!tooManyOccurrences && !writerDocValue.addOccurrence(value.getV2())) {
+		    tooManyOccurrences = true;
 		    context.getCounter(Counters.POSITIONLIST_SIZE_OVERFLOW).increment(1);
 		    System.err.println("More than " + MAX_POSITIONLIST_SIZE + " positions for term " + key.getTerm());
 		}
 	    }
 
-	    prevOcc.set(occ);
+	    prevValue.set(value);
 
 	    boolean last = false;
 	    if (valuesIt.hasNext()) {
-		occ = valuesIt.next();
+		value = valuesIt.next();
 		// Skip equivalent occurrences
-		while (occ.equals(prevOcc) && valuesIt.hasNext()) {
-		    occ = valuesIt.next();
+		while (value.equals(prevValue) && valuesIt.hasNext()) {
+		    value = valuesIt.next();
 		}
-		if (occ.equals(prevOcc) && !valuesIt.hasNext()) {
+		if (value.equals(prevValue) && !valuesIt.hasNext()) {
 		    last = true;
 		}
 	    } else {
@@ -124,11 +139,11 @@ public class TermOccurrencePairReduce extends Reducer<TermOccurrencePair, Occurr
 	    if (last) {
 		// This is the last occurrence: write out the remaining
 		// positions
-		writerDocValue.setDocument(prevOcc.getDocument());
+		writerDocValue.setDocument(prevValue.getV1());
 		context.write(writerKey, writerDocValue);
 
 		writerDocValue.clearOccerrences();
-		occ = null;
+		value = null;
 	    }
 	}
     }

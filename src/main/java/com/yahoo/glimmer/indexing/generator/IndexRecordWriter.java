@@ -96,13 +96,15 @@ public class IndexRecordWriter extends RecordWriter<IntWritable, IndexRecordWrit
 	    if (value instanceof IndexRecordWriterTermValue) {
 		IndexRecordWriterTermValue termValue = (IndexRecordWriterTermValue) value;
 		index.getTermsWriter().println(termValue.getTerm());
-		if (indexWriter instanceof QuasiSuccinctIndexWriter) {
-		    ((QuasiSuccinctIndexWriter) indexWriter).newInvertedList(termValue.getTermFrequency(), termValue.getOccurrenceCount(),
-			    termValue.getSumOfMaxTermPositions());
-		} else {
-		    indexWriter.newInvertedList();
-		    indexWriter.writeFrequency(termValue.getTermFrequency());
-		}
+		//if (index.hasPositions()) {
+		    if (indexWriter instanceof QuasiSuccinctIndexWriter) {
+			((QuasiSuccinctIndexWriter) indexWriter).newInvertedList(termValue.getTermFrequency(), termValue.getOccurrenceCount(),
+				termValue.getSumOfMaxTermPositions());
+		    } else {
+			indexWriter.newInvertedList();
+			indexWriter.writeFrequency(termValue.getTermFrequency());
+		    }
+		//}
 	    } else {
 		IndexRecordWriterDocValue docValue = (IndexRecordWriterDocValue) value;
 
