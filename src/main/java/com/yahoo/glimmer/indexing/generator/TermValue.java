@@ -46,17 +46,25 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
     // The order of this enum is important as it determines the order in which the values
     // are give in the Reducers values Iterable.
     public enum Type {
-	OCCURRENCE_COUNT, LAST_OCCURRENCE, PREDICATE_ID, OCCURRENCE;
+	DOC_STATS, 	// For every doc a DOC_STATS is written.  V1 = term occurrence count in doc. V2 = position of last term occurrence.
+	PREDICATE_ID, 	// For each unique term in a doc, a PREDICATE_ID is written.  V1 = the id of the index for the terms predicate. 
+	OCCURRENCE;	// For every term in every doc an OCCURRENCE is written. V1 = doc id, V2 = terms position.
     }
     private Type type;
     private int v1;
     private int v2;
 
     public TermValue(Type type, int v1) {
+	if (type != Type.PREDICATE_ID) {
+	    throw new IllegalArgumentException("Type " + type + " is not value with 1 arg");
+	}
 	this.type = type;
 	this.v1 = v1;
     }
     public TermValue(Type type, int v1, int v2) {
+	if (type != Type.DOC_STATS && type != Type.OCCURRENCE) {
+	    throw new IllegalArgumentException("Type " + type + " is not value with 2 args");
+	}
 	this.type = type;
 	this.v1 = v1;
 	this.v2 = v2;

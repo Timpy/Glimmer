@@ -14,7 +14,6 @@ package com.yahoo.glimmer.indexing.generator;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.nio.charset.CharacterCodingException;
 
 import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.Text;
@@ -102,6 +101,12 @@ public class TermKey implements WritableComparable<TermKey> {
 	return Integer.toString(index) + ":" + term + ":" + (value == null ? "null" : value.toString());
     }
 
+    private static final int TYPE_BYTE_OFFSET = 0;
+    private static final int V1_BYTE_OFFSET = 1 * Integer.SIZE / 8;
+    private static final int V2_BYTE_OFFSET = 2 * Integer.SIZE / 8;
+    private static final int INDEX_BYTE_OFFSET = 3 * Integer.SIZE / 8;
+    private static final int TERM_BYTE_OFFSET = 4 * Integer.SIZE / 8;
+
     /** A Comparator that compares serialized TermKey objects. */
     public static class Comparator extends WritableComparator {
 	public Comparator() {
@@ -109,53 +114,42 @@ public class TermKey implements WritableComparable<TermKey> {
 	}
 
 	public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
-	    // Compare the term
-	    try {
+	    // Compare the index
+	    int index1 = WritableComparator.readInt(b1, s1 + INDEX_BYTE_OFFSET);
+	    int index2 = WritableComparator.readInt(b2, s2 + INDEX_BYTE_OFFSET);
+	    int d = index1 - index2;
+	    if (d == 0) {
+		// Compare the term
+
 		// first byte of string encodes the length of the size
-		int length1 = WritableUtils.decodeVIntSize(b1[s1 + 3 * Integer.SIZE / 8]);
-		int length2 = WritableUtils.decodeVIntSize(b2[s2 + 3 * Integer.SIZE / 8]);
+		// length1 & 2 are the byte length of the serialized strings
+		// length
+		int length1 = WritableUtils.decodeVIntSize(b1[s1 + TERM_BYTE_OFFSET]);
+		int length2 = WritableUtils.decodeVIntSize(b2[s2 + TERM_BYTE_OFFSET]);
+		d = compareBytes(b1, s1 + TERM_BYTE_OFFSET + length1, l1 - TERM_BYTE_OFFSET - length1, b2, s2 + TERM_BYTE_OFFSET + length2, l2
+			- TERM_BYTE_OFFSET - length2);
 
-		String term1 = Text.decode(b1, s1 + 3 * Integer.SIZE / 8 + length1, l1 - (3 * Integer.SIZE / 8 + length1));
-		String term2 = Text.decode(b2, s2 + 3 * Integer.SIZE / 8 + length2, l2 - (3 * Integer.SIZE / 8 + length2));
-
-		int result = term1.compareTo(term2);
-
-		if (result != 0) {
-		    return result;
-		} else {
-		    // Compare the index
-		    int index1 = WritableComparator.readInt(b1, s1 + 2 * Integer.SIZE / 8);
-		    int index2 = WritableComparator.readInt(b2, s2 + 2 * Integer.SIZE / 8);
-		    if (index1 > index2) {
-			return 1;
-		    } else if (index1 < index2) {
-			return -1;
-		    } else {
-			// Compare the doc
-			int doc1 = WritableComparator.readInt(b1, s1);
-			int doc2 = WritableComparator.readInt(b2, s2);
-			if (doc1 > doc2) {
-			    return 1;
-			} else if (doc1 < doc2) {
-			    return -1;
-			} else {
-			    // Compare the position
-			    int pos1 = WritableComparator.readInt(b1, s1 + Integer.SIZE / 8);
-			    int pos2 = WritableComparator.readInt(b2, s2 + Integer.SIZE / 8);
-			    if (pos1 > pos2) {
-				return 1;
-			    } else if (pos1 < pos2) {
-				return -1;
-			    } else {
-				return 0;
-			    }
+		if (d == 0) {
+		    // Compare the values types
+		    int type1 = WritableComparator.readInt(b1, s1 + TYPE_BYTE_OFFSET);
+		    int type2 = WritableComparator.readInt(b2, s2 + TYPE_BYTE_OFFSET);
+		    d = type1 - type2;
+		    if (d == 0) {
+			// Compare the values v1s
+			int v11 = WritableComparator.readInt(b1, s1 + V1_BYTE_OFFSET);
+			int v12 = WritableComparator.readInt(b2, s2 + V1_BYTE_OFFSET);
+			d = v11 - v12;
+			if (d == 0) {
+			    // Compare the values v2s
+			    int v21 = WritableComparator.readInt(b1, s1 + V2_BYTE_OFFSET);
+			    int v22 = WritableComparator.readInt(b2, s2 + V2_BYTE_OFFSET);
+			    d = v21 - v22;
 			}
 		    }
 		}
-	    } catch (CharacterCodingException e) {
-		e.printStackTrace();
 	    }
-	    return 0;
+
+	    return d;
 	}
     }
 
@@ -168,9 +162,22 @@ public class TermKey implements WritableComparable<TermKey> {
     public static class FirstGroupingComparator implements RawComparator<TermKey> {
 
 	public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
-	    // Skip the first two integers
-	    int intsize = Integer.SIZE / 8;
-	    return WritableComparator.compareBytes(b1, s1 + intsize * 2, l1 - intsize * 2, b2, s2 + intsize * 2, l2 - intsize * 2);
+	    // Compare the index
+	    int index1 = WritableComparator.readInt(b1, s1 + INDEX_BYTE_OFFSET);
+	    int index2 = WritableComparator.readInt(b2, s2 + INDEX_BYTE_OFFSET);
+	    int d = index1 - index2;
+	    if (d == 0) {
+		// Compare the term
+
+		// first byte of string encodes the length of the size
+		// length1 & 2 are the byte length of the serialized strings
+		// length
+		int length1 = WritableUtils.decodeVIntSize(b1[s1 + TERM_BYTE_OFFSET]);
+		int length2 = WritableUtils.decodeVIntSize(b2[s2 + TERM_BYTE_OFFSET]);
+		d = WritableComparator.compareBytes(b1, s1 + TERM_BYTE_OFFSET + length1, l1 - TERM_BYTE_OFFSET - length1, b2, s2 + TERM_BYTE_OFFSET + length2,
+			l2 - TERM_BYTE_OFFSET - length2);
+	    }
+	    return d;
 	}
 
 	public int compare(TermKey o1, TermKey o2) {

@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import it.unimi.di.mg4j.index.DiskBasedIndex;
-import it.unimi.di.mg4j.index.FileIndex;
 import it.unimi.di.mg4j.index.IndexIterator;
 import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
 
@@ -83,8 +82,9 @@ public class IndexRecordWriterTest {
 	key.set(DocumentMapper.ALIGNMENT_INDEX);
 	termValue.setTerm("term1");
 	termValue.setTermFrequency(1);
-	termValue.setOccurrenceCount(1);
-	termValue.setSumOfMaxTermPositions(1);
+	// The alignment index doesn't have positions/counts.
+	termValue.setOccurrenceCount(0);
+	termValue.setSumOfMaxTermPositions(0);
 	recordWriter.write(key, termValue);
 	docValue.setDocument(0); // term1 occurs in index 0
 	recordWriter.write(key, docValue);
@@ -158,8 +158,9 @@ public class IndexRecordWriterTest {
 	key.set(DocumentMapper.ALIGNMENT_INDEX);
 	termValue.setTerm("term3");
 	termValue.setTermFrequency(1);
-	termValue.setOccurrenceCount(1);
-	termValue.setSumOfMaxTermPositions(1);
+	// The alignment index doesn't have positions/counts.
+	termValue.setOccurrenceCount(0);
+	termValue.setSumOfMaxTermPositions(0);
 	recordWriter.write(key, termValue);
 	docValue.setDocument(1); // term3 occurs in index 1
 	recordWriter.write(key, docValue);

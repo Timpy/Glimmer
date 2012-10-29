@@ -46,29 +46,33 @@ public class Index {
 
     private FileSystem fs;
     private Path outputDir;
-    private String indexName;
+    private String name;
     private int numDocs;
+    private int indexWriterCacheSize = QuasiSuccinctIndexWriter.DEFAULT_CACHE_SIZE;
 
     private boolean positions;
     private String hashValuePrefix;
 
-    public Index(FileSystem fs, Path outputDir, String indexName, int numDocs, boolean positions, String hashValuePrefix) {
+    public Index(FileSystem fs, Path outputDir, String indexName, int numDocs, boolean positions, String hashValuePrefix, int indexWriterCacheSize) {
 	this.fs = fs;
 	this.outputDir = outputDir;
 	// It seems like MG4J doesn't like index names with the '-' char
-	this.indexName = indexName.replaceAll("\\-", "_");
+	this.name = indexName.replaceAll("\\-", "_");
 	this.numDocs = numDocs;
 	this.positions = positions;
+	if (indexWriterCacheSize != 0) {
+	    this.indexWriterCacheSize = indexWriterCacheSize;
+	}
     }
 
     public void open() throws IOException {
-	String basename = new Path(outputDir, indexName).toString();
+	String basename = new Path(outputDir, name).toString();
 	
 
-	Path termsPath = new Path(outputDir, indexName + DiskBasedIndex.TERMS_EXTENSION);
+	Path termsPath = new Path(outputDir, name + DiskBasedIndex.TERMS_EXTENSION);
 	terms = new PrintWriter(new BufferedWriter(new OutputStreamWriter(fs.create(termsPath, true), "UTF-8")));// overwrite
 
-	Path propertiesPath = new Path(outputDir, indexName + DiskBasedIndex.PROPERTIES_EXTENSION);
+	Path propertiesPath = new Path(outputDir, name + DiskBasedIndex.PROPERTIES_EXTENSION);
 	properties = fs.create(propertiesPath, true);// overwrite
 
 	Map<Component, Coding> defaultStandardIndexFlags = new Object2ObjectOpenHashMap<Component, Coding>(CompressionFlags.DEFAULT_STANDARD_INDEX);
@@ -79,7 +83,7 @@ public class Index {
 	
 	IOFactory ioFactory = new HdfsIoFactory(fs);
 	
-	indexWriter = new QuasiSuccinctIndexWriter(ioFactory, basename, numDocs, Fast.mostSignificantBit(QuasiSuccinctIndex.DEFAULT_QUANTUM), QuasiSuccinctIndexWriter.DEFAULT_CACHE_SIZE, defaultStandardIndexFlags, ByteOrder.nativeOrder());
+	indexWriter = new QuasiSuccinctIndexWriter(ioFactory, basename, numDocs, Fast.mostSignificantBit(QuasiSuccinctIndex.DEFAULT_QUANTUM), indexWriterCacheSize, defaultStandardIndexFlags, ByteOrder.nativeOrder());
     }
 
     public PrintWriter getTermsWriter() {
@@ -101,12 +105,12 @@ public class Index {
     public void close(long writtenOccurrences) throws IOException {
 	try {
 	    Properties props = indexWriter.properties();
-	    System.out.println("Closing index " + indexName + " which has " + props.getProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.TERMS) + " terms ");
+	    System.out.println("Closing index " + name + " which has " + props.getProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.TERMS) + " terms ");
 	    if (positions) {
 		props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.OCCURRENCES, writtenOccurrences);
 	    }
 	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.MAXCOUNT, -1);
-	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.FIELD, indexName);
+	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.FIELD, name);
 	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.TERMPROCESSOR, CombinedTermProcessor.getInstance());
 	    props.setProperty(ResourceRefTermProcessor.PropertyKeys.REF_PREFIX, hashValuePrefix);
 
@@ -118,5 +122,9 @@ public class Index {
 	properties.close();
 	terms.close();
 	indexWriter.close();
+    }
+    
+    public String getName() {
+	return name;
     }
 }

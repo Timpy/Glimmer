@@ -41,6 +41,13 @@ public class IndexRecordWriterTermValue implements IndexRecordWriterValue {
     public void setSumOfMaxTermPositions(long sumOfMaxTermPositions) {
 	this.sumOfMaxTermPositions = sumOfMaxTermPositions;
     }
+    
+    public void set(IndexRecordWriterTermValue that) {
+	this.term = that.term;
+	this.termFrequency = that.termFrequency;
+	this.occurrenceCount = that.occurrenceCount;
+	this.sumOfMaxTermPositions = that.sumOfMaxTermPositions;
+    }
 
     @Override
     public void readFields(DataInput arg0) throws IOException {

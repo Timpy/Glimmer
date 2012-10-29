@@ -12,20 +12,32 @@ package com.yahoo.glimmer.indexing.generator;
  */
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
 
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue> {
-    private static final int MAX_INVERTEDLIST_SIZE = 50000000;
-    private static final int MAX_POSITIONLIST_SIZE = 1000000;
+    private static final Log LOG = LogFactory.getLog(TermReduce.class);
+    
+    public static final String MAX_INVERTEDLIST_SIZE_PARAMETER = "maxInvertiedListSize";
+    public static final String MAX_POSITIONLIST_SIZE_PARAMETER = "maxPositionListSize";
+    
+    private static final int DEFAULT_MAX_INVERTEDLIST_SIZE = 50000000;
+    private static final int DEFAULT_MAX_POSITIONLIST_SIZE = 1000000;
+
+    private int maxInvertiedListSize;
+    private int maxPositionListSize;
 
     private IntWritable writerKey;
     private IndexRecordWriterTermValue writerTermValue;
     private IndexRecordWriterDocValue writerDocValue;
+    private ArrayList<Integer> predicatedIds;
 
     private enum Counters {
 	POSTINGLIST_SIZE_OVERFLOW, POSITIONLIST_SIZE_OVERFLOW, POSITIONLIST_SIZE_OVERFLOW_TIMES
@@ -36,9 +48,13 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	    InterruptedException {
 	// The objects we pass to the writer are reused for every call to
 	// context.write()
+	maxInvertiedListSize = context.getConfiguration().getInt(MAX_INVERTEDLIST_SIZE_PARAMETER, DEFAULT_MAX_INVERTEDLIST_SIZE);
+	maxPositionListSize = context.getConfiguration().getInt(MAX_POSITIONLIST_SIZE_PARAMETER, DEFAULT_MAX_POSITIONLIST_SIZE);
+
 	writerKey = new IntWritable();
 	writerTermValue = new IndexRecordWriterTermValue();
-	writerDocValue = new IndexRecordWriterDocValue(MAX_POSITIONLIST_SIZE);
+	writerDocValue = new IndexRecordWriterDocValue(maxPositionListSize);
+	predicatedIds = new ArrayList<Integer>();
     };
 
     @Override
@@ -48,102 +64,125 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	}
 
 	context.setStatus(key.getIndex() + ":" + key.getTerm());
-
-	int termFrequency = 0;
-	int termCount = 0;
-	int sumOfMaxTermPositions = 0;
-	TermValue value = null;
-	TermValue prevValue = new TermValue();
-
-	Iterator<TermValue> valuesIt = values.iterator();
-	boolean valueIsOccurrence = false;
-	while (!valueIsOccurrence && valuesIt.hasNext()) {
-	    value = valuesIt.next();
-	    // We shouldn't get duplicates.. should we?
-	    if (value.equals(prevValue)) {
-		throw new IllegalStateException("For index " + key.getIndex() + " term " + key.getTerm());
-	    }
-	    prevValue.set(value);
-
-	    switch (value.getType()) {
-	    case OCCURRENCE_COUNT:
-		termFrequency++;
-		termCount += value.getV2();
-		break;
-	    case LAST_OCCURRENCE:
-		sumOfMaxTermPositions += value.getV2();
-		break;
-	    default:
-		valueIsOccurrence = true;
-		break;
-	    }
-	}
-
 	writerKey.set(key.getIndex());
 
-	writerTermValue.setTerm(key.getTerm());
-	writerTermValue.setOccurrenceCount(termCount);
-	writerTermValue.setTermFrequency(Math.min(termFrequency, MAX_INVERTEDLIST_SIZE));
-	writerTermValue.setSumOfMaxTermPositions(sumOfMaxTermPositions);
-
-	context.write(writerKey, writerTermValue);
-	
-	boolean tooManyOccurrences;
-	int writtenDocs = 0;
-	prevValue.set(value);
-	while (value != null) {
-	    if (value.getType() != Type.OCCURRENCE && value.getType() != Type.PREDICATE_ID) {
-		throw new IllegalStateException("Got a " + value.getType() + " value when expecting only occurrences.");
+	if (key.getIndex() == DocumentMapper.ALIGNMENT_INDEX) {
+	    int lastPredicateId = Integer.MIN_VALUE;
+	    for (TermValue value : values) {
+		if (value.getType() != Type.PREDICATE_ID) {
+		    throw new IllegalStateException("Got a " + value.getType() + " value when expecting only " + Type.PREDICATE_ID);
+		}
+		if (lastPredicateId != value.getV1()) {
+		    lastPredicateId = value.getV1();
+		    predicatedIds.add(lastPredicateId);
+		}
 	    }
-	    tooManyOccurrences = false;
-	    
-	    int docID = value.getV1();
-	    if (docID != prevValue.getV1()) {
-		// New document, write out previous postings
-		writerDocValue.setDocument(prevValue.getV1());
-		context.write(writerKey, writerDocValue);
-		writerDocValue.clearOccerrences();
-		writtenDocs++;
 
-		if (writtenDocs >= MAX_INVERTEDLIST_SIZE) {
-		    context.getCounter(Counters.POSTINGLIST_SIZE_OVERFLOW).increment(1);
-		    System.err.println("More than " + MAX_INVERTEDLIST_SIZE + " documents for term " + key.getTerm());
+	    writerTermValue.setTerm(key.getTerm());
+	    writerTermValue.setOccurrenceCount(0);
+	    writerTermValue.setTermFrequency(predicatedIds.size());
+	    writerTermValue.setSumOfMaxTermPositions(0);
+
+	    context.write(writerKey, writerTermValue);
+
+	    for (Integer predicateId : predicatedIds) {
+		writerDocValue.setDocument(predicateId);
+		context.write(writerKey, writerDocValue);
+	    }
+	    predicatedIds.clear();
+	} else {
+	    int termFrequency = 0;
+	    int termCount = 0;
+	    int sumOfMaxTermPositions = 0;
+	    TermValue value = null;
+
+	    Iterator<TermValue> valuesIt = values.iterator();
+	    while (valuesIt.hasNext()) {
+		value = valuesIt.next();
+		// LOG.warn("Value:" + value.toString());
+
+		if (value.getType() == Type.DOC_STATS) {
+		    termFrequency++;
+		    termCount += value.getV1();
+		    sumOfMaxTermPositions += value.getV2();
+		} else {
 		    break;
 		}
-		if (value.getType() == Type.OCCURRENCE) {
-		    writerDocValue.addOccurrence(value.getV2());
-		}
-	    } else if (value.getType() == Type.OCCURRENCE) {
-		if (!tooManyOccurrences && !writerDocValue.addOccurrence(value.getV2())) {
-		    tooManyOccurrences = true;
-		    context.getCounter(Counters.POSITIONLIST_SIZE_OVERFLOW).increment(1);
-		    System.err.println("More than " + MAX_POSITIONLIST_SIZE + " positions for term " + key.getTerm());
-		}
 	    }
 
+	    writerTermValue.setTerm(key.getTerm());
+	    writerTermValue.setOccurrenceCount(termCount);
+	    writerTermValue.setTermFrequency(termFrequency);
+	    writerTermValue.setSumOfMaxTermPositions(sumOfMaxTermPositions);
+
+	    context.write(writerKey, writerTermValue);
+
+	    boolean tooManyOccurrences = false;
+	    int writtenDocs = 0;
+	    TermValue prevValue = new TermValue();
 	    prevValue.set(value);
 
-	    boolean last = false;
-	    if (valuesIt.hasNext()) {
-		value = valuesIt.next();
-		// Skip equivalent occurrences
-		while (value.equals(prevValue) && valuesIt.hasNext()) {
-		    value = valuesIt.next();
+	    while (value != null) {
+		if (value.getType() == Type.OCCURRENCE) {
+		    int docId = value.getV1();
+		    if (docId != prevValue.getV1()) {
+			// New document, write out previous postings
+			writerDocValue.setDocument(prevValue.getV1());
+			context.write(writerKey, writerDocValue);
+			writtenDocs++;
+
+			if (writtenDocs >= maxInvertiedListSize) {
+			    context.getCounter(Counters.POSTINGLIST_SIZE_OVERFLOW).increment(1);
+			    LOG.warn("More than " + maxInvertiedListSize + " documents for term " + key.getTerm());
+			    break;
+			}
+
+			// The first occerrence of this docId/
+			writerDocValue.clearOccerrences();
+			writerDocValue.addOccurrence(value.getV2());
+		    } else {
+			boolean addOccurrenceOkay = writerDocValue.addOccurrence(value.getV2());
+
+			if (!addOccurrenceOkay && !tooManyOccurrences) {
+			    System.err.println("More than " + maxPositionListSize + " positions for term " + key.getTerm());
+			    context.getCounter(Counters.POSITIONLIST_SIZE_OVERFLOW).increment(1);
+			    tooManyOccurrences = true;
+			}
+		    }
+		} else {
+		    throw new IllegalStateException("Got a " + value.getType() + " value when expecting only " + Type.OCCURRENCE);
 		}
-		if (value.equals(prevValue) && !valuesIt.hasNext()) {
+
+		prevValue.set(value);
+
+		boolean last = false;
+		if (valuesIt.hasNext()) {
+		    value = valuesIt.next();
+		    //LOG.warn("Value:" + value.toString());
+		    // Skip equivalent occurrences
+		    while (value.equals(prevValue) && valuesIt.hasNext()) {
+			value = valuesIt.next();
+		    }
+		    if (value.equals(prevValue) && !valuesIt.hasNext()) {
+			last = true;
+		    }
+		} else {
 		    last = true;
 		}
-	    } else {
-		last = true;
-	    }
-	    if (last) {
-		// This is the last occurrence: write out the remaining
-		// positions
-		writerDocValue.setDocument(prevValue.getV1());
-		context.write(writerKey, writerDocValue);
+		if (last) {
+		    // This is the last occurrence: write out the remaining
+		    // positions
+		    writerDocValue.setDocument(prevValue.getV1());
+		    context.write(writerKey, writerDocValue);
 
-		writerDocValue.clearOccerrences();
-		value = null;
+		    writerDocValue.clearOccerrences();
+		    value = null;
+		}
+	    }
+
+	    if (writtenDocs >= maxInvertiedListSize) {
+		context.getCounter(Counters.POSTINGLIST_SIZE_OVERFLOW).increment(1);
+		LOG.warn("More than " + maxInvertiedListSize + " documents for term " + key.getTerm());
 	    }
 	}
     }

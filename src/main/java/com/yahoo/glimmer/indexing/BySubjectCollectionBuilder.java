@@ -107,13 +107,17 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
     }
 
     private static class BuilderOutputWriter extends RecordWriter<MutableString, MutableString> {
+	private static final String COLLECTION_PREFIX = "collection-";
 	private final DocumentCollectionBuilder builder;
 	private boolean newDoc = true;
 
 	public BuilderOutputWriter(TaskAttemptContext job, Path taskWorkPath) throws IllegalArgumentException, IOException {
+	    Path outputPath = FileOutputFormat.getOutputPath(job);
+	    String collectionBase = new Path(outputPath, COLLECTION_PREFIX).toString();
+	    
 	    FileSystem fs = FileSystem.get(job.getConfiguration());
 	    IOFactory ioFactory = new HdfsIoFactory(fs);
-	    builder = new StartOffsetDocumentCollectionBuilder("collection-", new IdentityDocumentFactory(), ioFactory);
+	    builder = new StartOffsetDocumentCollectionBuilder(collectionBase, new IdentityDocumentFactory(), ioFactory);
 	    // Use the id for this task.  It's the same for all attempts of this task.
 	    builder.open(Integer.toString(job.getTaskAttemptID().getTaskID().getId()));
 	}

@@ -49,6 +49,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
     static final String NUMBER_OF_DOCUMENTS = "NUMBER_OF_DOCUMENTS";
     static final String ALIGNMENT_INDEX_NAME = "alignment";
     static final String METHOD = "method";
+    static final String INDEX_WRITER_CACHE_SIZE = "indexWriterCacheSize";
 
     private static final String RESOURCES_HASH_ARG = "RESOURCES_HASH";
 
@@ -110,6 +111,9 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	conf.set("mapreduce.user.classpath.first", "true");
 
 	conf.setInt(NUMBER_OF_DOCUMENTS, jsapResult.getInt("numdocs"));
+	// Set this in a attempt to get around the 2GB of ram task limit on our cluster.
+	// Although even changing this from the 16GB default to 512KB doesn't permit many more than 100 indexes to be build in parallel.
+	//conf.setInt(INDEX_WRITER_CACHE_SIZE, 1024 * 1024);
 
 	conf.set(OUTPUT_DIR, jsapResult.getString("output"));
 

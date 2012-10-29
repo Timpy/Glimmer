@@ -59,7 +59,7 @@ public class TermReduceTest {
 	    // Alignement. without counts or positions..
 	    one(reducerContext).write(
 		    with(new IntWritable(-1)),
-		    with(new IndexRecordWriterTermValueMatcher("term1", 0, 0, 0)));
+		    with(new IndexRecordWriterTermValueMatcher("term1", 1, 0, 0)));
 	    one(reducerContext).write(
 		    with(new IntWritable(-1)),
 		    with(new IndexRecordWriterDocValueMatcher(0)));
@@ -76,7 +76,7 @@ public class TermReduceTest {
 	    // Alignement. without counts or positions..
 	    one(reducerContext).write(
 		    with(new IntWritable(-1)),
-		    with(new IndexRecordWriterTermValueMatcher("term2", 0, 0, 0)));
+		    with(new IndexRecordWriterTermValueMatcher("term2", 1, 0, 0)));
 	    one(reducerContext).write(
 		    with(new IntWritable(-1)),
 		    with(new IndexRecordWriterDocValueMatcher(1)));
@@ -96,7 +96,7 @@ public class TermReduceTest {
 	    // Alignement. without counts or positions..
 	    one(reducerContext).write(
 		    with(new IntWritable(-1)),
-		    with(new IndexRecordWriterTermValueMatcher("term3", 0, 0, 0)));
+		    with(new IndexRecordWriterTermValueMatcher("term3", 2, 0, 0)));
 	    one(reducerContext).write(
 		    with(new IntWritable(-1)),
 		    with(new IndexRecordWriterDocValueMatcher(0)));
@@ -110,12 +110,9 @@ public class TermReduceTest {
 	
 	TermKey key = new TermKey("term1", 0, null);
 	ArrayList<TermValue> values = new ArrayList<TermValue>();
-	values.add(new TermValue(Type.OCCURRENCE_COUNT, 3, 2));
-	values.add(new TermValue(Type.OCCURRENCE_COUNT, 4, 1));
-	values.add(new TermValue(Type.OCCURRENCE_COUNT, 7, 3));
-	values.add(new TermValue(Type.LAST_OCCURRENCE, 3, 15));
-	values.add(new TermValue(Type.LAST_OCCURRENCE, 4, 12));
-	values.add(new TermValue(Type.LAST_OCCURRENCE, 7, 18));
+	values.add(new TermValue(Type.DOC_STATS, 2, 15));
+	values.add(new TermValue(Type.DOC_STATS, 1, 12));
+	values.add(new TermValue(Type.DOC_STATS, 3, 18));
 	values.add(new TermValue(Type.OCCURRENCE, 3, 11));
 	values.add(new TermValue(Type.OCCURRENCE, 3, 15));
 	values.add(new TermValue(Type.OCCURRENCE, 4, 12));
@@ -133,10 +130,8 @@ public class TermReduceTest {
 	
 	key = new TermKey("term2", 1, null);
 	values.clear();
-	values.add(new TermValue(Type.OCCURRENCE_COUNT, 1, 2));
-	values.add(new TermValue(Type.OCCURRENCE_COUNT, 7, 2));
-	values.add(new TermValue(Type.LAST_OCCURRENCE, 1, 19));
-	values.add(new TermValue(Type.LAST_OCCURRENCE, 7, 16));
+	values.add(new TermValue(Type.DOC_STATS, 2, 19));
+	values.add(new TermValue(Type.DOC_STATS, 2, 16));
 	values.add(new TermValue(Type.OCCURRENCE, 1, 10));
 	values.add(new TermValue(Type.OCCURRENCE, 1, 19));
 	values.add(new TermValue(Type.OCCURRENCE, 7, 13));
@@ -151,15 +146,13 @@ public class TermReduceTest {
 
 	key = new TermKey("term3", 0, null);
 	values.clear();
-	values.add(new TermValue(Type.OCCURRENCE_COUNT, 2, 2));
-	values.add(new TermValue(Type.LAST_OCCURRENCE, 2, 7));
+	values.add(new TermValue(Type.DOC_STATS, 2, 7));
 	values.add(new TermValue(Type.OCCURRENCE, 2, 5));
 	values.add(new TermValue(Type.OCCURRENCE, 2, 7));
 	reducer.reduce(key, values, reducerContext);
 	key = new TermKey("term3", 1, null);
 	values.clear();
-	values.add(new TermValue(Type.OCCURRENCE_COUNT, 2, 2));
-	values.add(new TermValue(Type.LAST_OCCURRENCE, 2, 11));
+	values.add(new TermValue(Type.DOC_STATS, 2, 11));
 	values.add(new TermValue(Type.OCCURRENCE, 2, 10));
 	values.add(new TermValue(Type.OCCURRENCE, 2, 11));
 	reducer.reduce(key, values, reducerContext);

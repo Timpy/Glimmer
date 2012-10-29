@@ -108,14 +108,10 @@ public class DocumentMapperTest {
 	    
 	    allowing(doc).content(0);
 	    will(returnValue(new DelimitedWordReader("a literal b".toCharArray(), DELIMITER)));
-	    // Occurrence counts.
-	    one(mapperContext).write(with(new TermKeyMatcher(0, "a", Type.OCCURRENCE_COUNT, 10, 1)), with(new TermValueMatcher(Type.OCCURRENCE_COUNT, 10, 1)));
-	    one(mapperContext).write(with(new TermKeyMatcher(0, "literal", Type.OCCURRENCE_COUNT, 10, 1)), with(new TermValueMatcher(Type.OCCURRENCE_COUNT, 10, 1)));
-	    one(mapperContext).write(with(new TermKeyMatcher(0, "b", Type.OCCURRENCE_COUNT, 10, 1)), with(new TermValueMatcher(Type.OCCURRENCE_COUNT, 10, 1)));
-	    // Last positions of terms.
-	    one(mapperContext).write(with(new TermKeyMatcher(0, "a", Type.LAST_OCCURRENCE, 10, 0)), with(new TermValueMatcher(Type.LAST_OCCURRENCE, 10, 0)));
-	    one(mapperContext).write(with(new TermKeyMatcher(0, "literal", Type.LAST_OCCURRENCE, 10, 1)), with(new TermValueMatcher(Type.LAST_OCCURRENCE, 10, 1)));
-	    one(mapperContext).write(with(new TermKeyMatcher(0, "b", Type.LAST_OCCURRENCE, 10, 2)), with(new TermValueMatcher(Type.LAST_OCCURRENCE, 10, 2)));
+	    // Occurrence counts and last positions.
+	    one(mapperContext).write(with(new TermKeyMatcher(0, "a", Type.DOC_STATS, 1, 0)), with(new TermValueMatcher(Type.DOC_STATS, 1, 0)));
+	    one(mapperContext).write(with(new TermKeyMatcher(0, "literal", Type.DOC_STATS, 1, 1)), with(new TermValueMatcher(Type.DOC_STATS, 1, 1)));
+	    one(mapperContext).write(with(new TermKeyMatcher(0, "b", Type.DOC_STATS, 1, 2)), with(new TermValueMatcher(Type.DOC_STATS, 1, 2)));
 	    // The occurrences
 	    one(mapperContext).write(with(new TermKeyMatcher(0, "a", Type.OCCURRENCE, 10, 0)), with(new TermValueMatcher(Type.OCCURRENCE, 10, 0)));
 	    one(mapperContext).write(with(new TermKeyMatcher(0, "literal", Type.OCCURRENCE, 10, 1)), with(new TermValueMatcher(Type.OCCURRENCE, 10, 1)));
@@ -123,12 +119,9 @@ public class DocumentMapperTest {
 	    
 	    allowing(doc).content(1);
 	    will(returnValue(new DelimitedWordReader("X Y X".toCharArray(), DELIMITER)));
-	    // Occurrence counts.
-	    one(mapperContext).write(with(new TermKeyMatcher(1, "X", Type.OCCURRENCE_COUNT, 10, 2)), with(new TermValueMatcher(Type.OCCURRENCE_COUNT, 10, 2)));
-	    one(mapperContext).write(with(new TermKeyMatcher(1, "Y", Type.OCCURRENCE_COUNT, 10, 1)), with(new TermValueMatcher(Type.OCCURRENCE_COUNT, 10, 1)));
-	    // Last positions of terms.
-	    one(mapperContext).write(with(new TermKeyMatcher(1, "X", Type.LAST_OCCURRENCE, 10, 2)), with(new TermValueMatcher(Type.LAST_OCCURRENCE, 10, 2)));
-	    one(mapperContext).write(with(new TermKeyMatcher(1, "Y", Type.LAST_OCCURRENCE, 10, 1)), with(new TermValueMatcher(Type.LAST_OCCURRENCE, 10, 1)));
+	    // Occurrence counts and last positions.
+	    one(mapperContext).write(with(new TermKeyMatcher(1, "X", Type.DOC_STATS, 2, 2)), with(new TermValueMatcher(Type.DOC_STATS, 2, 2)));
+	    one(mapperContext).write(with(new TermKeyMatcher(1, "Y", Type.DOC_STATS, 1, 1)), with(new TermValueMatcher(Type.DOC_STATS, 1, 1)));
 	    // The occurrences
 	    one(mapperContext).write(with(new TermKeyMatcher(1, "X", Type.OCCURRENCE, 10, 0)), with(new TermValueMatcher(Type.OCCURRENCE, 10, 0)));
 	    one(mapperContext).write(with(new TermKeyMatcher(1, "Y", Type.OCCURRENCE, 10, 1)), with(new TermValueMatcher(Type.OCCURRENCE, 10, 1)));
@@ -136,12 +129,9 @@ public class DocumentMapperTest {
 	    
 	    allowing(doc).content(2);
 	    will(returnValue(new DelimitedWordReader("Y Y Z Z Z".toCharArray(), DELIMITER)));
-	    // Occurrence counts.
-	    one(mapperContext).write(with(new TermKeyMatcher(2, "Y", Type.OCCURRENCE_COUNT, 10, 2)), with(new TermValueMatcher(Type.OCCURRENCE_COUNT, 10, 2)));
-	    one(mapperContext).write(with(new TermKeyMatcher(2, "Z", Type.OCCURRENCE_COUNT, 10, 3)), with(new TermValueMatcher(Type.OCCURRENCE_COUNT, 10, 3)));
-	    // Last positions of terms.
-	    one(mapperContext).write(with(new TermKeyMatcher(2, "Y", Type.LAST_OCCURRENCE, 10, 1)), with(new TermValueMatcher(Type.LAST_OCCURRENCE, 10, 1)));
-	    one(mapperContext).write(with(new TermKeyMatcher(2, "Z", Type.LAST_OCCURRENCE, 10, 4)), with(new TermValueMatcher(Type.LAST_OCCURRENCE, 10, 4)));
+	    // Occurrence counts and last positions.
+	    one(mapperContext).write(with(new TermKeyMatcher(2, "Y", Type.DOC_STATS, 2, 1)), with(new TermValueMatcher(Type.DOC_STATS, 2, 1)));
+	    one(mapperContext).write(with(new TermKeyMatcher(2, "Z", Type.DOC_STATS, 3, 4)), with(new TermValueMatcher(Type.DOC_STATS, 3, 4)));
 	    // The occurrences
 	    one(mapperContext).write(with(new TermKeyMatcher(2, "Y", Type.OCCURRENCE, 10, 0)), with(new TermValueMatcher(Type.OCCURRENCE, 10, 0)));
 	    one(mapperContext).write(with(new TermKeyMatcher(2, "Y", Type.OCCURRENCE, 10, 1)), with(new TermValueMatcher(Type.OCCURRENCE, 10, 1)));
@@ -157,15 +147,6 @@ public class DocumentMapperTest {
 	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "Y", Type.PREDICATE_ID, 1)), with(new TermValueMatcher(Type.PREDICATE_ID, 1)));
 	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "Y", Type.PREDICATE_ID, 2)), with(new TermValueMatcher(Type.PREDICATE_ID, 2)));
 	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "Z", Type.PREDICATE_ID, 2)), with(new TermValueMatcher(Type.PREDICATE_ID, 2)));
-	    // 
-//	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "1", Type.PREDICATE_OCCURRENCE, 0)), with(new TermValueMatcher(Type.PREDICATE_OCCURRENCE, 0)));
-//	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "literal", Type.PREDICATE_OCCURRENCE, 0)), with(new TermValueMatcher(Type.PREDICATE_OCCURRENCE, 0)));
-//	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "3", Type.PREDICATE_OCCURRENCE, 0)), with(new TermValueMatcher(Type.PREDICATE_OCCURRENCE, 0)));
-//	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "4", Type.PREDICATE_OCCURRENCE, 1)), with(new TermValueMatcher(Type.PREDICATE_OCCURRENCE, 1)));
-//	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "5", Type.PREDICATE_OCCURRENCE, 1)), with(new TermValueMatcher(Type.PREDICATE_OCCURRENCE, 1)));
-//	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "A", Type.PREDICATE_OCCURRENCE, 2)), with(new TermValueMatcher(Type.PREDICATE_OCCURRENCE, 2)));
-//	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "B", Type.PREDICATE_OCCURRENCE, 2)), with(new TermValueMatcher(Type.PREDICATE_OCCURRENCE, 2)));
-//	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "C", Type.PREDICATE_OCCURRENCE, 2)), with(new TermValueMatcher(Type.PREDICATE_OCCURRENCE, 2)));
 	}});
 	
 	DocumentMapper mapper = new DocumentMapper();
