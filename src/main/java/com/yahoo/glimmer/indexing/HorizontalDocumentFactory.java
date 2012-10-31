@@ -1,7 +1,5 @@
 package com.yahoo.glimmer.indexing;
 
-import org.apache.hadoop.conf.Configuration;
-
 /*
  * Copyright (c) 2012 Yahoo! Inc. All rights reserved.
  * 
@@ -13,6 +11,7 @@ import org.apache.hadoop.conf.Configuration;
  *  See accompanying LICENSE file.
  */
 
+import org.apache.hadoop.conf.Configuration;
 
 public class HorizontalDocumentFactory extends RDFDocumentFactory {
     public static void setupConf(Configuration conf, boolean withContext, String resourcesHash, String hashValuePrefix) {
