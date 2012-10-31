@@ -1,10 +1,22 @@
 package com.yahoo.glimmer.indexing.generator;
 
+/*
+ * Copyright (c) 2012 Yahoo! Inc. All rights reserved.
+ * 
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is 
+ *  distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and limitations under the License.
+ *  See accompanying LICENSE file.
+ */
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import it.unimi.dsi.mg4j.index.FileIndex;
-import it.unimi.dsi.mg4j.index.IndexIterator;
+import it.unimi.di.mg4j.index.DiskBasedIndex;
+import it.unimi.di.mg4j.index.IndexIterator;
+import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
 
 import java.io.IOException;
 import java.net.URI;
@@ -14,6 +26,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskInputOutputContext;
@@ -43,7 +56,7 @@ public class IndexRecordWriterTest {
 	conf = new Configuration();
 	
 	conf.set("mapred.output.dir", INDEX_TMP_DIR.toString());
-	conf.setInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, 7);
+	conf.setInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, 8);
 
 	fs.initialize(new URI("file:///"), new Configuration());
     }
@@ -70,80 +83,111 @@ public class IndexRecordWriterTest {
 	conf.setStrings("RdfFieldNames", "index0", "index1");
 	conf.setEnum("IndexType", RDFDocumentFactory.IndexType.VERTICAL);
 
-	RecordWriter<TermOccurrencePair, TermOccurrences> recordWriter = outputFormat.getRecordWriter(taskContext);
+	RecordWriter<IntWritable, IndexRecordWriterValue> recordWriter = outputFormat.getRecordWriter(taskContext);
 	
-	TermOccurrencePair alignmentKey = new TermOccurrencePair("term1", DocumentMapper.ALIGNMENT_INDEX, null);
-	TermOccurrences value = new TermOccurrences(16);
-	value.setTermFrequency(1);
-	recordWriter.write(alignmentKey, value);
-	value.setDocument(0); // term1 occurres in index 0
-	recordWriter.write(alignmentKey, value);
+	IntWritable key = new IntWritable();
+	IndexRecordWriterTermValue termValue = new IndexRecordWriterTermValue();
+	IndexRecordWriterDocValue docValue = new IndexRecordWriterDocValue(16);
 	
-	TermOccurrencePair key = new TermOccurrencePair("term1", 0, null);
-	value.setTermFrequency(3);
-	recordWriter.write(key, value);
-	value.setDocument(3);
-	value.clearOccerrences();
-	value.addOccurrence(11);
-	value.addOccurrence(15);
-	recordWriter.write(key, value);
-	value.setDocument(4);
-	value.clearOccerrences();
-	value.addOccurrence(12);
-	recordWriter.write(key, value);
-	value.setDocument(7);
-	value.clearOccerrences();
-	value.addOccurrence(14);
-	value.addOccurrence(17);
-	value.addOccurrence(18);
-	recordWriter.write(key, value);
+	// ALIGNEMENT_INDEX
+	key.set(DocumentMapper.ALIGNMENT_INDEX);
+	termValue.setTerm("term1");
+	termValue.setTermFrequency(1);
+	// The alignment index doesn't have positions/counts.
+	termValue.setOccurrenceCount(0);
+	termValue.setSumOfMaxTermPositions(0);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(0); // term1 occurs in index 0
+	recordWriter.write(key, docValue);
 	
-	value.setTermFrequency(2);
-	value.clearOccerrences();
-	recordWriter.write(alignmentKey, value);
-	value.setDocument(0); // term2 occurres in index 0 & 1
-	recordWriter.write(alignmentKey, value);
-	value.setDocument(1); // term2 occurres in index 0 & 1
-	recordWriter.write(alignmentKey, value);
+	// Index 0
+	key.set(0);
+	termValue.setTermFrequency(3);
+	termValue.setOccurrenceCount(6);
+	termValue.setSumOfMaxTermPositions(15 + 12 + 18);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(3);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(11);
+	docValue.addOccurrence(15);
+	recordWriter.write(key, docValue);
+	docValue.setDocument(4);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(12);
+	recordWriter.write(key, docValue);
+	docValue.setDocument(7);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(14);
+	docValue.addOccurrence(17);
+	docValue.addOccurrence(18);
+	recordWriter.write(key, docValue);
+
+	// ALIGNEMENT_INDEX
+	key.set(DocumentMapper.ALIGNMENT_INDEX);
+	termValue.setTerm("term2");
+	termValue.setTermFrequency(2);
+	// The alignment index doesn't have positions/counts.
+	termValue.setOccurrenceCount(0);
+	termValue.setSumOfMaxTermPositions(0);
+	recordWriter.write(key, termValue);
+	docValue.clearOccerrences();
+	docValue.setDocument(0); // term2 occurs in index 0 & 1
+	recordWriter.write(key, docValue);
+	docValue.setDocument(1); // term2 occurs in index 0 & 1
+	recordWriter.write(key, docValue);
 	
-	key = new TermOccurrencePair("term2", 0, null);
-	value.setTermFrequency(2);
-	recordWriter.write(key, value);
-	value.setDocument(1);
-	value.clearOccerrences();
-	value.addOccurrence(10);
-	value.addOccurrence(19);
-	recordWriter.write(key, value);
-	value.setDocument(7);
-	value.clearOccerrences();
-	value.addOccurrence(13);
-	value.addOccurrence(16);
-	recordWriter.write(key, value);
+	// Index 0
+	key.set(0);
+	termValue.setTermFrequency(2);
+	termValue.setOccurrenceCount(4);
+	termValue.setSumOfMaxTermPositions(19 + 16);
+	recordWriter.write(key, termValue);
 	
-	key = new TermOccurrencePair("term2", 1, null);
-	value.setTermFrequency(1);
-	recordWriter.write(key, value);
-	value.setDocument(1);
-	value.clearOccerrences();
-	value.addOccurrence(14);
-	recordWriter.write(key, value);
+	docValue.setDocument(1);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(10);
+	docValue.addOccurrence(19);
+	recordWriter.write(key, docValue);
+	docValue.setDocument(7);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(13);
+	docValue.addOccurrence(16);
+	recordWriter.write(key, docValue);
 	
-	value.setTermFrequency(1);
-	value.clearOccerrences();
-	recordWriter.write(alignmentKey, value);
-	value.setDocument(1); // term3 occurres in index 1
-	recordWriter.write(alignmentKey, value);
+	// Index 1
+	key.set(1);
+	termValue.setTermFrequency(1);
+	termValue.setOccurrenceCount(1);
+	termValue.setSumOfMaxTermPositions(14);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(1);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(14);
+	recordWriter.write(key, docValue);
 	
-	key = new TermOccurrencePair("term3", 1, null);
-	value.setTermFrequency(1);
-	recordWriter.write(key, value);
-	value.setDocument(3);
-	value.clearOccerrences();
-	value.addOccurrence(10);
-	value.addOccurrence(11);
-	recordWriter.write(key, value);
+	// ALIGNMENT_INDEX 
+	key.set(DocumentMapper.ALIGNMENT_INDEX);
+	termValue.setTerm("term3");
+	termValue.setTermFrequency(1);
+	// The alignment index doesn't have positions/counts.
+	termValue.setOccurrenceCount(0);
+	termValue.setSumOfMaxTermPositions(0);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(1); // term3 occurs in index 1
+	recordWriter.write(key, docValue);
+	docValue.clearOccerrences();
 	
-	
+	// Index 1
+	key.set(1);
+	termValue.setTermFrequency(1);
+	termValue.setOccurrenceCount(2);
+	termValue.setSumOfMaxTermPositions(11);
+	recordWriter.write(key, termValue);
+	docValue.setDocument(3);
+	docValue.clearOccerrences();
+	docValue.addOccurrence(10);
+	docValue.addOccurrence(11);
+	recordWriter.write(key, docValue);
 	
 	recordWriter.close(taskContext);
 
@@ -151,9 +195,9 @@ public class IndexRecordWriterTest {
 	
 	Path workPath = outputFormat.getDefaultWorkFile(taskContext,"");
 	System.out.println("Default work file is " + workPath.toString());
-	
-	FileIndex index0 = (FileIndex) FileIndex.getInstance(workPath.toString() + "/index0", true);
-	assertEquals(7, index0.numberOfDocuments);
+	String dir = workPath.toUri().getPath();
+	QuasiSuccinctIndex index0 = (QuasiSuccinctIndex) DiskBasedIndex.getInstance(dir + "/index0", true);
+	assertEquals(8, index0.numberOfDocuments);
 	assertEquals(2, index0.numberOfTerms);
 	assertTrue(index0.hasPositions);
 	// term1
@@ -161,16 +205,16 @@ public class IndexRecordWriterTest {
 	// term2
 	checkOccurrences(index0.documents(1), 2, "(1:10,19) (7:13,16)");
 
-	FileIndex index1 = (FileIndex) FileIndex.getInstance(workPath.toString() + "/index1", true);
-	assertEquals(7, index1.numberOfDocuments);
+	QuasiSuccinctIndex index1 = (QuasiSuccinctIndex) DiskBasedIndex.getInstance(dir + "/index1", true);
+	assertEquals(8, index1.numberOfDocuments);
 	assertEquals(2, index1.numberOfTerms);
 	assertTrue(index0.hasPositions);
 	checkOccurrences(index1.documents(0), 1, "(1:14)");
 	// term3
 	checkOccurrences(index1.documents(1), 1, "(3:10,11)");
 	
-	FileIndex indexAlignment = (FileIndex) FileIndex.getInstance(workPath.toString() + "/alignment", true);
-	assertEquals(7, indexAlignment.numberOfDocuments);
+	QuasiSuccinctIndex indexAlignment = (QuasiSuccinctIndex) DiskBasedIndex.getInstance(dir + "/alignment", true);
+	assertEquals(8, indexAlignment.numberOfDocuments);
 	assertEquals(3, indexAlignment.numberOfTerms);
 	assertFalse(indexAlignment.hasPositions);
 	// term1
@@ -184,21 +228,23 @@ public class IndexRecordWriterTest {
     private void checkOccurrences(IndexIterator documents, int frequencey, String expected) throws IOException {
 	assertEquals(frequencey, documents.frequency());
 	StringBuilder actual = new StringBuilder();
-	while (documents.hasNext()) {
+	while (documents.mayHaveNext()) {
 	    if (actual.length() > 0) {
 		actual.append(' ');
 	    }
-	    Integer next = documents.next();
+	    Integer next = documents.nextDocument();
 	    actual.append('(');
 	    actual.append(next);
 	    actual.append(':');
-	    int[] positions = new int[10];
-	    int noPositions = documents.positions(positions);
-	    for (int i = 0; i < noPositions; i++) {
-		if (i != 0) {
+	    int position;
+	    boolean first = true;
+	    while ((position = documents.nextPosition()) != IndexIterator.END_OF_POSITIONS) {
+		if (first) {
+		    first = false;
+		} else {
 		    actual.append(',');
 		}
-		actual.append(positions[i]);
+		actual.append(position);
 	    }
 	    actual.append(")");
 	}

@@ -11,10 +11,11 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.di.mg4j.document.DocumentCollectionBuilder;
+import it.unimi.di.mg4j.document.IdentityDocumentFactory;
+import it.unimi.di.mg4j.io.IOFactory;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.dsi.mg4j.document.HdfsSimpleCompressedDocumentCollectionBuilder;
-import it.unimi.dsi.mg4j.document.IdentityDocumentFactory;
 
 import java.io.IOException;
 
@@ -35,6 +36,7 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import com.yahoo.glimmer.util.BySubjectRecord;
+import com.yahoo.mg4hadoop.HdfsIoFactory;
 
 public class BySubjectCollectionBuilder extends Configured implements Tool {
     // Sequence that isn't possible as a Resource or word/nonWord tokenization.
@@ -105,13 +107,17 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
     }
 
     private static class BuilderOutputWriter extends RecordWriter<MutableString, MutableString> {
-	private final HdfsSimpleCompressedDocumentCollectionBuilder builder;
+	private static final String COLLECTION_PREFIX = "collection-";
+	private final DocumentCollectionBuilder builder;
 	private boolean newDoc = true;
-	private int docCount;
 
 	public BuilderOutputWriter(TaskAttemptContext job, Path taskWorkPath) throws IllegalArgumentException, IOException {
+	    Path outputPath = FileOutputFormat.getOutputPath(job);
+	    String collectionBase = new Path(outputPath, COLLECTION_PREFIX).toString();
+	    
 	    FileSystem fs = FileSystem.get(job.getConfiguration());
-	    builder = new HdfsSimpleCompressedDocumentCollectionBuilder("collection-", new IdentityDocumentFactory(), true, fs, taskWorkPath);
+	    IOFactory ioFactory = new HdfsIoFactory(fs);
+	    builder = new StartOffsetDocumentCollectionBuilder(collectionBase, new IdentityDocumentFactory(), ioFactory);
 	    // Use the id for this task.  It's the same for all attempts of this task.
 	    builder.open(Integer.toString(job.getTaskAttemptID().getTaskID().getId()));
 	}
@@ -128,10 +134,6 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 		    builder.endTextField();
 		    builder.endDocument();
 		    newDoc = true;
-		    docCount++;
-		    if (docCount % 100000 == 0) {
-			System.out.println("Builder: terms=" + builder.getTerms().size() + " nonTerms:" + builder.getNonTerms().size());
-		    }
 		}
 	    } else if (newDoc) {
 		newDoc = false;

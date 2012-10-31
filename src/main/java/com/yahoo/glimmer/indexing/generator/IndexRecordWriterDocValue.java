@@ -14,51 +14,21 @@ package com.yahoo.glimmer.indexing.generator;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.util.Arrays;
 
-import org.apache.commons.lang.NotImplementedException;
-import org.apache.hadoop.io.Writable;
-
-/**
- * This is only used to pass the results from the Reducer to the RecordWriter.
- * So object of this type shouldn't be compared or serialized by Hadoop.
- * 
- * @author tep
- */
-public class TermOccurrences implements Writable, Cloneable {
-    // This is the number of times the term occurs in all docs not just this
-    // doc.
-    private int termFrequency;
+public class IndexRecordWriterDocValue implements IndexRecordWriterValue {
     private int document;
     private int[] occurrences;
     private int occurrenceCount;
 
-    public TermOccurrences(int occurrencesBufferSize) {
+    public IndexRecordWriterDocValue(int occurrencesBufferSize) {
 	occurrences = new int[occurrencesBufferSize];
-    }
-    
-    public int getTermFrequency() {
-	return termFrequency;
-    }
-
-    public void setTermFrequency(int termFrequency) {
-	this.termFrequency = termFrequency;
-	document = 0;
-	clearOccerrences();
     }
 
     public int getDocument() {
 	return document;
     }
-
     public void setDocument(int document) {
 	this.document = document;
-	termFrequency = 0;
-    }
-
-
-    public void clearOccerrences() {
-	occurrenceCount = 0;
     }
 
     /**
@@ -85,22 +55,26 @@ public class TermOccurrences implements Writable, Cloneable {
     public int[] getOccurrences() {
 	return occurrences;
     }
+    
+    public void clearOccerrences() {
+	occurrenceCount = 0;
+    }
 
     @Override
     public void readFields(DataInput in) throws IOException {
-	throw new NotImplementedException();
+	throw new UnsupportedOperationException();
     }
 
     @Override
     public void write(DataOutput out) throws IOException {
-	throw new NotImplementedException();
+	throw new UnsupportedOperationException();
     }
 
     @Override
     public boolean equals(Object o) {
-	if (o instanceof TermOccurrences) {
-	    TermOccurrences that = (TermOccurrences) o;
-	    if (termFrequency == that.termFrequency && document == that.document && occurrenceCount == that.occurrenceCount) {
+	if (o instanceof IndexRecordWriterDocValue) {
+	    IndexRecordWriterDocValue that = (IndexRecordWriterDocValue) o;
+	    if (document == that.document && occurrenceCount == that.occurrenceCount) {
 		for (int i = 0; i < occurrenceCount; i++) {
 		    if (occurrences[i] != that.occurrences[i]) {
 			return false;
@@ -115,19 +89,24 @@ public class TermOccurrences implements Writable, Cloneable {
     @Override
     public int hashCode() {
 	int hash = 7;
-	hash = 31 * hash + termFrequency;
 	hash = 31 * hash + document;
-	hash = 31 * hash + Arrays.hashCode(occurrences);
+	hash = 31 * hash + occurrenceCount;
+	for (int i = 0; i < occurrenceCount; i++) {
+	    hash = 31 * hash + occurrences[i];
+	}
 	return hash;
+    }
+
+    @Override
+    public int compareTo(IndexRecordWriterValue o) {
+	throw new UnsupportedOperationException();
     }
 
     public String toString() {
 	StringBuilder sb = new StringBuilder();
-	sb.append(termFrequency);
-	sb.append(':');
 	sb.append(document);
 	sb.append(" (");
-	for (int i = 0 ; i < occurrenceCount ; i++) {
+	for (int i = 0; i < occurrenceCount; i++) {
 	    if (i > 0) {
 		sb.append(',');
 	    }

@@ -14,6 +14,7 @@ package com.yahoo.glimmer.indexing.generator;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -48,11 +49,12 @@ public class TripleIndexGenerator extends Configured implements Tool {
     static final String NUMBER_OF_DOCUMENTS = "NUMBER_OF_DOCUMENTS";
     static final String ALIGNMENT_INDEX_NAME = "alignment";
     static final String METHOD = "method";
+    static final String INDEX_WRITER_CACHE_SIZE = "indexWriterCacheSize";
 
     private static final String RESOURCES_HASH_ARG = "RESOURCES_HASH";
 
     static { // register comparator
-	WritableComparator.define(TermOccurrencePair.class, new TermOccurrencePair.Comparator());
+	WritableComparator.define(TermKey.class, new TermKey.Comparator());
     }
 
     public int run(String[] args) throws Exception {
@@ -91,24 +93,27 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.setInputFormatClass(RDFInputFormat.class);
 
 	job.setMapperClass(DocumentMapper.class);
-	job.setMapOutputKeyClass(TermOccurrencePair.class);
-	job.setMapOutputValueClass(Occurrence.class);
+	job.setMapOutputKeyClass(TermKey.class);
+	job.setMapOutputValueClass(TermValue.class);
 
-	job.setPartitionerClass(TermOccurrencePair.FirstPartitioner.class);
-	job.setGroupingComparatorClass(TermOccurrencePair.FirstGroupingComparator.class);
+	job.setPartitionerClass(TermKey.FirstPartitioner.class);
+	job.setGroupingComparatorClass(TermKey.FirstGroupingComparator.class);
 
-	job.setReducerClass(TermOccurrencePairReduce.class);
-	job.setOutputKeyClass(TermOccurrencePair.class);
-	job.setOutputValueClass(TermOccurrences.class);
+	job.setReducerClass(TermReduce.class);
+	job.setOutputKeyClass(IntWritable.class);
+	job.setOutputValueClass(IndexRecordWriterValue.class);
 	job.setOutputFormatClass(IndexRecordWriter.OutputFormat.class);
 	FileOutputFormat.setOutputPath(job, new Path(jsapResult.getString("output")));
 
 	Configuration conf = job.getConfiguration();
 
-	conf.setClass("mapred.output.key.comparator.class", TermOccurrencePair.Comparator.class, WritableComparator.class);
+	conf.setClass("mapred.output.key.comparator.class", TermKey.Comparator.class, WritableComparator.class);
 	conf.set("mapreduce.user.classpath.first", "true");
 
 	conf.setInt(NUMBER_OF_DOCUMENTS, jsapResult.getInt("numdocs"));
+	// Set this in a attempt to get around the 2GB of ram task limit on our cluster.
+	// Although even changing this from the 16GB default to 512KB doesn't permit many more than 100 indexes to be build in parallel.
+	//conf.setInt(INDEX_WRITER_CACHE_SIZE, 1024 * 1024);
 
 	conf.set(OUTPUT_DIR, jsapResult.getString("output"));
 

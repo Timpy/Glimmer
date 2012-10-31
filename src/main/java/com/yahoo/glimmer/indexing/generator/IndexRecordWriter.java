@@ -12,15 +12,19 @@ package com.yahoo.glimmer.indexing.generator;
  */
 
 import it.unimi.dsi.io.OutputBitStream;
-import it.unimi.dsi.mg4j.index.IndexWriter;
+import it.unimi.di.mg4j.index.IndexWriter;
+import it.unimi.di.mg4j.index.QuasiSuccinctIndexWriter;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -29,18 +33,19 @@ import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.util.Util;
 
-public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccurrences> {
+public class IndexRecordWriter extends RecordWriter<IntWritable, IndexRecordWriterValue> {
+    private static final Log LOG = LogFactory.getLog(IndexRecordWriter.class);
     private Map<Integer, IndexWrapper> indices = new HashMap<Integer, IndexWrapper>();
 
-    public IndexRecordWriter(FileSystem fs, Path taskWorkPath, int numberOfDocs, RDFDocumentFactory.IndexType indexType, String hashValuePrefix, String ... fieldNames) throws IOException {
+    public IndexRecordWriter(FileSystem fs, Path taskWorkPath, int numberOfDocs, RDFDocumentFactory.IndexType indexType, String hashValuePrefix, int indexWriterCacheSize,
+	    String... fieldNames) throws IOException {
 	if (indexType == RDFDocumentFactory.IndexType.VERTICAL) {
 	    // Open the alignment index
-	    Index index = new Index(fs, taskWorkPath, TripleIndexGenerator.ALIGNMENT_INDEX_NAME, numberOfDocs, false, hashValuePrefix);
+	    Index index = new Index(fs, taskWorkPath, TripleIndexGenerator.ALIGNMENT_INDEX_NAME, numberOfDocs, false, hashValuePrefix, indexWriterCacheSize);
 	    index.open();
 	    indices.put(DocumentMapper.ALIGNMENT_INDEX, new IndexWrapper(index));
 	}
 
-	
 	// Open one index per field
 	for (int i = 0; i < fieldNames.length; i++) {
 	    String name = Util.encodeFieldName(fieldNames[i]);
@@ -60,7 +65,7 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
 
 		System.out.println("Opening index for field:" + name + " Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
 
-		Index index = new Index(fs, taskWorkPath, name, numberOfDocs, true, hashValuePrefix);
+		Index index = new Index(fs, taskWorkPath, name, numberOfDocs, true, hashValuePrefix, indexWriterCacheSize);
 		index.open();
 
 		indices.put(i, new IndexWrapper(index));
@@ -69,9 +74,9 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
     }
 
     @Override
-    public void write(TermOccurrencePair key, TermOccurrences value) throws IOException, InterruptedException {
-	IndexWrapper index = indices.get(key.getIndex());
-	index.write(key.getTerm(), value);
+    public void write(IntWritable key, IndexRecordWriterValue value) throws IOException, InterruptedException {
+	IndexWrapper index = indices.get(key.get());
+	index.write(value);
     }
 
     @Override
@@ -83,37 +88,77 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
 
     private static class IndexWrapper {
 	private final Index index;
-	private int writtenOccurrenceCount;
+	
+	private IndexRecordWriterTermValue lastTermValue = new IndexRecordWriterTermValue();
+	
+	private int accumulatedTermFrequency;
+	private int accumulatedOccurrenceCount;
+	private long accumulatedSumOfMaxPositions;
 
 	public IndexWrapper(Index index) {
 	    this.index = index;
 	}
 
-	public void write(String term, TermOccurrences value) throws IOException {
-	    if (value.getTermFrequency() > 0) {
-		index.getTermsWriter().println(term);
-		index.getIndexWriter().newInvertedList();
-		index.getIndexWriter().writeFrequency(value.getTermFrequency());
-	    } else {
-		IndexWriter indexWriter = index.getIndexWriter();
-		OutputBitStream out = indexWriter.newDocumentRecord();
-		indexWriter.writeDocumentPointer(out, value.getDocument());
-		if (index.hasPositions() && value.hasOccurrence()) {
-		    indexWriter.writePositionCount(out, value.getOccurrenceCount());
-		    indexWriter.writeDocumentPositions(out, value.getOccurrences(), 0, value.getOccurrenceCount(), -1);
+	public void write(IndexRecordWriterValue value) throws IOException {
+	    IndexWriter indexWriter = index.getIndexWriter();
+	    try {
+		if (value instanceof IndexRecordWriterTermValue) {
+		    IndexRecordWriterTermValue termValue = (IndexRecordWriterTermValue) value;
+		    index.getTermsWriter().println(termValue.getTerm());
+		    if (indexWriter instanceof QuasiSuccinctIndexWriter) {
+			((QuasiSuccinctIndexWriter) indexWriter).newInvertedList(termValue.getTermFrequency(), termValue.getOccurrenceCount(),
+				termValue.getSumOfMaxTermPositions());
+		    } else {
+			indexWriter.newInvertedList();
+			indexWriter.writeFrequency(termValue.getTermFrequency());
+		    }
+		    lastTermValue.set(termValue);
+		    accumulatedTermFrequency = 0;
+		    accumulatedOccurrenceCount = 0;
+		    accumulatedSumOfMaxPositions = 0;
+		} else {
+		    IndexRecordWriterDocValue docValue = (IndexRecordWriterDocValue) value;
+
+		    OutputBitStream out = indexWriter.newDocumentRecord();
+		    indexWriter.writeDocumentPointer(out, docValue.getDocument());
+		    if (index.hasPositions() && docValue.hasOccurrence()) {
+			indexWriter.writePositionCount(out, docValue.getOccurrenceCount());
+			indexWriter.writeDocumentPositions(out, docValue.getOccurrences(), 0, docValue.getOccurrenceCount(), -1);
+		    }
+		    accumulatedTermFrequency++;
+		    int occurrenceCount = docValue.getOccurrenceCount();
+		    if (occurrenceCount > 0) {
+			accumulatedOccurrenceCount += occurrenceCount;
+			accumulatedSumOfMaxPositions += docValue.getOccurrences()[occurrenceCount - 1];
+		    }
 		}
-		writtenOccurrenceCount += value.getOccurrenceCount();
+	    } catch (RuntimeException e) {
+		LOG.warn("Exception for term>" + lastTermValue == null ? "" : lastTermValue.getTerm() + "< and doc value:" + value == null ? "null" : value.toString());
+		logStats();
+		throw e;
 	    }
 	}
 
 	public void close() throws IOException {
-	    index.close(writtenOccurrenceCount);
+	    LOG.info("Closing index" + index.getName());
+	    logStats();
+	    index.close(accumulatedOccurrenceCount);
+	}
+	
+	private void logStats() {
+	    LOG.info("\n" +
+		    "Index:" + index.getName() + "\n" +
+		    "TermFrequency\tlast:" + lastTermValue.getTermFrequency() + "\taccumulated:" + accumulatedTermFrequency + "\n" +
+		    "OccurrenceCount\tlast:" + lastTermValue.getOccurrenceCount() + "\taccumulated:" + accumulatedOccurrenceCount + "\n" +
+		    "SumOfMaxPositions\tlast:" + lastTermValue.getSumOfMaxTermPositions() + "\taccumulated:" + accumulatedSumOfMaxPositions);
 	}
     }
     
-    public static class OutputFormat extends FileOutputFormat<TermOccurrencePair, TermOccurrences> {
+
+    public static class OutputFormat extends FileOutputFormat<IntWritable, IndexRecordWriterValue> {
+
 	@Override
-	public RecordWriter<TermOccurrencePair, TermOccurrences> getRecordWriter(TaskAttemptContext job) throws IOException, InterruptedException {
+	public RecordWriter<IntWritable, IndexRecordWriterValue> getRecordWriter(TaskAttemptContext job) throws IOException, InterruptedException {
 	    Configuration conf = job.getConfiguration();
 	    FileSystem fs = FileSystem.get(conf);
 
@@ -127,7 +172,9 @@ public class IndexRecordWriter extends RecordWriter<TermOccurrencePair, TermOccu
 	    IndexType indexType = RDFDocumentFactory.getIndexType(conf);
 	    String[] fields = RDFDocumentFactory.getFieldsFromConf(conf);
 	    String hashValuePrefix = RDFDocumentFactory.getHashValuePrefix(conf);
-	    return new IndexRecordWriter(fs, taskWorkPath, numberOfDocuments, indexType, hashValuePrefix, fields);
+	    
+	    int indexWriterCacheSize = conf.getInt(TripleIndexGenerator.INDEX_WRITER_CACHE_SIZE, 0);
+	    return new IndexRecordWriter(fs, taskWorkPath, numberOfDocuments, indexType, hashValuePrefix, indexWriterCacheSize, fields);
 	}
     }
 }

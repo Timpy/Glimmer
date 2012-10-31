@@ -1,4 +1,4 @@
-package com.yahoo.glimmer.indexing;
+package com.yahoo.glimmer.indexing.generator;
 
 /*
  * Copyright (c) 2012 Yahoo! Inc. All rights reserved.
@@ -11,15 +11,8 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.WritableComparable;
 
-public class HorizontalDocumentFactory extends RDFDocumentFactory {
-    public static void setupConf(Configuration conf, boolean withContext, String resourcesHash, String hashValuePrefix) {
-	setupConf(conf, IndexType.HORIZONTAL, withContext, resourcesHash, hashValuePrefix, "object", "predicate", "context", "subject");
-    }
+public interface IndexRecordWriterValue extends WritableComparable<IndexRecordWriterValue> {
 
-    @Override
-    public RDFDocument getDocument() {
-	return new HorizontalDocument(this);
-    }
 }

@@ -15,7 +15,8 @@ import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
@@ -23,9 +24,10 @@ import org.apache.hadoop.mapreduce.Mapper;
 
 import com.yahoo.glimmer.indexing.RDFDocument;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory;
+import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
-public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurrencePair, Occurrence> {
-    static final int ALIGNMENT_INDEX = -1; // special index for alignments
+public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, TermValue> {
+    public static final int ALIGNMENT_INDEX = -1; // special index for alignments
 
     enum Counters {
 	FAILED_PARSING, INDEXED_OCCURRENCES, NEGATIVE_PREDICATE_ID, NUMBER_OF_RECORDS
@@ -33,7 +35,7 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurr
 
     private String[] fields;
 
-    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, RDFDocument, TermOccurrencePair, Occurrence>.Context context) throws IOException,
+    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, RDFDocument, TermKey, TermValue>.Context context) throws IOException,
 	    InterruptedException {
 	Configuration conf = context.getConfiguration();
 	fields = RDFDocumentFactory.getFieldsFromConf(conf);
@@ -48,14 +50,13 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurr
 	    return;
 	}
 
-	// Collect the keys (term+index) of this document
-	HashSet<TermOccurrencePair> keySet = new HashSet<TermOccurrencePair>();
-
-	// used for counting # of docs per term
-	Occurrence fakeDocOccurrrence = new Occurrence(null, doc.getId());
+	// This is used to write the position of the last occurrence and testing
+	// if the fakeDocOccurrrence for the term has already been written.
+	Map<String, DocStat> termToDocStatMap = new HashMap<String, DocStat>();
 
 	// Iterate over all indices
 	for (int i = 0; i < fields.length; i++) {
+	    TermValue predicateIdValue = new TermValue(Type.PREDICATE_ID, i);
 
 	    String fieldName = fields[i];
 	    if (fieldName.startsWith("NOINDEX")) {
@@ -71,47 +72,56 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermOccurr
 	    while (termReader.next(term, nonWord)) {
 		// Read next property as well
 		if (term != null) {
+		    String termString = term.toString();
 
 		    // Report progress
 		    context.setStatus(fields[i] + "=" + term.substring(0, Math.min(term.length(), 50)));
 
 		    // Create an occurrence at the next position
-		    Occurrence occ = new Occurrence(doc.getId(), position);
-		    context.write(new TermOccurrencePair(term.toString(), i, occ), occ);
+		    TermValue occurrenceValue = new TermValue(Type.OCCURRENCE, doc.getId(), position);
+		    context.write(new TermKey(termString, i, occurrenceValue), occurrenceValue);
 
-		    // Create fake occurrences for each term (this will be
-		    // used for counting # of docs per term
-		    keySet.add(new TermOccurrencePair(term.toString(), i, fakeDocOccurrrence));
+		    DocStat docStat = termToDocStatMap.get(termString);
+		    if (docStat == null) {
+			if (doc.getIndexType() == RDFDocumentFactory.IndexType.VERTICAL) {
+			    // For the Alignment Index, we write the predicate
+			    // id the first time we encounter a term.
+			    // The 'Alignment Index' is an index without counts
+			    // or positions. It's used for query optimization in
+			    // the query parse. The resulting 'alignment index'
+			    // is basically used as a map from term to
+			    // predicates that term occures in.
+			    context.write(new TermKey(termString, ALIGNMENT_INDEX, predicateIdValue), predicateIdValue);
+			}
+			docStat = new DocStat();
+			docStat.last = position;
+			docStat.count = 1;
+			termToDocStatMap.put(termString, docStat);
+		    } else {
+			docStat.last = position;
+			docStat.count++;
+		    }
 
 		    position++;
 		    context.getCounter(Counters.INDEXED_OCCURRENCES).increment(1);
-
-		    if (doc.getIndexType() == RDFDocumentFactory.IndexType.VERTICAL) {
-			// Create an entry in the alignment index
-			// int predicateID =
-			// ResourcesHashLoader.lookup(fieldName).intValue();
-			// if (predicateID < 0) {
-			// System.err.println("Negative predicateID for URI: " +
-			// fieldName);
-			// context.getCounter(Counters.NEGATIVE_PREDICATE_ID).increment(1);
-			// }
-			int predicateID = i;
-			Occurrence predicateOcc = new Occurrence(predicateID, null);
-			// TODO Why not add to keySet?
-			context.write(new TermOccurrencePair(term.toString(), ALIGNMENT_INDEX, predicateOcc), predicateOcc);
-			Occurrence fakePredicateOccurrrence = new Occurrence(null, predicateID);
-			keySet.add(new TermOccurrencePair(term.toString(), ALIGNMENT_INDEX, fakePredicateOccurrrence));
-		    }
 		} else {
 		    System.out.println("Nextterm is null");
 		}
 	    }
+
+	    for (String termString : termToDocStatMap.keySet()) {
+		DocStat docStat = termToDocStatMap.get(termString);
+		TermValue occurrenceCountValue = new TermValue(Type.DOC_STATS, docStat.count, docStat.last);
+		context.write(new TermKey(termString, i, occurrenceCountValue), occurrenceCountValue);
+	    }
+	    termToDocStatMap.clear();
 	}
 
 	context.getCounter(Counters.NUMBER_OF_RECORDS).increment(1);
+    }
 
-	for (TermOccurrencePair term : keySet) {
-	    context.write(term, term.getOccurrence());
-	}
+    private static class DocStat {
+	int last;
+	int count;
     }
 }
