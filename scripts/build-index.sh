@@ -57,7 +57,8 @@ COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,${COMPRESSION_COD
 
 HASH_EXTENSION=".smap"
 
-INDEX_FILE_EXTENSIONS="frequencies index offsets positions posnumbits properties stats termmap terms"
+#INDEX_FILE_EXTENSIONS="frequencies index offsets positions posnumbits properties stats termmap terms"
+INDEX_FILE_EXTENSIONS="counts countsoffsets frequencies occurrencies pointers pointersoffsets positions positionsoffsets properties sumsmaxpos terms"
 
 if [ ! -f ${PROJECT_JAR} ] ; then
 	echo "Projects jar file missing!! ${PROJECT_JAR}"
@@ -313,8 +314,8 @@ function mergeSubIndexes() {
 	echo "MERGING SUB INDEXES FOR METHOD:" ${METHOD}
 	echo
 	
-	if [ -e "${INDEX_DIR}/*.index" ] ; then
-		read -p "Local .index files exist in ${INDEX_DIR}! Continue(delete them) or otherwise quit? (C)" -n 1 -r
+	if [ -e "${INDEX_DIR}/*.properties" ] ; then
+		read -p "Local .properties files exist in ${INDEX_DIR}! Continue(delete them) or otherwise quit? (C)" -n 1 -r
 		echo
 		if [[ ! $REPLY =~ ^[Cc]$ ]] ; then
 			echo Exiting..
@@ -331,7 +332,7 @@ function mergeSubIndexes() {
 	echo ${PART_DIRS[@]}
 	echo
 	
-	INDEX_NAMES=`ls ${PART_DIRS[0]} | awk '/\.index/{sub(".index$","") ; print $0}'`
+	INDEX_NAMES=`ls ${PART_DIRS[0]} | awk '/\.properties/{sub(".properties$","") ; print $0}'`
 	echo "Index names are:"
 	echo ${INDEX_NAMES[@]}
 	echo
@@ -348,7 +349,7 @@ function mergeSubIndexes() {
 			NO_COUNTS_OPTIONS="-cCOUNTS:NONE -cPOSITIONS:NONE"
 		fi
 		
-		CMD="java -Xmx2G -cp ${PROJECT_JAR} it.unimi.di.mg4j.tool.Merge --interleaved ${NO_COUNTS_OPTIONS} ${INDEX_DIR}/${INDEX_NAME} ${SUB_INDEXES}"
+		CMD="java -Xmx2G -cp ${PROJECT_JAR} it.unimi.di.mg4j.tool.Merge ${NO_COUNTS_OPTIONS} ${INDEX_DIR}/${INDEX_NAME} ${SUB_INDEXES}"
 		echo ${CMD}
 		${CMD}
 		
@@ -444,11 +445,11 @@ function buildCollection () {
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.BySubjectCollectionBuilder \
 		-Dmapred.map.max.attempts=2 \
 		-Dmapred.map.tasks.speculative.execution=false \
-		-Dmapred.child.java.opts=-Xmx800m \
+		-Dmapred.child.java.opts=-Xmx900m \
 		-Dmapred.job.map.memory.mb=2000 \
 		-Dmapred.job.reduce.memory.mb=2000 \
 		-Dmapred.job.queue.name=${QUEUE} \
-		-Dmapred.min.split.size=10000000000 \
+		-Dmapred.min.split.size=2500000000 \
 		${PREP_DIR}/bySubject ${COLLECTION_DIR}"
 	echo ${CMD}
 	${CMD}

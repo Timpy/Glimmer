@@ -35,7 +35,7 @@ if [ ! -d ${INDEX_DIR} ] ; then
 	exit -1;
 fi
 
-FILENAMES=`ls ${INDEX_DIR}/*.index`
+FILENAMES=`ls ${INDEX_DIR}/*.properties`
 EXIT_CODE=$?
 if [ $EXIT_CODE -ne "0" ] ; then
 	exit $EXIT_CODE
@@ -44,7 +44,7 @@ fi
 BASENAMES=
 for FILENAME in ${FILENAMES} 
 do 
-  FIELDNAME=`echo ${FILENAME} | sed 's/.*\/\(.*\).index$/\1/'`
+  FIELDNAME=`echo ${FILENAME} | sed 's/.*\/\(.*\).properties$/\1/'`
   if [ ${FIELDNAME} != "alignment" ] ; then
   	BASENAMES=$BASENAMES' '${INDEX_DIR}/$FIELDNAME
   fi
