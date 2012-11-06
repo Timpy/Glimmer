@@ -61,7 +61,7 @@ public class PrepTool extends Configured implements Tool {
 	boolean withContexts = !jsapResult.getBoolean(NO_CONTEXTS_ARG, false);
 	config.setBoolean(TuplesToResourcesMapper.INCLUDE_CONTEXTS_KEY, withContexts);
 
-	Job job = new Job(config);
+	Job job = Job.getInstance(config);
 	job.setJarByClass(PrepTool.class);
 
 	job.setJobName(PrepTool.class.getName() + "-part1-" + System.currentTimeMillis());

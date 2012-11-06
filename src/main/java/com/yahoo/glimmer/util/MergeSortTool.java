@@ -87,7 +87,7 @@ public class MergeSortTool extends Configured implements Tool {
 	
 	List<Path> sourcePaths = new ArrayList<Path>(sources.length);
 	for (FileStatus source : sources) {
-	    if (source.isDir()) {
+	    if (source.isDirectory()) {
 		System.err.println(source.getPath().toString() + " is a directory.");
 		return 1;
 	    }

@@ -72,12 +72,12 @@
 		<dependency>
 			<groupId>org.semanticweb.yars</groupId>
 			<artifactId>nxparser</artifactId>
-			<version>1.2.3-SNAPSHOT</version>
+			<version>1.2.3</version>
 		</dependency>
 		<dependency>
 			<groupId>it.unimi.di</groupId>
 			<artifactId>mg4j</artifactId>
-			<version>5.0.1</version>
+			<version>5.1</version>
 			<exclusions>
 				<exclusion>
 					<artifactId>jetty</artifactId>

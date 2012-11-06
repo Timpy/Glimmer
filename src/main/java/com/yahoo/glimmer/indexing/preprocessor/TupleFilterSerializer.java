@@ -29,6 +29,7 @@ public class TupleFilterSerializer {
     
     public static TupleFilter deserialize(Configuration conf) throws IOException {
 	FileSystem fs = FileSystem.get(conf);
+	@SuppressWarnings("deprecation") // TODO How to do this in hadoop 0.23??
 	URI[] cacheFiles = DistributedCache.getCacheFiles(conf);
 	if (cacheFiles != null) {
 	    for (URI cacheFile : cacheFiles) {

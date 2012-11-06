@@ -85,7 +85,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	    System.exit(1);
 	}
 
-	Job job = new Job(getConf());
+	Job job = Job.getInstance(getConf());
 	job.setJarByClass(TripleIndexGenerator.class);
 	job.setJobName("TripleIndexGenerator" + System.currentTimeMillis());
 

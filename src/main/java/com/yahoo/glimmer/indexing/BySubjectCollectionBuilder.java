@@ -13,7 +13,7 @@ package com.yahoo.glimmer.indexing;
 
 import it.unimi.di.mg4j.document.DocumentCollectionBuilder;
 import it.unimi.di.mg4j.document.IdentityDocumentFactory;
-import it.unimi.di.mg4j.io.HDFSIOFactory;
+import it.unimi.di.mg4j.io.HadoopFileSystemIOFactory;
 import it.unimi.di.mg4j.io.IOFactory;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.lang.MutableString;
@@ -116,7 +116,7 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	    String collectionBase = new Path(outputPath, COLLECTION_PREFIX).toString();
 	    
 	    FileSystem fs = FileSystem.get(job.getConfiguration());
-	    IOFactory ioFactory = new HDFSIOFactory(fs);
+	    IOFactory ioFactory = new HadoopFileSystemIOFactory(fs);
 	    builder = new StartOffsetDocumentCollectionBuilder(collectionBase, new IdentityDocumentFactory(), ioFactory);
 	    // Use the id for this task.  It's the same for all attempts of this task.
 	    builder.open(Integer.toString(job.getTaskAttemptID().getTaskID().getId()));
@@ -174,7 +174,7 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	    return 1;
 	}
 
-	Job job = new Job(getConf());
+	Job job = Job.getInstance(getConf());
 
 	job.setJarByClass(BySubjectCollectionBuilder.class);
 	job.setJobName("BySubjectCollectionBuilder" + System.currentTimeMillis());

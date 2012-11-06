@@ -76,7 +76,7 @@ public class ComputeHashTest {
 	expectations = new Expectations() {{
 		one(fs).getFileStatus(with(inPath));
 		will(returnValue(inPathStatus));
-		one(inPathStatus).isDir();
+		one(inPathStatus).isDirectory();
 		will(returnValue(false));
 		one(fs).getConf();
 		will(returnValue(new Configuration()));

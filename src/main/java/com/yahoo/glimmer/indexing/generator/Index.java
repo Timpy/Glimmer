@@ -18,7 +18,7 @@ import it.unimi.di.mg4j.index.DiskBasedIndex;
 import it.unimi.di.mg4j.index.IndexWriter;
 import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
 import it.unimi.di.mg4j.index.QuasiSuccinctIndexWriter;
-import it.unimi.di.mg4j.io.HDFSIOFactory;
+import it.unimi.di.mg4j.io.HadoopFileSystemIOFactory;
 import it.unimi.di.mg4j.io.IOFactory;
 import it.unimi.dsi.bits.Fast;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -81,7 +81,7 @@ public class Index {
 	    defaultStandardIndexFlags.remove(CompressionFlags.Component.COUNTS); // Quasi Succinct Indexes can't not have counts.
 	}
 	
-	IOFactory ioFactory = new HDFSIOFactory(fs);
+	IOFactory ioFactory = new HadoopFileSystemIOFactory(fs);
 	
 	indexWriter = new QuasiSuccinctIndexWriter(ioFactory, basename, numDocs, Fast.mostSignificantBit(QuasiSuccinctIndex.DEFAULT_QUANTUM), indexWriterCacheSize, defaultStandardIndexFlags, ByteOrder.nativeOrder());
     }

@@ -41,7 +41,7 @@ public class MapReducePartInputStreamEnumeration implements Enumeration<InputStr
 	codecIfAny = factory.getCodec(srcPath);
 
 	FileStatus srcFileStatus = fileSystem.getFileStatus(srcPath);
-	if (srcFileStatus.isDir()) {
+	if (srcFileStatus.isDirectory()) {
 	    // returns FileStatus objects sorted by filename.
 	    String partFilenamePattern = "part-?-?????";
 	    if (codecIfAny != null) {
