@@ -462,26 +462,26 @@ function buildCollection () {
 	${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/collection" "${LOCAL_BUILD_DIR}"
 }
 
-groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep ${SUBINDICES}
-computeHashes ${DFS_BUILD_DIR}/prep/all
+#groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep ${SUBINDICES}
+#computeHashes ${DFS_BUILD_DIR}/prep/all
 
-getDocCount ${DFS_BUILD_DIR}/prep
+#getDocCount ${DFS_BUILD_DIR}/prep
 
-generateIndex ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
-getSubIndexes horizontal
-mergeSubIndexes horizontal
+#generateIndex ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
+#getSubIndexes horizontal
+#mergeSubIndexes horizontal
 
-generateIndex ${DFS_BUILD_DIR}/prep vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
-getSubIndexes vertical
-mergeSubIndexes vertical
+#generateIndex ${DFS_BUILD_DIR}/prep vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
+#getSubIndexes vertical
+#mergeSubIndexes vertical
 
 # These could be run in parallel with index generation.
-generateDocSizes ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS}
+#generateDocSizes ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS}
 
 buildCollection ${DFS_BUILD_DIR}/prep
 
-${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
-${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.smap" "${LOCAL_BUILD_DIR}"
+#${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
+#${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.smap" "${LOCAL_BUILD_DIR}"
 
 echo Done. Index files are here ${LOCAL_BUILD_DIR}
 

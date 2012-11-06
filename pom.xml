@@ -12,7 +12,8 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<hadoop.version>0.20.205.0</hadoop.version>
+<!-- 		<hadoop.version>0.20.205.0</hadoop.version> -->
+		<hadoop.version>0.23.3</hadoop.version>
 	</properties>
 
 	<build>
@@ -58,24 +59,15 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-core</artifactId>
+			<artifactId>hadoop-common</artifactId>
 			<version>${hadoop.version}</version>
 			<scope>provided</scope>
-			<exclusions>
-				<exclusion>
-					<!-- Hadoop includes version 1.6 which doesn't have the method PropertiesConfigurationLayout.setGlobalSeparator(String) -->
-					<groupId>commons-collections</groupId>
-					<artifactId>commons-collections</artifactId>
-				</exclusion>
-				<exclusion>
-					<artifactId>jetty</artifactId>
-					<groupId>org.mortbay.jetty</groupId>
-				</exclusion>
-				<exclusion>
-					<artifactId>jsp-api-2.1</artifactId>
-					<groupId>org.mortbay.jetty</groupId>
-				</exclusion>
-			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+			<artifactId>hadoop-client</artifactId>
+			<version>${hadoop.version}</version>
+			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.semanticweb.yars</groupId>

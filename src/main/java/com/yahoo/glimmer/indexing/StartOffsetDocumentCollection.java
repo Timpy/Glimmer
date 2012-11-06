@@ -15,8 +15,9 @@ import it.unimi.di.mg4j.document.AbstractDocumentCollection;
 import it.unimi.di.mg4j.document.Document;
 import it.unimi.di.mg4j.document.DocumentCollection;
 import it.unimi.di.mg4j.document.DocumentFactory;
+import it.unimi.di.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMaps;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -41,20 +42,23 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
     private int subListSize = DEFAULT_SUBLIST_SIZE;
 
     private final ArrayList<OffsetsList> offsetsLists = new ArrayList<OffsetsList>();
-    private DocumentFactory factory;
+    private final String name; 
+    private final DocumentFactory documentFactory;
     private int size;
     private transient FileChannel channel;
 
-    public StartOffsetDocumentCollection(DocumentFactory factory) {
-	this.factory = factory;
+    public StartOffsetDocumentCollection(String name, DocumentFactory documentFactory) {
+	this.name = new File(name).getName();
+	this.documentFactory = documentFactory;
     }
 
     @Override
-    public void filename(CharSequence filename) throws IOException {
-	initFiles(new File(filename.toString()));
+    public void filename(CharSequence absolutePathToAFileInTheCollection) throws IOException {
+	initFiles(new File(absolutePathToAFileInTheCollection.toString()).getParentFile());
     }
-    
-    private void initFiles(File documentsFile) throws FileNotFoundException {
+
+    private void initFiles(File absolutePathToCollection) throws FileNotFoundException {
+	File documentsFile = new File( absolutePathToCollection, name + DOCUMENTS_EXTENSION);
 	FileInputStream documentsInputStream = new FileInputStream(documentsFile);
 	channel = documentsInputStream.getChannel();
     }
@@ -66,7 +70,9 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 
     @Override
     public Document document(int index) throws IOException {
-	return factory.getDocument(stream(index), metadata(index));
+	InputStream stream = stream(index);
+	Reference2ObjectMap<Enum<?>, Object> metadata = getMetadata(stream);
+	return documentFactory.getDocument(stream, metadata);
     }
 
     @Override
@@ -88,10 +94,33 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 	return new ByteArrayInputStream(byteBuffer.array());
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public Reference2ObjectMap<Enum<?>, Object> metadata(int index) throws IOException {
-	return Reference2ObjectMaps.EMPTY_MAP;
+	return getMetadata(stream(index));
+    }
+    
+    private Reference2ObjectMap<Enum<?>, Object> getMetadata(InputStream stream) throws IOException {
+	Reference2ObjectOpenHashMap<Enum<?>, Object> metadata = new Reference2ObjectOpenHashMap<Enum<?>, Object>();
+	
+	// TODO Why is this not picked up from the factories metadata?
+	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.ENCODING, "UTF-8");
+	
+	// read the title from the stream.
+	byte[] buffer = new byte[4096];
+	int pos = 0;
+	int b = stream.read();
+	// Cludge.  Really the DocumentFactory should extract the title from the stream and do it without treating ints as chars.
+	while (b != -1 && b != '\t') {
+	    buffer[pos++] = (byte) b;
+	    b = stream.read();
+	}
+	if (b == -1) {
+	    throw new IllegalStateException("Could not read from stream!");
+	}
+	
+	String title = new String(buffer, 0, pos, "UTF-8");
+	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.TITLE, title);
+	return metadata;
     }
 
     @Override
@@ -101,7 +130,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 
     @Override
     public DocumentFactory factory() {
-	return factory;
+	return documentFactory;
     }
 
     private int getOffset(int index) {

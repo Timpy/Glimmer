@@ -30,6 +30,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.mapreduce.TaskInputOutputContext;
+import org.apache.hadoop.mapreduce.TaskType;
 import org.jmock.Expectations;
 import org.jmock.Mockery;
 import org.jmock.lib.legacy.ClassImposteriser;
@@ -46,7 +47,7 @@ public class IndexRecordWriterTest {
     private TaskInputOutputContext<?, ?, ?, ?> taskContext;
     private Configuration conf;
     private FileSystem fs = new RawLocalFileSystem();
-    private TaskAttemptID taskAttemptID = new TaskAttemptID("taskId", 8, false, 88, 888);
+    private TaskAttemptID taskAttemptID = new TaskAttemptID("taskId", 8, TaskType.REDUCE, 88, 888);
 
     @Before
     public void before() throws IOException, URISyntaxException {

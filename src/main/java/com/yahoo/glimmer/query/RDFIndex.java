@@ -34,6 +34,7 @@ import it.unimi.di.mg4j.index.DiskBasedIndex;
 import it.unimi.di.mg4j.index.Index;
 import it.unimi.di.mg4j.index.Index.UriKeys;
 import it.unimi.di.mg4j.index.IndexIterator;
+import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
 import it.unimi.di.mg4j.index.TermProcessor;
 import it.unimi.di.mg4j.query.QueryEngine;
 import it.unimi.di.mg4j.query.SelectedInterval;
@@ -178,9 +179,7 @@ public class RDFIndex {
 		String[] fileNames = collectionFile.list(new FilenameFilter() {
 		    @Override
 		    public boolean accept(File dir, String name) {
-			if (name.endsWith(".collection"))
-			    return true;
-			return false;
+			return name.endsWith(".collection") || name.endsWith(".sos");
 		    }
 		});
 
@@ -205,7 +204,7 @@ public class RDFIndex {
 			    collections[i] = loadDocumentCollection(file);
 			} catch (Error e) {
 			    LOGGER.fatal("Exception loading sub collection " + (i + 1) + " of " + fileNames.length);
-			    throw(e);
+			    throw (e);
 			}
 		    }
 		    documentCollection = new InstantiatableConcatenatedDocumentCollection(names, collections);
@@ -310,15 +309,15 @@ public class RDFIndex {
 		return predicateDistribution.get(b).compareTo(predicateDistribution.get(a));
 	    }
 	});
-	
+
 	allPredicatesOrdered = Collections.unmodifiableList(allPredicatesOrdered);
-	
+
 	// We need to maintain insertion order and test inclusion.
 	LinkedHashMap<String, String> fieldNameSuffixToFieldNameOrderedMap = new LinkedHashMap<String, String>();
 	fieldNameSuffixToFieldNameOrderedMap.put(SUBJECT_INDEX_KEY, SUBJECT_INDEX_KEY);
 	fieldNameSuffixToFieldNameOrderedMap.put(PREDICATE_INDEX_KEY, PREDICATE_INDEX_KEY);
 	fieldNameSuffixToFieldNameOrderedMap.put(OBJECT_INDEX_KEY, OBJECT_INDEX_KEY);
-	
+
 	for (String fullName : allPredicatesOrdered) {
 	    fullName = Util.encodeFieldName(fullName);
 	    int i = fullName.length();
@@ -336,11 +335,11 @@ public class RDFIndex {
 	    }
 	    fieldNameSuffixToFieldNameOrderedMap.put(suffix, fullName);
 	}
-	
+
 	RDFIndexStatisticsBuilder statsBuilder = new RDFIndexStatisticsBuilder();
 	statsBuilder.setSortedPredicates(fieldNameSuffixToFieldNameOrderedMap);
 	statsBuilder.setTypeTermDistribution(typeTermDistribution);
-	
+
 	// Load the ontology if provided
 	if (context.getOntoPath() != null) {
 	    try {
@@ -354,7 +353,7 @@ public class RDFIndex {
 		throw new RDFIndexException("Ontology file not found:" + context.getOntoPath());
 	    } catch (IOException e) {
 		throw new RDFIndexException("Reading file " + context.getOntoPath(), e);
-	    } 
+	    }
 	}
 	stats = statsBuilder.build();
 
@@ -386,7 +385,8 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), allPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_INDEX_KEY, termProcessors, allResourcesToIds);
+	parser = new RDFQueryParser(getAlignmentIndex(), allPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_INDEX_KEY, termProcessors,
+		allResourcesToIds);
     }
 
     private Object2ReferenceMap<String, Index> loadIndexesFromDir(File indexDir, boolean loadDocSizes, boolean inMemory) throws RDFIndexException {
@@ -556,6 +556,8 @@ public class RDFIndex {
 	Index subjectIndex = getSubjectIndex();
 	if (subjectIndex instanceof BitStreamIndex) {
 	    subjectTermMap = ((BitStreamIndex) subjectIndex).termMap;
+	} else if (subjectIndex instanceof QuasiSuccinctIndex) {
+		subjectTermMap = ((QuasiSuccinctIndex) subjectIndex).termMap;
 	} else {
 	    throw new IllegalStateException("Subject index is not a BitStreamIndex. Don't know how to get its termMap.");
 	}
@@ -611,14 +613,16 @@ public class RDFIndex {
 
     /**
      * 
-     * @param uri - Resource or BNode
+     * @param uri
+     *            - Resource or BNode
      * @return the doc id if the given uri is a valid doc uri.
-     * @throws IOException 
+     * @throws IOException
      */
     public Integer getSubjectId(String uri) throws IOException {
 	Long id = allResourcesToIds.get(uri);
 	if (id != null) {
-	    // Check that the doc is a valid doc(has contents)..  TODO could use the subjects signed hash here..
+	    // Check that the doc is a valid doc(has contents).. TODO could use
+	    // the subjects signed hash here..
 	    Document doc = documentCollection.document(id.intValue());
 	    if (doc.title().length() == 0) {
 		id = null;
@@ -627,10 +631,10 @@ public class RDFIndex {
 	}
 	return id == null ? null : id.intValue();
     }
-    
+
     public Integer getObjectID(String uri) {
 	Long id = allResourcesToIds.get(uri);
-	return id == null ? null :id.intValue();
+	return id == null ? null : id.intValue();
     }
 
     public DocumentCollection getCollection() {
@@ -674,7 +678,8 @@ public class RDFIndex {
 	return parser;
     }
 
-    public int process(final int offset, final int length, final ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results, final Query ... queries) throws QueryBuilderVisitorException, IOException {
+    public int process(final int offset, final int length, final ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results,
+	    final Query... queries) throws QueryBuilderVisitorException, IOException {
 	return queryEngine.copy().process(queries, offset, length, results);
     }
 
@@ -696,25 +701,29 @@ public class RDFIndex {
     }
 
     private Map<String, Integer> getTermDistribution(Index index, boolean termsAreResourceIds) throws IOException {
+	StringMap<? extends CharSequence> termMap;
 	if (index instanceof BitStreamIndex) {
-	    StringMap<? extends CharSequence> termMap = ((BitStreamIndex) index).termMap;
-
-	    Map<String, Integer> histogram = new HashMap<String, Integer>();
-
-	    for (CharSequence term : termMap.list()) {
-		long docId = termMap.get(term);
-		IndexIterator it = index.documents(((int) docId));
-		if (termsAreResourceIds) {
-		    int termAsId = Integer.parseInt(term.toString());
-		    histogram.put(lookupResourceById(termAsId), it.frequency());
-		} else {
-		    histogram.put(term.toString(), it.frequency());
-		}
-		it.dispose();
-	    }
-	    return histogram;
+	    termMap = ((BitStreamIndex) index).termMap;
+	} else if (index instanceof QuasiSuccinctIndex) {
+	    termMap = ((QuasiSuccinctIndex) index).termMap;
+	} else {
+	    throw new IllegalArgumentException("Index is not a BitStreamIndex");
 	}
-	throw new IllegalArgumentException("Index is not a BitStreamIndex");
+
+	Map<String, Integer> histogram = new HashMap<String, Integer>();
+
+	for (CharSequence term : termMap.list()) {
+	    long docId = termMap.get(term);
+	    IndexIterator it = index.documents(((int) docId));
+	    if (termsAreResourceIds) {
+		int termAsId = Integer.parseInt(term.toString());
+		histogram.put(lookupResourceById(termAsId), it.frequency());
+	    } else {
+		histogram.put(term.toString(), it.frequency());
+	    }
+	    it.dispose();
+	}
+	return histogram;
     }
 
     public static class RDFIndexException extends Exception {
@@ -740,7 +749,7 @@ public class RDFIndex {
     public Integer getDocumentSize(int docId) {
 	return getSubjectIndex().sizes.get(docId);
     }
-    
+
     public Set<String> getIndexedPredicates() {
 	return verticalPredicates;
     }

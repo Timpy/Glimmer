@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Reducer.Context;
@@ -31,6 +32,7 @@ import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 public class TermReduceTest {
     private Mockery context;
     private Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue>.Context reducerContext;
+    private Configuration reducerConf;
 
     @SuppressWarnings("unchecked")
     @Before
@@ -38,11 +40,14 @@ public class TermReduceTest {
 	context = new Mockery();
 	context.setImposteriser(ClassImposteriser.INSTANCE);
 	reducerContext = context.mock(Context.class, "reducerContext");
+	reducerConf = new Configuration();
     }
 
     @Test
     public void treeTermsTest() throws Exception {
 	context.checking(new Expectations() {{
+	    allowing(reducerContext).getConfiguration();
+	    	will(returnValue(reducerConf));
 	    allowing(reducerContext).setStatus(with(any(String.class)));
 	    one(reducerContext).write(
 		    with(new IntWritable(0)),

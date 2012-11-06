@@ -24,17 +24,19 @@ import java.io.OutputStream;
 
 public class StartOffsetDocumentCollectionBuilder implements DocumentCollectionBuilder {
     private final String basename;
-    private final DocumentFactory factory;
+    private final DocumentFactory documentFactory;
     private final IOFactory ioFactory;
     
     private StartOffsetDocumentCollection collection;
     private ByteCountOutputStream documentsOutputStream;
     private OutputStream offsetsOutputStream;
+    private MutableString ms;
     
-    public StartOffsetDocumentCollectionBuilder(String basename, DocumentFactory factory, IOFactory ioFactory) {
+    public StartOffsetDocumentCollectionBuilder(String basename, DocumentFactory documentFactory, IOFactory ioFactory) {
 	this.basename = basename;
-	this.factory = factory;
+	this.documentFactory = documentFactory;
 	this.ioFactory = ioFactory;
+	ms = new MutableString();
     }
     
     @Override
@@ -44,9 +46,10 @@ public class StartOffsetDocumentCollectionBuilder implements DocumentCollectionB
 
     @Override
     public void open(CharSequence suffix) throws IOException {
-	collection = new StartOffsetDocumentCollection(factory);
-	
 	String basenameSuffixed = basename + suffix;
+	
+	collection = new StartOffsetDocumentCollection(basenameSuffixed, documentFactory);
+	
 	String documentsFilename = basenameSuffixed + StartOffsetDocumentCollection.DOCUMENTS_EXTENSION;
 	documentsOutputStream = new ByteCountOutputStream(ioFactory.getOutputStream(documentsFilename));
 	
@@ -57,6 +60,10 @@ public class StartOffsetDocumentCollectionBuilder implements DocumentCollectionB
     @Override
     public void startDocument(CharSequence title, CharSequence uri) throws IOException {
 	collection.addOffset(documentsOutputStream.getByteCount());
+	ms.setLength(0);
+	ms.append(title);
+	ms.append('\t');
+	ms.writeUTF8(documentsOutputStream);
     }
 
     @Override

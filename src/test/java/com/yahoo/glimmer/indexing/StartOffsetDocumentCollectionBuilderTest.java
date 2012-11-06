@@ -23,14 +23,10 @@ import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 import it.unimi.dsi.lang.MutableString;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.io.Reader;
 import java.nio.CharBuffer;
 
@@ -45,9 +41,8 @@ public class StartOffsetDocumentCollectionBuilderTest {
     private DocumentFactory documentFactory;
     private IOFactory ioFactory;
     private StartOffsetDocumentCollectionBuilder builder;
-    private ByteArrayOutputStream documentsOutputStream;
-    private InputStream offsetsInStream;
-    private OutputStream offsetsOutputStream;
+    private String basename;
+    private File sysTmp;
     
     @Before
     public void before() throws IOException {
@@ -61,39 +56,45 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	
 	ioFactory = context.mock(IOFactory.class);
 	
-	builder = new StartOffsetDocumentCollectionBuilder("BaseName", documentFactory, ioFactory);
-	
-	documentsOutputStream = new ByteArrayOutputStream(4096);
-	offsetsInStream = new PipedInputStream(4096);
-	offsetsOutputStream = new PipedOutputStream((PipedInputStream)offsetsInStream);
+	sysTmp = new File(System.getProperty("java.io.tmpdir"));
+	basename = new File(sysTmp, StartOffsetDocumentCollectionBuilderTest.class.getSimpleName() + (System.currentTimeMillis() % 100000)).toString();
+	builder = new StartOffsetDocumentCollectionBuilder(basename, documentFactory, ioFactory);
     }
     
     @Test
     public void test() throws IOException, ClassNotFoundException {
+	File tempDocumentsFile = new File(basename + "-suffix" + StartOffsetDocumentCollection.DOCUMENTS_EXTENSION);
+	tempDocumentsFile.deleteOnExit();
+	final FileOutputStream documentsOutputStream = new FileOutputStream(tempDocumentsFile);
+	
+	File tempOffsetsFile = new File(basename + "-suffix"+ StartOffsetDocumentCollection.START_OFFSETS_EXTENSION);
+	tempOffsetsFile.deleteOnExit();
+	final FileOutputStream offsetsOutputStream = new FileOutputStream(tempOffsetsFile);
+	
 	context.checking(new Expectations() {{
-	    one(ioFactory).getOutputStream("BaseNameSuffix.documents");
+	    one(ioFactory).getOutputStream(basename + "-suffix.documents");
 	    will(returnValue(documentsOutputStream));
-	    one(ioFactory).getOutputStream("BaseNameSuffix.sos");
+	    one(ioFactory).getOutputStream(basename + "-suffix.sos");
 	    will(returnValue(offsetsOutputStream));
 	}});
 	
-	builder.open("Suffix");
+	builder.open("-suffix");
 	MutableString nonWord = new MutableString(" ");
 	
-	builder.startDocument(null, null);
+	builder.startDocument("Doc1", "URI1");
 	builder.add(new MutableString("A"), nonWord);
 	builder.add(new MutableString("Document"), nonWord);
 	builder.endDocument();
-	builder.startDocument(null, null);
+	builder.startDocument("Doc2", "URI2");
 	builder.add(new MutableString("Another"), nonWord);
 	builder.add(new MutableString("document"), nonWord);
 	builder.endDocument();
-	builder.startDocument(null, null);
+	builder.startDocument("Doc3", "URI3");
 	builder.add(new MutableString("The"), nonWord);
 	builder.add(new MutableString("third"), nonWord);
 	builder.add(new MutableString("document"), nonWord);
 	builder.endDocument();
-	builder.startDocument(null, null);
+	builder.startDocument("Doc4", "URI4");
 	builder.add(new MutableString("Something completely different."), nonWord);
 	builder.endDocument();
 	
@@ -101,21 +102,25 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals("A Document Another document The third document Something completely different. ", new String(documentsOutputStream.toByteArray(), 0, documentsOutputStream.size(), "UTF-8"));
+	documentsOutputStream.flush();
+	offsetsOutputStream.flush();
+
+	// Check contents of .documents file.
+	FileInputStream documentsInputStream = new FileInputStream(tempDocumentsFile);
+	byte[] buffer = new byte[4096];
+	int byteCount = documentsInputStream.read(buffer);
+	assertEquals("Doc1\tA Document Doc2\tAnother document Doc3\tThe third document Doc4\tSomething completely different. ", new String(buffer, 0, byteCount, "UTF-8"));
 	
-	// Write the document collection to a temp file for loading into the collection once it's been de-serialized.
-	File tempDocumentsFile = File.createTempFile(StartOffsetDocumentCollectionBuilderTest.class.getSimpleName(), Long.toString(System.currentTimeMillis()));
-	tempDocumentsFile.deleteOnExit();
-	FileOutputStream tempOutputStream = new FileOutputStream(tempDocumentsFile);
-	tempOutputStream.write(documentsOutputStream.toByteArray(), 0, documentsOutputStream.size());
+	FileInputStream offsetsInputStream = new FileInputStream(tempOffsetsFile);
 	
-	Object object = BinIO.loadObject(offsetsInStream);
+	Object object = BinIO.loadObject(offsetsInputStream);
 	assertTrue(object instanceof StartOffsetDocumentCollection);
 	StartOffsetDocumentCollection collection = (StartOffsetDocumentCollection)object;
-	collection.filename(tempDocumentsFile.getAbsolutePath());
+	collection.filename(tempOffsetsFile.getAbsolutePath());
 	
 	CharBuffer contentBuffer = CharBuffer.allocate(4096);
 	Document document = collection.document(0);
+	assertEquals("Doc1", document.title());
 	Object content = document.content(0);
 	assertTrue(content instanceof Reader);
 	Reader contentReader = (Reader) content;
@@ -125,6 +130,7 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	
 	contentBuffer.clear();
 	document = collection.document(1);
+	assertEquals("Doc2", document.title());
 	content = document.content(0);
 	assertTrue(content instanceof Reader);
 	contentReader = (Reader) content;
@@ -134,6 +140,7 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	
 	contentBuffer.clear();
 	document = collection.document(2);
+	assertEquals("Doc3", document.title());
 	content = document.content(0);
 	assertTrue(content instanceof Reader);
 	contentReader = (Reader) content;
@@ -143,6 +150,7 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	
 	contentBuffer.clear();
 	document = collection.document(3);
+	assertEquals("Doc4", document.title());
 	content = document.content(0);
 	assertTrue(content instanceof Reader);
 	contentReader = (Reader) content;
