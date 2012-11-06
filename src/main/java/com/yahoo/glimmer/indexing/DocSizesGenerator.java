@@ -33,7 +33,6 @@ import org.apache.hadoop.io.RawComparator;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
-import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -414,7 +413,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    System.exit(1);
 	}
 
-	Job job = Job.getInstance(new JobConf(getConf()));
+	Job job = Job.getInstance(getConf());
 	job.setJarByClass(DocSizesGenerator.class);
 
 	job.setJobName("DocSizesGenerator" + System.currentTimeMillis());
