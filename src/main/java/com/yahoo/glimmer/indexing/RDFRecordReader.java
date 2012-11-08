@@ -53,7 +53,7 @@ public class RDFRecordReader extends RecordReader<LongWritable, RDFDocument> {
 
 	Configuration job = context.getConfiguration();
 
-	this.maxLineLength = job.getInt("mapred.linerecordreader.maxlength", Integer.MAX_VALUE);
+	this.maxLineLength = job.getInt("mapreduce.input.linerecordreader.line.maxlength", Integer.MAX_VALUE);
 	start = split.getStart();
 	end = start + split.getLength();
 	final Path file = split.getPath();

@@ -160,14 +160,14 @@ function groupBySubject () {
 	
 	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.PrepTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
-		-Dmapred.map.tasks.speculative.execution=true \
+		-Dmapreduce.map.speculative=true \
 		-Dmapred.child.java.opts=-Xmx800m \
-		-Dmapred.job.map.memory.mb=2000 \
-		-Dmapred.job.reduce.memory.mb=2000 \
-		-Dmapred.reduce.tasks=1 \
+		-Dmapreduce.map.memory.mb=2000 \
+		-Dmapreduce.reduce.memory.mb=2000 \
+		-Dmapreduce.job.reduces=1 \
 		-Dmapred.output.compression.codec=${COMPRESSION_CODEC} \
 		-Dmapred.output.compress=false \
-		-Dmapred.job.queue.name=${QUEUE} \
+		-Dmapreduce.job.queuename=${QUEUE} \
 		${HADOOP_FILES} \
 		${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${PREP_DIR}"
 	echo ${CMD}
@@ -256,13 +256,13 @@ function generateIndex () {
 	echo Generating index..
 	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.generator.TripleIndexGenerator \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
-		-Dmapred.map.tasks.speculative.execution=true \
-		-Dmapred.reduce.tasks=${SUBINDICES} \
+		-Dmapreduce.map.speculative=true \
+		-Dmapreduce.job.reduces=${SUBINDICES} \
 		-Dmapred.child.java.opts=-Xmx900m \
-		-Dmapred.job.map.memory.mb=2000 \
-		-Dmapred.job.reduce.memory.mb=2000 \
-		-Dio.sort.mb=128 \
-		-Dmapred.job.queue.name=${QUEUE} \
+		-Dmapreduce.map.memory.mb=2000 \
+		-Dmapreduce.reduce.memory.mb=2000 \
+		-Dmapreduce.task.io.sort.mb=128 \
+		-Dmapreduce.job.queuename=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
@@ -391,14 +391,10 @@ function generateDocSizes () {
 	REDUCE_TASKS=$(( 1 + ${NUMBER_OF_DOCS} / 10000000 ))
 	
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.DocSizesGenerator \
-		-Dmapred.max.map.failures.percent=1 \
-		-Dmapred.map.tasks.speculative.execution=true \
-		-Dmapred.reduce.tasks=${REDUCE_TASKS} \
-		-Dmapred.child.java.opts=-Xmx800m \
-		-Dmapred.job.map.memory.mb=2000 \
-		-D=mapred.job.reduce.memory.mb=2000 \
-		-Dio.sort.mb=128 \
-		-Dmapred.job.queue.name=${QUEUE} \
+		-Dmapreduce.map.failures.maxpercent=1 \
+		-Dmapreduce.map.speculative=true \
+		-Dmapreduce.job.reduces=${REDUCE_TASKS} \
+		-Dmapreduce.job.queuename=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} -p ${PREP_DIR}/predicate ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
@@ -444,11 +440,11 @@ function buildCollection () {
 	# Probably best to keep the number of mappers low (5-20) at the expense of runtime.
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.BySubjectCollectionBuilder \
 		-Dmapred.map.max.attempts=2 \
-		-Dmapred.map.tasks.speculative.execution=false \
+		-Dmapreduce.map.speculative=false \
 		-Dmapred.child.java.opts=-Xmx900m \
-		-Dmapred.job.map.memory.mb=2000 \
-		-Dmapred.job.reduce.memory.mb=2000 \
-		-Dmapred.job.queue.name=${QUEUE} \
+		-Dmapreduce.map.memory.mb=2000 \
+		-Dmapreduce.reduce.memory.mb=2000 \
+		-Dmapreduce.job.queuename=${QUEUE} \
 		-Dmapred.min.split.size=2500000000 \
 		${PREP_DIR}/bySubject ${COLLECTION_DIR}"
 	echo ${CMD}
@@ -462,26 +458,26 @@ function buildCollection () {
 	${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/collection" "${LOCAL_BUILD_DIR}"
 }
 
-#groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep ${SUBINDICES}
-#computeHashes ${DFS_BUILD_DIR}/prep/all
+groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep ${SUBINDICES}
+computeHashes ${DFS_BUILD_DIR}/prep/all
 
-#getDocCount ${DFS_BUILD_DIR}/prep
+getDocCount ${DFS_BUILD_DIR}/prep
 
-#generateIndex ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
-#getSubIndexes horizontal
-#mergeSubIndexes horizontal
+generateIndex ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
+getSubIndexes horizontal
+mergeSubIndexes horizontal
 
-#generateIndex ${DFS_BUILD_DIR}/prep vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
-#getSubIndexes vertical
-#mergeSubIndexes vertical
+generateIndex ${DFS_BUILD_DIR}/prep vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
+getSubIndexes vertical
+mergeSubIndexes vertical
 
 # These could be run in parallel with index generation.
-#generateDocSizes ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS}
+generateDocSizes ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS}
 
 buildCollection ${DFS_BUILD_DIR}/prep
 
-#${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
-#${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.smap" "${LOCAL_BUILD_DIR}"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.smap" "${LOCAL_BUILD_DIR}"
 
 echo Done. Index files are here ${LOCAL_BUILD_DIR}
 

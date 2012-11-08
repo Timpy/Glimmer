@@ -456,7 +456,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}
 
-	conf.setInt("mapred.linerecordreader.maxlength", 10000);
+	conf.setInt("mapreduce.input.linerecordreader.line.maxlength", 10000);
 
 	boolean success = job.waitForCompletion(true);
 
