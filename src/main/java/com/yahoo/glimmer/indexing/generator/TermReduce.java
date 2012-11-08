@@ -15,45 +15,26 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
 
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue> {
-    private static final Log LOG = LogFactory.getLog(TermReduce.class);
-    
     public static final String MAX_INVERTEDLIST_SIZE_PARAMETER = "maxInvertiedListSize";
     public static final String MAX_POSITIONLIST_SIZE_PARAMETER = "maxPositionListSize";
     
-    private static final int DEFAULT_MAX_INVERTEDLIST_SIZE = 50000000;
-    private static final int DEFAULT_MAX_POSITIONLIST_SIZE = 1000000;
-
-    private int maxInvertiedListSize;
-    private int maxPositionListSize;
-
     private IntWritable writerKey;
     private IndexRecordWriterTermValue writerTermValue;
     private IndexRecordWriterDocValue writerDocValue;
     private ArrayList<Integer> predicatedIds;
 
-    private enum Counters {
-	POSTINGLIST_SIZE_OVERFLOW, POSITIONLIST_SIZE_OVERFLOW, POSITIONLIST_SIZE_OVERFLOW_TIMES
-    }
-
     @Override
     protected void setup(org.apache.hadoop.mapreduce.Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue>.Context context) throws IOException,
 	    InterruptedException {
-	// The objects we pass to the writer are reused for every call to
-	// context.write()
-	maxInvertiedListSize = context.getConfiguration().getInt(MAX_INVERTEDLIST_SIZE_PARAMETER, DEFAULT_MAX_INVERTEDLIST_SIZE);
-	maxPositionListSize = context.getConfiguration().getInt(MAX_POSITIONLIST_SIZE_PARAMETER, DEFAULT_MAX_POSITIONLIST_SIZE);
-
 	writerKey = new IntWritable();
 	writerTermValue = new IndexRecordWriterTermValue();
-	writerDocValue = new IndexRecordWriterDocValue(maxPositionListSize);
+	writerDocValue = new IndexRecordWriterDocValue();
 	predicatedIds = new ArrayList<Integer>();
     };
 
@@ -117,8 +98,6 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 
 	    context.write(writerKey, writerTermValue);
 
-	    boolean tooManyOccurrences = false;
-	    int writtenDocs = 0;
 	    TermValue prevValue = new TermValue();
 	    prevValue.set(value);
 
@@ -129,25 +108,12 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 			// New document, write out previous postings
 			writerDocValue.setDocument(prevValue.getV1());
 			context.write(writerKey, writerDocValue);
-			writtenDocs++;
-
-			if (writtenDocs >= maxInvertiedListSize) {
-			    context.getCounter(Counters.POSTINGLIST_SIZE_OVERFLOW).increment(1);
-			    LOG.warn("More than " + maxInvertiedListSize + " documents for term " + key.getTerm());
-			    break;
-			}
 
 			// The first occerrence of this docId/
 			writerDocValue.clearOccerrences();
 			writerDocValue.addOccurrence(value.getV2());
 		    } else {
-			boolean addOccurrenceOkay = writerDocValue.addOccurrence(value.getV2());
-
-			if (!addOccurrenceOkay && !tooManyOccurrences) {
-			    System.err.println("More than " + maxPositionListSize + " positions for term " + key.getTerm());
-			    context.getCounter(Counters.POSITIONLIST_SIZE_OVERFLOW).increment(1);
-			    tooManyOccurrences = true;
-			}
+			writerDocValue.addOccurrence(value.getV2());
 		    }
 		} else {
 		    throw new IllegalStateException("Got a " + value.getType() + " value when expecting only " + Type.OCCURRENCE);
@@ -178,11 +144,6 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 		    writerDocValue.clearOccerrences();
 		    value = null;
 		}
-	    }
-
-	    if (writtenDocs >= maxInvertiedListSize) {
-		context.getCounter(Counters.POSTINGLIST_SIZE_OVERFLOW).increment(1);
-		LOG.warn("More than " + maxInvertiedListSize + " documents for term " + key.getTerm());
 	    }
 	}
     }

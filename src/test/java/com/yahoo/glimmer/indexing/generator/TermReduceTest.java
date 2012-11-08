@@ -199,7 +199,7 @@ public class TermReduceTest {
 	private final IndexRecordWriterDocValue docValue;
 	
 	public IndexRecordWriterDocValueMatcher(int document, int ... occurrences) {
-	    docValue = new IndexRecordWriterDocValue(16);
+	    docValue = new IndexRecordWriterDocValue(1);
 	    docValue.setDocument(document);
 	    for (int i = 0 ; i < occurrences.length ; i++) {
 		docValue.addOccurrence(occurrences[i]);

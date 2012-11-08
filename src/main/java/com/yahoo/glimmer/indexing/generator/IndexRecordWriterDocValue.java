@@ -20,10 +20,13 @@ public class IndexRecordWriterDocValue implements IndexRecordWriterValue {
     private int[] occurrences;
     private int occurrenceCount;
 
-    public IndexRecordWriterDocValue(int occurrencesBufferSize) {
-	occurrences = new int[occurrencesBufferSize];
+    public IndexRecordWriterDocValue() {
+	occurrences = new int[4096];
     }
-
+    public IndexRecordWriterDocValue(int initialOccurrencesSize) {
+	occurrences = new int[initialOccurrencesSize];
+    }
+    
     public int getDocument() {
 	return document;
     }
@@ -34,14 +37,15 @@ public class IndexRecordWriterDocValue implements IndexRecordWriterValue {
     /**
      * @param occurrence
      *            to add at next to end of list
-     * @return true if occurrence was added.
      */
-    public boolean addOccurrence(int occurrence) {
-	if (occurrenceCount >= occurrences.length) {
-	    return false;
+    public void addOccurrence(int occurrence) {
+	if (occurrenceCount == occurrences.length) {
+	    // expand array.
+	    int[] newOccurrences = new int[occurrences.length * 2];
+	    System.arraycopy(occurrences, 0, newOccurrences, 0, occurrences.length);
+	    occurrences = newOccurrences;
 	}
 	occurrences[occurrenceCount++] = occurrence;
-	return true;
     }
 
     public boolean hasOccurrence() {

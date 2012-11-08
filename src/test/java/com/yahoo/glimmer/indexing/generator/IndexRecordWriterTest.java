@@ -88,7 +88,7 @@ public class IndexRecordWriterTest {
 	
 	IntWritable key = new IntWritable();
 	IndexRecordWriterTermValue termValue = new IndexRecordWriterTermValue();
-	IndexRecordWriterDocValue docValue = new IndexRecordWriterDocValue(16);
+	IndexRecordWriterDocValue docValue = new IndexRecordWriterDocValue();
 	
 	// ALIGNEMENT_INDEX
 	key.set(DocumentMapper.ALIGNMENT_INDEX);
