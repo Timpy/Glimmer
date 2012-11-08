@@ -83,7 +83,7 @@ public class PrepTool extends Configured implements Tool {
 	FileOutputFormat.setOutputPath(job, outputDir);
 
 	if (!job.waitForCompletion(true)) {
-	    System.err.print("Failed to process tuples from " + jsapResult.getString(INPUT_ARG));
+	    System.err.println("Failed to process tuples from " + jsapResult.getString(INPUT_ARG));
 	    return 1;
 	}
 

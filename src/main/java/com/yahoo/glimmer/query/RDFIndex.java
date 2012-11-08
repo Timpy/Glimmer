@@ -701,13 +701,15 @@ public class RDFIndex {
     }
 
     private Map<String, Integer> getTermDistribution(Index index, boolean termsAreResourceIds) throws IOException {
-	StringMap<? extends CharSequence> termMap;
+	StringMap<? extends CharSequence> termMap = null;
 	if (index instanceof BitStreamIndex) {
 	    termMap = ((BitStreamIndex) index).termMap;
 	} else if (index instanceof QuasiSuccinctIndex) {
 	    termMap = ((QuasiSuccinctIndex) index).termMap;
-	} else {
-	    throw new IllegalArgumentException("Index is not a BitStreamIndex");
+	}
+	
+	if (termMap == null) {
+	    throw new IllegalArgumentException("termMap is null. Index is for field:" + index.field + ". Index class is:" + index.getClass().getSimpleName());
 	}
 
 	Map<String, Integer> histogram = new HashMap<String, Integer>();
