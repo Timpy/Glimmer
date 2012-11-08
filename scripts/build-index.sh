@@ -39,8 +39,9 @@ PREP_FILTER_FILE=""
 N_VERTICAL_PREDICATES=200
 
 # To allow the use of commons-configuration version 1.8 over Hadoop's version 1.6 we export HADOOP_USER_CLASSPATH_FIRST=true
-# See https://issues.apache.org/jira/browse/MAPREDUCE-1938 and hadoop.apache.org/common/docs/r0.20.204.0/releasenotes.html
-export HADOOP_USER_CLASSPATH_FIRST=true
+# See https://issues.apache.org/jira/browse/MAPREDUCE-1938 and http://hadoop.apache.org/common/docs/r0.20.204.0/releasenotes.html
+# This is for hadoop 0.20.xx
+#export HADOOP_USER_CLASSPATH_FIRST=true
 
 #HADOOP_NAME_NODE="localhost:9000"
 HADOOP_NAME_NODE=""
@@ -48,6 +49,8 @@ DFS_ROOT_DIR="hdfs://${HADOOP_NAME_NODE}"
 DFS_USER_DIR="${DFS_ROOT_DIR}/user/${USER}"
 DFS_BUILD_DIR="${DFS_USER_DIR}/index-${BUILD_NAME}"
 LOCAL_BUILD_DIR="${HOME}/tmp/index-${BUILD_NAME}"
+
+QUEUE=${QUEUE:-default}
 
 PROJECT_JAR="../target/Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
 HADOOP_CACHE_FILES="../target/classes/blacklist.txt"
@@ -262,6 +265,7 @@ function generateIndex () {
 		-Dmapreduce.map.memory.mb=2000 \
 		-Dmapreduce.reduce.memory.mb=2000 \
 		-Dmapreduce.task.io.sort.mb=128 \
+		-Dmapreduce.job.user.classpath.first=true \
 		-Dmapreduce.job.queuename=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
