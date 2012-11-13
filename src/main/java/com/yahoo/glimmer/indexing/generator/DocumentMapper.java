@@ -27,10 +27,11 @@ import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, TermValue> {
-    public static final int ALIGNMENT_INDEX = -1; // special index for alignments
+    public static final int ALIGNMENT_INDEX = -1; // special index for
+						  // alignments
 
     enum Counters {
-	FAILED_PARSING, INDEXED_OCCURRENCES, NEGATIVE_PREDICATE_ID, NUMBER_OF_RECORDS
+	FAILED_PARSING, INDEXED_OCCURRENCES, NUMBER_OF_RECORDS
     }
 
     private String[] fields;
@@ -56,7 +57,7 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, T
 
 	// Iterate over all indices
 	for (int i = 0; i < fields.length; i++) {
-	    TermValue predicateIdValue = new TermValue(Type.PREDICATE_ID, i);
+	    TermValue indexIdValue = new TermValue(Type.INDEX_ID, i);
 
 	    String fieldName = fields[i];
 	    if (fieldName.startsWith("NOINDEX")) {
@@ -85,13 +86,14 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, T
 		    if (docStat == null) {
 			if (doc.getIndexType() == RDFDocumentFactory.IndexType.VERTICAL) {
 			    // For the Alignment Index, we write the predicate
-			    // id the first time we encounter a term.
+			    // id(Which is equal to the index id for a VERTICAL
+			    // index) the first time we encounter a term.
 			    // The 'Alignment Index' is an index without counts
 			    // or positions. It's used for query optimization in
 			    // the query parse. The resulting 'alignment index'
 			    // is basically used as a map from term to
 			    // predicates that term occures in.
-			    context.write(new TermKey(termString, ALIGNMENT_INDEX, predicateIdValue), predicateIdValue);
+			    context.write(new TermKey(termString, ALIGNMENT_INDEX, indexIdValue), indexIdValue);
 			}
 			docStat = new DocStat();
 			docStat.last = position;

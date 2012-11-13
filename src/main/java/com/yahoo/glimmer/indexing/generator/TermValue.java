@@ -20,47 +20,47 @@ import org.apache.hadoop.io.WritableComparable;
 /**
  * The value that is passed between the mapper and reducer.
  * 
- * Can represent different thing depending on how the document and position are
- * set.
- * 
- * If both document and position are set and are positive - The Occurrence is
- * the occurrence of keys term in the given document at the given position.
- * 
- * If both document and position are set but the position is negative - The
- * Occurrence represents the last position the term occurs at. Where the
- * position is the absolute value minus 1.
- * 
- * If document is not set, and the index is not the alignment index - The
- * position is the doc id. This is used to compute the term frequency(Document
- * containing this term).
- * 
- * If document is not set, and the index is the alignment index - The position
- * is index/predicate id.
- * 
- * 
+ * Can represent different thing depending the type
  * 
  * @author tep
- * 
  */
 public class TermValue implements WritableComparable<TermValue>, Cloneable {
-    // The order of this enum is important as it determines the order in which the values
-    // are give in the Reducers values Iterable.
+    /**
+     * TermValue Type. The order of this enum is important as it determines the
+     * order in which the values are give in the Reducers values Iterable.
+     */
     public enum Type {
-	DOC_STATS, 	// For every doc a DOC_STATS is written.  V1 = term occurrence count in doc. V2 = position of last term occurrence.
-	PREDICATE_ID, 	// For each unique term in a doc, a PREDICATE_ID is written.  V1 = the id of the index for the terms predicate. 
-	OCCURRENCE;	// For every term in every doc an OCCURRENCE is written. V1 = doc id, V2 = terms position.
+	/**
+	 * For every doc a DOC_STATS is written. v1 = term occurrence count in
+	 * doc. v2 = position of last term occurrence.
+	 */
+	DOC_STATS,
+
+	/**
+	 * For each unique term in a doc, a PREDICATE_ID is written. v1 = the id
+	 * of the index for the term.
+	 */
+	INDEX_ID,
+
+	/**
+	 * For every term in every doc an OCCURRENCE is written. v1 = doc id, v2
+	 * = terms position.
+	 */
+	OCCURRENCE;
     }
+
     private Type type;
     private int v1;
     private int v2;
 
     public TermValue(Type type, int v1) {
-	if (type != Type.PREDICATE_ID) {
+	if (type != Type.INDEX_ID) {
 	    throw new IllegalArgumentException("Type " + type + " is not value with 1 arg");
 	}
 	this.type = type;
 	this.v1 = v1;
     }
+
     public TermValue(Type type, int v1, int v2) {
 	if (type != Type.DOC_STATS && type != Type.OCCURRENCE) {
 	    throw new IllegalArgumentException("Type " + type + " is not value with 2 args");
@@ -76,19 +76,21 @@ public class TermValue implements WritableComparable<TermValue>, Cloneable {
     public TermValue(TermValue that) {
 	set(that);
     }
-    
+
     public void set(TermValue that) {
 	type = that.type;
 	v1 = that.v1;
 	v2 = that.v2;
     }
-    
+
     public Type getType() {
 	return type;
     }
+
     public int getV1() {
 	return v1;
     }
+
     public int getV2() {
 	return v2;
     }

@@ -128,9 +128,9 @@ public class TermReduceTest {
 	// Alignment.  Term1 is indexed in predicate id(index id) 0.
 	key = new TermKey("term1", -1, null);
 	values.clear();
-	values.add(new TermValue(Type.PREDICATE_ID, 0));
-	values.add(new TermValue(Type.PREDICATE_ID, 0));
-	values.add(new TermValue(Type.PREDICATE_ID, 0));
+	values.add(new TermValue(Type.INDEX_ID, 0));
+	values.add(new TermValue(Type.INDEX_ID, 0));
+	values.add(new TermValue(Type.INDEX_ID, 0));
 	reducer.reduce(key, values, reducerContext);
 	
 	key = new TermKey("term2", 1, null);
@@ -145,8 +145,8 @@ public class TermReduceTest {
 	// Alignment.  Term2 is indexed in predicate id(index id) 1.
 	key = new TermKey("term2", -1, null);
 	values.clear();
-	values.add(new TermValue(Type.PREDICATE_ID, 1));
-	values.add(new TermValue(Type.PREDICATE_ID, 1));
+	values.add(new TermValue(Type.INDEX_ID, 1));
+	values.add(new TermValue(Type.INDEX_ID, 1));
 	reducer.reduce(key, values, reducerContext);
 
 	key = new TermKey("term3", 0, null);
@@ -164,10 +164,10 @@ public class TermReduceTest {
 	// Alignment.  Term3 is indexed in predicate id(index id) 0 & 1.
 	key = new TermKey("term3", -1, null);
 	values.clear();
-	values.add(new TermValue(Type.PREDICATE_ID, 0));
-	values.add(new TermValue(Type.PREDICATE_ID, 0));
-	values.add(new TermValue(Type.PREDICATE_ID, 1));
-	values.add(new TermValue(Type.PREDICATE_ID, 1));
+	values.add(new TermValue(Type.INDEX_ID, 0));
+	values.add(new TermValue(Type.INDEX_ID, 0));
+	values.add(new TermValue(Type.INDEX_ID, 1));
+	values.add(new TermValue(Type.INDEX_ID, 1));
 	reducer.reduce(key, values, reducerContext);
 	
 	context.assertIsSatisfied();

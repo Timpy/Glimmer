@@ -50,8 +50,8 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	if (key.getIndex() == DocumentMapper.ALIGNMENT_INDEX) {
 	    int lastPredicateId = Integer.MIN_VALUE;
 	    for (TermValue value : values) {
-		if (value.getType() != Type.PREDICATE_ID) {
-		    throw new IllegalStateException("Got a " + value.getType() + " value when expecting only " + Type.PREDICATE_ID);
+		if (value.getType() != Type.INDEX_ID) {
+		    throw new IllegalStateException("Got a " + value.getType() + " value when expecting only " + Type.INDEX_ID);
 		}
 		if (lastPredicateId != value.getV1()) {
 		    lastPredicateId = value.getV1();

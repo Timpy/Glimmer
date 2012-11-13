@@ -85,7 +85,7 @@ public class DocumentMapperTest {
     }
     
     @Test
-    public void twoFieldstest() throws IOException, InterruptedException {
+    public void vertialTest() throws IOException, InterruptedException {
 	mapperConf.setStrings("RdfFieldNames", "fieldZero", "fieldOne", "fieldTwo");
 	
 	context.checking(new Expectations(){{
@@ -140,13 +140,13 @@ public class DocumentMapperTest {
 	    one(mapperContext).write(with(new TermKeyMatcher(2, "Z", Type.OCCURRENCE, 10, 4)), with(new TermValueMatcher(Type.OCCURRENCE, 10, 4)));
 	
 	    // The ALIGNMENT_INDEX is created for Vertical indexes only. It's just a map between terms and the index they occur in.
-	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "a", Type.PREDICATE_ID, 0)), with(new TermValueMatcher(Type.PREDICATE_ID, 0)));
-	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "literal", Type.PREDICATE_ID, 0)), with(new TermValueMatcher(Type.PREDICATE_ID, 0)));
-	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "b", Type.PREDICATE_ID, 0)), with(new TermValueMatcher(Type.PREDICATE_ID, 0)));
-	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "X", Type.PREDICATE_ID, 1)), with(new TermValueMatcher(Type.PREDICATE_ID, 1)));
-	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "Y", Type.PREDICATE_ID, 1)), with(new TermValueMatcher(Type.PREDICATE_ID, 1)));
-	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "Y", Type.PREDICATE_ID, 2)), with(new TermValueMatcher(Type.PREDICATE_ID, 2)));
-	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "Z", Type.PREDICATE_ID, 2)), with(new TermValueMatcher(Type.PREDICATE_ID, 2)));
+	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "a", Type.INDEX_ID, 0)), with(new TermValueMatcher(Type.INDEX_ID, 0)));
+	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "literal", Type.INDEX_ID, 0)), with(new TermValueMatcher(Type.INDEX_ID, 0)));
+	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "b", Type.INDEX_ID, 0)), with(new TermValueMatcher(Type.INDEX_ID, 0)));
+	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "X", Type.INDEX_ID, 1)), with(new TermValueMatcher(Type.INDEX_ID, 1)));
+	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "Y", Type.INDEX_ID, 1)), with(new TermValueMatcher(Type.INDEX_ID, 1)));
+	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "Y", Type.INDEX_ID, 2)), with(new TermValueMatcher(Type.INDEX_ID, 2)));
+	    one(mapperContext).write(with(new TermKeyMatcher(DocumentMapper.ALIGNMENT_INDEX, "Z", Type.INDEX_ID, 2)), with(new TermValueMatcher(Type.INDEX_ID, 2)));
 	}});
 	
 	DocumentMapper mapper = new DocumentMapper();
