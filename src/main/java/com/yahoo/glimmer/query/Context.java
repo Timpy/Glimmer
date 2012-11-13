@@ -95,6 +95,10 @@ public class Context extends Properties {
     public File getHorizontalIndexDir() {
 	return getKbRootRelativeFile(getProperty(HORIZONTAL_DIR_KEY, "horizontal"));
     }
+    
+    public File getIndexedPredicatesFile() {
+	return getKbRootRelativeFile(getProperty(HORIZONTAL_DIR_KEY, "topPredicates"));
+    }
 
     public double getDlCutoff() {
 	return getDouble(DL_CUTOFF_TAG, 10);

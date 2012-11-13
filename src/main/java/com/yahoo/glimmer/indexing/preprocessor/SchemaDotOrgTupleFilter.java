@@ -32,6 +32,8 @@ public class SchemaDotOrgTupleFilter implements TupleFilter {
     public boolean filter(Tuple tuple) {
 	if (tuple.predicate.type == TupleElement.Type.RESOURCE && tuple.predicate.text.startsWith(SCHEMA_DOT_ORG_URL_PREFIX)) {
 	    String text = tuple.predicate.text.toLowerCase();
+	    // To lower case.
+	    tuple.predicate.text = text;
 	    int end = text.length();
 	    while (text.charAt(--end) == '/') {}
 	    

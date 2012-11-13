@@ -11,21 +11,6 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.fastutil.Hash;
-import it.unimi.dsi.fastutil.io.BinIO;
-import it.unimi.dsi.fastutil.objects.Object2LongFunction;
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectSet;
-import it.unimi.dsi.fastutil.objects.Reference2DoubleMap;
-import it.unimi.dsi.fastutil.objects.Reference2DoubleOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
-import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
-import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import it.unimi.dsi.io.InputBitStream;
-import it.unimi.dsi.lang.MutableString;
 import it.unimi.di.mg4j.document.ConcatenatedDocumentCollection;
 import it.unimi.di.mg4j.document.Document;
 import it.unimi.di.mg4j.document.DocumentCollection;
@@ -44,6 +29,21 @@ import it.unimi.di.mg4j.search.DocumentIteratorBuilderVisitor;
 import it.unimi.di.mg4j.search.score.CountScorer;
 import it.unimi.di.mg4j.search.score.DocumentScoreInfo;
 import it.unimi.di.mg4j.search.score.Scorer;
+import it.unimi.dsi.fastutil.Hash;
+import it.unimi.dsi.fastutil.io.BinIO;
+import it.unimi.dsi.fastutil.objects.Object2LongFunction;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ReferenceLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
+import it.unimi.dsi.fastutil.objects.Reference2DoubleMap;
+import it.unimi.dsi.fastutil.objects.Reference2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
+import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
+import it.unimi.dsi.io.InputBitStream;
+import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.sux4j.io.FileLinesList;
 import it.unimi.dsi.util.SemiExternalGammaList;
 import it.unimi.dsi.util.StringMap;
@@ -56,7 +56,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -77,7 +76,7 @@ public class RDFIndex {
 
     private final static String BASENAME_INDEX_PROPERTY_KEY = "basename";
 
-    private final static String ALIGNMENT_INDEX_KEY = "alignment";
+    private final static String ALIGNMENT_INDEX_NAME = "alignment";
     private final static String SUBJECT_INDEX_KEY = "subject";
     private final static String PREDICATE_INDEX_KEY = "predicate";
     private final static String OBJECT_INDEX_KEY = "object";
@@ -100,11 +99,6 @@ public class RDFIndex {
 
     private Map<String, Integer> predicateDistribution;
     private Map<String, Integer> typeTermDistribution;
-
-    /**
-     * All predicates (including non indexed) ordered by usage.
-     */
-    private List<String> allPredicatesOrdered;
 
     private Set<String> verticalPredicates;
 
@@ -252,11 +246,15 @@ public class RDFIndex {
 	// Load vertical indexes
 	Object2ReferenceMap<String, Index> indexMap = loadIndexesFromDir(verticalIndexDir, context.getLoadDocumentSizes(), context.getLoadIndexesInMemory());
 	LOGGER.info("Loaded " + indexMap.size() + " vertical indices.");
-
+	
 	verticalPredicates = Collections.unmodifiableSet(new HashSet<String>(indexMap.keySet()));
 
-	if (!indexMap.containsKey(ALIGNMENT_INDEX_KEY)) {
-	    LOGGER.error("No alignment index found.");
+	try {
+	    LOGGER.info("Loading alignment index..");
+	    String alignmentUri = new File(verticalIndexDir, ALIGNMENT_INDEX_NAME).getPath();
+	    alignmentIndex = Index.getInstance( alignmentUri + "?mapped=1" );
+	} catch( Exception e ) {
+	    LOGGER.error("Failed to load alignment index", e);
 	}
 
 	// Load horizontal indexes
@@ -301,41 +299,28 @@ public class RDFIndex {
 	    throw new RDFIndexException(e);
 	}
 
-	// allPredicates list sorted by frequence.
-	allPredicatesOrdered = new ArrayList<String>(predicateDistribution.keySet());
-	Collections.sort(allPredicatesOrdered, new Comparator<String>() {
-	    @Override
-	    public int compare(String a, String b) {
-		return predicateDistribution.get(b).compareTo(predicateDistribution.get(a));
+	List<String> indexedPredicatesOrdered = new ArrayList<String>();
+	try {
+	    LOGGER.info("Loading indexed predicates list..");
+	    for (MutableString line : new FileLinesList(context.getIndexedPredicatesFile().getPath(), "UTF-8")) {
+	        indexedPredicatesOrdered.add(line.toString());
 	    }
-	});
-
-	allPredicatesOrdered = Collections.unmodifiableList(allPredicatesOrdered);
+	} catch (IOException e1) {
+	    throw new RDFIndexException("Failed to load indexed predicated list from file:" + context.getIndexedPredicatesFile().getPath());
+	}
 
 	// We need to maintain insertion order and test inclusion.
-	LinkedHashMap<String, String> fieldNameSuffixToFieldNameOrderedMap = new LinkedHashMap<String, String>();
+	Map<String, String> fieldNameSuffixToFieldNameOrderedMap = new LinkedHashMap<String, String>();
 	fieldNameSuffixToFieldNameOrderedMap.put(SUBJECT_INDEX_KEY, SUBJECT_INDEX_KEY);
 	fieldNameSuffixToFieldNameOrderedMap.put(PREDICATE_INDEX_KEY, PREDICATE_INDEX_KEY);
 	fieldNameSuffixToFieldNameOrderedMap.put(OBJECT_INDEX_KEY, OBJECT_INDEX_KEY);
 
-	for (String fullName : allPredicatesOrdered) {
-	    fullName = Util.encodeFieldName(fullName);
-	    int i = fullName.length();
-	    String suffix;
-	    do {
-		i = fullName.lastIndexOf('_', i);
-		if (i == -1) {
-		    suffix = fullName;
-		    break;
-		}
-		suffix = fullName.substring(i + 1);
-	    } while (fieldNameSuffixToFieldNameOrderedMap.containsKey(suffix));
-	    if (fieldNameSuffixToFieldNameOrderedMap.containsKey(suffix)) {
-		throw new RDFIndexException("None unique field name " + suffix);
-	    }
-	    fieldNameSuffixToFieldNameOrderedMap.put(suffix, fullName);
+	List<String> shortNames = Util.generateShortNames(indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap.keySet());
+	for (int i = 0 ; i < shortNames.size() ; i++) {
+	    fieldNameSuffixToFieldNameOrderedMap.put(shortNames.get(i), indexedPredicatesOrdered.get(i));
+	    LOGGER.info("Predicate short name: " + shortNames.get(i) + " -> " + indexedPredicatesOrdered.get(i));
 	}
-
+	
 	RDFIndexStatisticsBuilder statsBuilder = new RDFIndexStatisticsBuilder();
 	statsBuilder.setSortedPredicates(fieldNameSuffixToFieldNameOrderedMap);
 	statsBuilder.setTypeTermDistribution(typeTermDistribution);
@@ -385,7 +370,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), allPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_INDEX_KEY, termProcessors,
+	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_INDEX_KEY, termProcessors,
 		allResourcesToIds);
     }
 
@@ -409,7 +394,7 @@ public class RDFIndex {
 	for (int i = 0; i < propertiesFiles.length; i++) {
 	    String baseName = propertiesFiles[i].getName();
 	    baseName = baseName.substring(0, baseName.lastIndexOf('.'));
-	    if (ALIGNMENT_INDEX_KEY.equals(baseName)) {
+	    if (ALIGNMENT_INDEX_NAME.equals(baseName)) {
 		continue;
 	    }
 	    LOGGER.info("Loading vertical index: '" + baseName + "'");

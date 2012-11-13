@@ -29,8 +29,13 @@ import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.xml.transform.Source;
@@ -393,5 +398,40 @@ public class Util {
 	    return nullsFirst ? 1 : -1;
 	}
 	return a.compareTo(b);
+    }
+    
+    public static List<String> generateShortNames(List<String> names, Set<String> exclude) {
+	if (names == null || names.isEmpty()) {
+	    return Collections.emptyList();
+	}
+	if (exclude == null) {
+	    exclude = Collections.emptySet();
+	}
+	
+	ArrayList<String> shortNames = new ArrayList<String>(names.size());
+	HashSet<String> used = new HashSet<String>(names.size() + exclude.size());
+	used.addAll(exclude);
+	
+	for (String name : names) {
+	    name = Util.encodeFieldName(name);
+	    int i = name.length();
+	    String shortName;
+	    do {
+		i = name.lastIndexOf('_', i);
+		if (i == -1) {
+		    shortName = name;
+		    break;
+		}
+		shortName = name.substring(i + 1);
+		i--;
+	    } while (used.contains(shortName));
+	    if (used.contains(shortName)) {
+		throw new IllegalArgumentException("None unique name " + name);
+	    }
+	    shortNames.add(shortName);
+	    used.add(shortName);
+	}
+
+	return shortNames;
     }
 }
