@@ -41,6 +41,11 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
     static enum Counters {
 	TOO_MANY_RELATIONS;
     }
+    
+    private final static Text SUBJECT_TEXT = new Text(TupleElementName.SUBJECT.name());
+    private final static Text PREDICATE_TEXT = new Text(TupleElementName.PREDICATE.name());
+    private final static Text OBJECT_TEXT = new Text(TupleElementName.OBJECT.name());
+    private final static Text CONTEXT_TEXT = new Text(TupleElementName.CONTEXT.name());
 
     protected void reduce(Text key, Iterable<Text> values, Reducer<Text, Text, Text, Object>.Context context) throws IOException, InterruptedException {
 	int keyPredicateCount = 0;
@@ -57,20 +62,19 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 	bySubjectRecord.clearRelations();
 
 	for (Text value : values) {
-	    String valueString = value.toString();
-
-	    if (TupleElementName.PREDICATE.name().equals(valueString)) {
+	    if (PREDICATE_TEXT.equals(value)) {
 		keyPredicateCount++;
-	    } else if (TupleElementName.OBJECT.name().equals(valueString)) {
+	    } else if (OBJECT_TEXT.equals(value)) {
 		keyObjectCount++;
-	    } else if (TupleElementName.CONTEXT.name().equals(valueString)) {
+	    } else if (CONTEXT_TEXT.equals(value)) {
 		keyContextCount++;
+	    } else if (SUBJECT_TEXT.equals(value)) {
+		throw new IllegalArgumentException("Reducer got a SUBJECT value!?.  Should only be \"PREDICATE\", \"OBJECT\", \"CONTEXT\" or a relation String.");
 	    } else {
-		bySubjectRecord.addRelation(valueString);
+		bySubjectRecord.addRelation(value.toString());
 		relationsCount++;
 	    }
 	}
-	
 	
 	if (relationsCount > 0) {
 	    bySubjectRecord.setSubject(key.toString());
@@ -80,10 +84,6 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 			+ key.toString());
 		context.getCounter(Counters.TOO_MANY_RELATIONS).increment(1);
 	    }
-	}
-
-
-	if (bySubjectRecord.hasRelations()) {
 	    context.write(key, bySubjectRecord);
 	}
 
