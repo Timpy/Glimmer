@@ -22,7 +22,7 @@ _:123bnode <http://xmlns.com/foaf/0.1/name> "Joshua Fry Speed"@en <http://en.wik
 <http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://dbpedia.org/ontology/deathPlace> <http://dbpedia.org/resource/Illinois> <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=7> .
 <http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://dbpedia.org/ontology/deathDate> "1882-07-16"^^<http://www.w3.org/2001/XMLSchema#date> <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=6> .
 <http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/Kentucky> <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=5> .
-<http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://dbpedia.org/ontology/birthPlace> <http://dbpedia.org/resource/United_States> <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=5> .
+<http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://dbpedia.org/ontology/BirthPlace> <http://dbpedia.org/resource/United_States> <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=5> .
 <http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://dbpedia.org/ontology/birthDate> "1818-12-13"^^<http://www.w3.org/2001/XMLSchema#date> <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=4> .
 <http://dbpedia.org/resource/Mary_Todd_Lincoln> <http://xmlns.com/foaf/0.1/name> "Mary Todd Lincoln"@en <http://en.wikipedia.org/wiki/Mary_Todd_Lincoln#absolute-line=2> .
 <http://dbpedia.org/resource/Robert_Todd_Lincoln> <http://dbpedia.org/ontology/deathPlace> <http://dbpedia.org/resource/Manchester_%28town%29,_Vermont> <http://en.wikipedia.org/wiki/Robert_Todd_Lincoln#absolute-line=23> .

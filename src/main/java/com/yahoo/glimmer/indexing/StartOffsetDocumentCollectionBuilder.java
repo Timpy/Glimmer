@@ -99,6 +99,8 @@ public class StartOffsetDocumentCollectionBuilder implements DocumentCollectionB
 	documentsOutputStream.close();
 	collection.close();
 	BinIO.storeObject(collection, offsetsOutputStream);
+	offsetsOutputStream.flush();
+	offsetsOutputStream.close();
     }
     
     private static class ByteCountOutputStream extends OutputStream {

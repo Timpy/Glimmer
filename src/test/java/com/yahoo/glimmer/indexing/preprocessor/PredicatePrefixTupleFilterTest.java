@@ -19,13 +19,16 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 
-public class SchemaDotOrgTupleFilterTest {
-    private SchemaDotOrgTupleFilter filter;
+public class PredicatePrefixTupleFilterTest {
+    private PredicatePrefixTupleFilter filter;
     private Tuple tuple;
     
     @Before
     public void before() {
-	filter = new SchemaDotOrgTupleFilter();
+	filter = new PredicatePrefixTupleFilter();
+	filter.setUrlPrefix("http://schema.org/");
+	filter.setFilterNonMatches(true);
+	filter.setLowercase(true);
 	tuple = new Tuple();
     }
     
@@ -37,12 +40,13 @@ public class SchemaDotOrgTupleFilterTest {
 	assertNull(tuple.predicate.n3);
 	
 	tuple.predicate.type = TupleElement.Type.RESOURCE;
-	tuple.predicate.text = "http://not.schema.org/path";
-	tuple.predicate.n3 = "<http://not.schema.org/path>";
+	tuple.predicate.text = "http://not.schema.org/Path";
+	tuple.predicate.n3 = "<http://not.schema.org/Path>";
 	assertFalse(filter.filter(tuple));
+	// Should be unchanged.
 	assertEquals(TupleElement.Type.RESOURCE, tuple.predicate.type);
-	assertEquals("http://not.schema.org/path", tuple.predicate.text);
-	assertEquals("<http://not.schema.org/path>", tuple.predicate.n3);
+	assertEquals("http://not.schema.org/Path", tuple.predicate.text);
+	assertEquals("<http://not.schema.org/Path>", tuple.predicate.n3);
 	
 	tuple.predicate.text = "http://schema.org/path";
 	tuple.predicate.n3 = "<http://schema.org/path>";

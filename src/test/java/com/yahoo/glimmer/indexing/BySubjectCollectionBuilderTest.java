@@ -20,6 +20,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.jmock.Expectations;
 import org.jmock.Mockery;
+import org.jmock.Sequence;
 import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 import org.junit.Test;
@@ -49,32 +50,54 @@ public class BySubjectCollectionBuilderTest {
     
     @Test
     public void mapTest() throws IOException, InterruptedException {
+	final Sequence writeSequence = context.sequence("writeSequence");
 	context.checking(new Expectations() {{
+	    exactly(3 - 1).of(mapperContext).write(with(BySubjectCollectionBuilder.COMMAND_KEY), with(BySubjectCollectionBuilder.EMPTY_DOC_VALUE));
+	    inSequence(writeSequence);
+	    
 	    // doc 1
 	    one(mapperContext).write(with(new MutableString("http://subject1/")), with(new MutableString("http://subject1/")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("")), with(new MutableString("<")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("http")), with(new MutableString("://")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("predicate11")), with(new MutableString("> \"")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("literal1")), with(new MutableString("\" .  <")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("http")), with(new MutableString("://")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("predicate12")), with(new MutableString("> <")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("http")), with(new MutableString("://")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("resource1")), with(new MutableString("> .")));
+	    inSequence(writeSequence);
 	    // End doc 1.
 	    one(mapperContext).write(with(new MutableString(BySubjectCollectionBuilder.COMMAND_KEY)), with(BySubjectCollectionBuilder.END_DOC_VALUE));
+	    inSequence(writeSequence);
 	    
 	    // Empty docs.
 	    exactly(7 - 3 - 1).of(mapperContext).write(with(BySubjectCollectionBuilder.COMMAND_KEY), with(BySubjectCollectionBuilder.EMPTY_DOC_VALUE));
+	    inSequence(writeSequence);
 	    
 	    // doc 2
 	    one(mapperContext).write(with(new MutableString("http://subject2/")), with(new MutableString("http://subject2/")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("")), with(new MutableString("<")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("http")), with(new MutableString("://")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("predicate21")), with(new MutableString("> <")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("http")), with(new MutableString("://")));
+	    inSequence(writeSequence);
 	    one(mapperContext).write(with(new MutableString("resource2")), with(new MutableString("> .")));
+	    inSequence(writeSequence);
 	    // End doc 2.
 	    one(mapperContext).write(with(new MutableString(BySubjectCollectionBuilder.COMMAND_KEY)), with(BySubjectCollectionBuilder.END_DOC_VALUE));
+	    inSequence(writeSequence);
 	}});
 	
 	MapClass mapper = new MapClass();

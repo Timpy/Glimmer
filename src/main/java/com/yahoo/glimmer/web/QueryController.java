@@ -129,7 +129,7 @@ public class QueryController {
 	return Collections.singletonMap(OBJECT_KEY, result);
     }
 
-    @ExceptionHandler(Exception.class)
+   // @ExceptionHandler(Exception.class)
     public Map<String, ?> handleException(Exception ex, HttpServletResponse response) {
 	response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 	return Collections.singletonMap(OBJECT_KEY, ex.getMessage());

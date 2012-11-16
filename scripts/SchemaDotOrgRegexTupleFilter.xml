@@ -1,6 +1,0 @@
-<com.yahoo.glimmer.indexing.preprocessor.RegexTupleFilter>
-	<predicatePattern>
-		<pattern>^&lt;http://schema.org</pattern>
-		<flags>0</flags>
-	</predicatePattern>
-</com.yahoo.glimmer.indexing.preprocessor.RegexTupleFilter>

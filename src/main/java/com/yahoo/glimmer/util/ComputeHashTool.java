@@ -32,6 +32,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -105,8 +106,9 @@ public class ComputeHashTool extends Configured implements Tool {
 	} else {
 	    LOGGER.info("Building unsigned hashes for " + srcFileCharset.displayName() + " files:" + srcFilenames);
 	}
-
-	JobConf job = new JobConf(getConf(), ComputeHashTool.class);
+	Configuration conf = getConf();
+	//conf.set("fs.default.name","hdfs://127.0.0.1:9000/");
+	JobConf job = new JobConf(conf, ComputeHashTool.class);
 	FileSystem fs = FileSystem.get(job);
 	for (String srcFilename : srcFilenames) {
 	    LOGGER.info("Building hash of " + srcFilename);

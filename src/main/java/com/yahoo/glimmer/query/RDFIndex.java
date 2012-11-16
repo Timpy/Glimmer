@@ -303,7 +303,7 @@ public class RDFIndex {
 	try {
 	    LOGGER.info("Loading indexed predicates list..");
 	    for (MutableString line : new FileLinesList(context.getIndexedPredicatesFile().getPath(), "UTF-8")) {
-	        indexedPredicatesOrdered.add(line.toString());
+	        indexedPredicatesOrdered.add(Util.encodeFieldName(line.toString()));
 	    }
 	} catch (IOException e1) {
 	    throw new RDFIndexException("Failed to load indexed predicated list from file:" + context.getIndexedPredicatesFile().getPath());
@@ -315,7 +315,7 @@ public class RDFIndex {
 	fieldNameSuffixToFieldNameOrderedMap.put(PREDICATE_INDEX_KEY, PREDICATE_INDEX_KEY);
 	fieldNameSuffixToFieldNameOrderedMap.put(OBJECT_INDEX_KEY, OBJECT_INDEX_KEY);
 
-	List<String> shortNames = Util.generateShortNames(indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap.keySet());
+	List<String> shortNames = Util.generateShortNames(indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap.keySet(), '_');
 	for (int i = 0 ; i < shortNames.size() ; i++) {
 	    fieldNameSuffixToFieldNameOrderedMap.put(shortNames.get(i), indexedPredicatesOrdered.get(i));
 	    LOGGER.info("Predicate short name: " + shortNames.get(i) + " -> " + indexedPredicatesOrdered.get(i));

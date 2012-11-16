@@ -400,7 +400,7 @@ public class Util {
 	return a.compareTo(b);
     }
     
-    public static List<String> generateShortNames(List<String> names, Set<String> exclude) {
+    public static List<String> generateShortNames(List<String> names, Set<String> exclude, char delimiter) {
 	if (names == null || names.isEmpty()) {
 	    return Collections.emptyList();
 	}
@@ -413,11 +413,10 @@ public class Util {
 	used.addAll(exclude);
 	
 	for (String name : names) {
-	    name = Util.encodeFieldName(name);
 	    int i = name.length();
 	    String shortName;
 	    do {
-		i = name.lastIndexOf('_', i);
+		i = name.lastIndexOf(delimiter, i);
 		if (i == -1) {
 		    shortName = name;
 		    break;
