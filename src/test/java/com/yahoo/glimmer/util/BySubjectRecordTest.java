@@ -29,10 +29,11 @@ import org.junit.Test;
 
 public class BySubjectRecordTest {
     private static final int ID_1 = 33;
+    private static final int PREVIOUS_ID_1 = 5;
     private static final String SUBJECT_1 = "http://subject/";
     private static final String RELATION_1_1 = "<http://predicate1> \"literal\" .";
     private static final String RELATION_1_2 = "<http://predicate2> <http://resource> .";
-    private static final String SUBJECT_DOC_1 = "" + ID_1 + '\t' + SUBJECT_1 + '\t' + RELATION_1_1 + "  " + RELATION_1_2;
+    private static final String SUBJECT_DOC_1 = "" + ID_1 + '\t' + PREVIOUS_ID_1 + '\t' + SUBJECT_1 + '\t' + RELATION_1_1 + "  " + RELATION_1_2;
     private ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(4096);
     private Writer writer;
     private BySubjectRecord record;
@@ -49,11 +50,12 @@ public class BySubjectRecordTest {
 	record.writeTo(writer);
 	writer.flush();
 	byteArrayOutputStream.flush();
-	assertEquals("0\t\t\n", byteArrayOutputStream.toString("UTF-8"));
+	assertEquals("0\t-1\t\t\n", byteArrayOutputStream.toString("UTF-8"));
 	
 	byteArrayOutputStream.reset();
 	
 	record.setId(ID_1);
+	record.setPreviousId(PREVIOUS_ID_1);
 	record.setSubject(SUBJECT_1);
 	record.addRelation(RELATION_1_1);
 	record.addRelation(RELATION_1_2);
@@ -70,6 +72,7 @@ public class BySubjectRecordTest {
 	assertTrue(record.parse(bytes, 0, bytes.length));
 	
 	assertEquals(ID_1, record.getId());
+	assertEquals(PREVIOUS_ID_1, record.getPreviousId());
 	assertEquals(SUBJECT_1, record.getSubject());
 	assertTrue(record.hasRelations());
 	assertEquals(2, record.getRelationsCount());
@@ -87,8 +90,9 @@ public class BySubjectRecordTest {
 	System.arraycopy(bytes, 0, buffer, 20, bytes.length);
 	buffer[20 + bytes.length] = '\n';
 	
-	assertTrue(record.parse(buffer, 20, bytes.length + 1));
+	assertTrue(record.parse(buffer, 20, bytes.length + 21));
 	assertEquals(ID_1, record.getId());
+	assertEquals(PREVIOUS_ID_1, record.getPreviousId());
 	assertEquals(SUBJECT_1, record.getSubject());
 	assertTrue(record.hasRelations());
 	assertEquals(2, record.getRelationsCount());
@@ -104,6 +108,7 @@ public class BySubjectRecordTest {
 	assertFalse(record.parse(bytes, 0, bytes.length));
 	
 	assertEquals(0, record.getId());
+	assertEquals(-1, record.getPreviousId());
 	assertNull(record.getSubject());
 	assertFalse(record.hasRelations());
 	assertEquals(0, record.getRelationsCount());
@@ -169,10 +174,11 @@ public class BySubjectRecordTest {
     
     @Test
     public void noRelationsTest() throws IOException {
-	byte[] bytes = "6\thttp://sbj/\t\n".getBytes("UTF-8");
+	byte[] bytes = "6\t3\thttp://sbj/\t\n".getBytes("UTF-8");
 	assertTrue(record.parse(bytes, 0, bytes.length));
 	
 	assertEquals(6, record.getId());
+	assertEquals(3, record.getPreviousId());
 	assertEquals("http://sbj/", record.getSubject());
 	assertFalse(record.hasRelations());
 	assertEquals(0, record.getRelationsCount());
@@ -182,10 +188,25 @@ public class BySubjectRecordTest {
     
     @Test
     public void spacesTest() throws IOException {
-	byte[] bytes = " 6 \t http://sbj/ \t  \n".getBytes("UTF-8");
+	byte[] bytes = "7\t2\thttp://sbj/ \t  \n".getBytes("UTF-8");
 	assertTrue(record.parse(bytes, 0, bytes.length));
 	
-	assertEquals(6, record.getId());
+	assertEquals(7, record.getId());
+	assertEquals(2, record.getPreviousId());
+	assertEquals("http://sbj/", record.getSubject());
+	assertFalse(record.hasRelations());
+	assertEquals(0, record.getRelationsCount());
+	Iterator<String> relations = record.getRelations().iterator();
+	assertFalse(relations.hasNext());
+    }
+    
+    @Test
+    public void firstRecordTest() throws IOException {
+	byte[] bytes = "4\t-1\thttp://sbj/\t  \n".getBytes("UTF-8");
+	assertTrue(record.parse(bytes, 0, bytes.length));
+	
+	assertEquals(4, record.getId());
+	assertEquals(-1, record.getPreviousId());
 	assertEquals("http://sbj/", record.getSubject());
 	assertFalse(record.hasRelations());
 	assertEquals(0, record.getRelationsCount());

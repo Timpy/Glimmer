@@ -28,59 +28,85 @@ public class BySubjectRecord {
     private static final int MAX_RELATIONS = 10000;
 
     private int id;
+    /**
+     * Because the doc id's have to line up with what is in the 'all resources'
+     * hash(to avoid having a separate 'subjects' hash), the id's don't run
+     * consecutively. This is a problem when we split the bySubjects file for
+     * the collection builder. We can't assume the first record in the split is
+     * 0, as it may be preceded by empty docs. The previousId is used to keep
+     * the doc ids consistent when setting the first doc id in a split.
+     */
+    private int previousId = -1;
     private String subject;
     private final ArrayList<String> relations = new ArrayList<String>();
-    
+
     public boolean parse(Text text) {
 	return parse(text.getBytes(), 0, text.getLength());
     }
-    public boolean parse(final byte[] bytes, final int start, final int length) {
-	return parse(bytes, start, length, DEFAULT_CHARSET);
+
+    public boolean parse(final byte[] bytes, final int start, final int end) {
+	return parse(bytes, start, end, DEFAULT_CHARSET);
     }
-    public boolean parse(final byte[] bytes, final int start, final int length, final Charset charset) {
-	int end = start + length;
-	
+
+    public boolean parse(final byte[] bytes, final int start, final int end, final Charset charset) {
 	int startOfIdIndex = start;
-	while (startOfIdIndex < end && Character.isWhitespace(bytes[startOfIdIndex])) { startOfIdIndex++; }
-	if (startOfIdIndex >= end) {
-	    return false;
-	}
-	
 	int endOfIdIndex = startOfIdIndex;
-	while (endOfIdIndex < end && Character.isDigit(bytes[endOfIdIndex])) { endOfIdIndex++; };
+	while (endOfIdIndex < end && Character.isDigit(bytes[endOfIdIndex])) {
+	    endOfIdIndex++;
+	}
+	;
 	if (endOfIdIndex >= end || endOfIdIndex == startOfIdIndex) {
 	    return false;
 	}
-	id = Integer.parseInt(new String(bytes, startOfIdIndex, endOfIdIndex - startOfIdIndex, charset));
-	
-	while (endOfIdIndex < end && bytes[endOfIdIndex] != FIELD_DELIMITER) { endOfIdIndex++; }
-	if (endOfIdIndex >= end) {
-	    return false;
-	}
-	
-	int startOfSubjectIdx = endOfIdIndex + 1;
-	while (startOfSubjectIdx < end && Character.isWhitespace(bytes[startOfSubjectIdx])) { startOfSubjectIdx++; }
-	if (startOfSubjectIdx >= end) {
+	try {
+	    id = Integer.parseInt(new String(bytes, startOfIdIndex, endOfIdIndex - startOfIdIndex, charset));
+	} catch (NumberFormatException e) {
 	    return false;
 	}
 
+	int startOfIdDeltaIndex = endOfIdIndex + 1;
+	int endOfIdDeltaIndex = startOfIdDeltaIndex + 1;
+	while (endOfIdDeltaIndex < end && Character.isDigit(bytes[endOfIdDeltaIndex])) {
+	    endOfIdDeltaIndex++;
+	}
+	;
+	if (endOfIdDeltaIndex >= end || endOfIdDeltaIndex == startOfIdDeltaIndex) {
+	    return false;
+	}
+	try {
+	    previousId = Integer.parseInt(new String(bytes, startOfIdDeltaIndex, endOfIdDeltaIndex - startOfIdDeltaIndex, charset));
+	} catch (NumberFormatException e) {
+	    return false;
+	}
+
+	int startOfSubjectIdx = endOfIdDeltaIndex + 1;
 	int endOfSubjectIndex = startOfSubjectIdx;
-	while (endOfSubjectIndex < end && !Character.isWhitespace(bytes[endOfSubjectIndex])) { endOfSubjectIndex++; }
+	while (endOfSubjectIndex < end && !Character.isWhitespace(bytes[endOfSubjectIndex])) {
+	    endOfSubjectIndex++;
+	}
 	if (endOfSubjectIndex >= end || endOfSubjectIndex == startOfSubjectIdx) {
 	    return false;
 	}
 	subject = new String(bytes, startOfSubjectIdx, endOfSubjectIndex - startOfSubjectIdx, DEFAULT_CHARSET);
-	
-	while (endOfSubjectIndex < end && bytes[endOfSubjectIndex] != FIELD_DELIMITER) { endOfSubjectIndex++; }
+
+	while (endOfSubjectIndex < end && bytes[endOfSubjectIndex] != FIELD_DELIMITER) {
+	    endOfSubjectIndex++;
+	}
 	if (endOfSubjectIndex >= end) {
 	    return false;
 	}
 
 	int startOfRelationIndex = endOfSubjectIndex + 1;
+
+	return parseRelations(bytes, startOfRelationIndex, end, charset);
+    }
+    
+    public boolean parseRelations(final byte[] bytes, final int start, final int end, final Charset charset) {
+	int startOfRelationIndex = start;
 	int endOfRelationIndex = startOfRelationIndex;
 	
 	relations.clear();
-	
+
 	do {
 	    int delimiterIndex = 0;
 	    while (endOfRelationIndex < end) {
@@ -126,6 +152,14 @@ public class BySubjectRecord {
 	this.id = id;
     }
 
+    public int getPreviousId() {
+	return previousId;
+    }
+
+    public void setPreviousId(int previousId) {
+	this.previousId = previousId;
+    }
+
     public String getSubject() {
 	return subject;
     }
@@ -144,7 +178,7 @@ public class BySubjectRecord {
 	    private char[] relationChars = new char[4096];
 	    private int relationCharsLength;
 	    private int relationIndex;
-	    
+
 	    @Override
 	    public void close() throws IOException {
 	    }
@@ -152,14 +186,14 @@ public class BySubjectRecord {
 	    @Override
 	    public int read(final char[] buffer, final int startIndex, final int len) throws IOException {
 		int bufferIndex = startIndex;
-		
+
 		while (true) {
 		    if (relationCharsLength == 0) {
 			if (relations.size() <= relationsIndex) {
 			    // No more relations. EOF or number of chars copied.
 			    return bufferIndex == startIndex ? -1 : bufferIndex - startIndex;
 			}
-			
+
 			String relationsString = relations.get(relationsIndex++);
 			relationCharsLength = relationsString.length();
 			if (relationChars.length < relationCharsLength + 2) {
@@ -174,12 +208,13 @@ public class BySubjectRecord {
 			}
 			relationIndex = 0;
 		    }
-		    
+
 		    int remainingBufferChars = startIndex + len - bufferIndex;
 		    int remainingRelationChars = relationCharsLength - relationIndex;
-		    
+
 		    if (remainingBufferChars > remainingRelationChars) {
-			// Write rest of relation chars and move to next relation.
+			// Write rest of relation chars and move to next
+			// relation.
 			System.arraycopy(relationChars, relationIndex, buffer, bufferIndex, remainingRelationChars);
 			bufferIndex += remainingRelationChars;
 			relationCharsLength = 0;
@@ -221,6 +256,8 @@ public class BySubjectRecord {
     public void writeTo(Writer writer) throws IOException {
 	writer.write(Integer.toString(id));
 	writer.write(FIELD_DELIMITER);
+	writer.write(Integer.toString(previousId));
+	writer.write(FIELD_DELIMITER);
 	if (subject != null) {
 	    writer.write(subject);
 	}
@@ -236,24 +273,25 @@ public class BySubjectRecord {
 	}
 	writer.write(RECORD_DELIMITER);
     }
-    
+
     @Override
     public String toString() {
-        StringWriter stringWriter = new StringWriter(4096);
-        try {
+	StringWriter stringWriter = new StringWriter(4096);
+	try {
 	    writeTo(stringWriter);
 	} catch (IOException e) {
 	    e.printStackTrace();
 	}
-        return stringWriter.toString();
+	return stringWriter.toString();
     }
-    
+
     @Override
     public boolean equals(Object object) {
 	if (object instanceof BySubjectRecord) {
 	    BySubjectRecord that = (BySubjectRecord) object;
-	    return id == that.id && (subject == null ? that.subject == null : subject.equals(that.subject)) && relations.equals(that.relations);
+	    return id == that.id && previousId == that.previousId && (subject == null ? that.subject == null : subject.equals(that.subject))
+		    && relations.equals(that.relations);
 	}
-        return false;
+	return false;
     }
 }

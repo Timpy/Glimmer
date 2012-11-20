@@ -74,6 +74,8 @@ public class PrepTool extends Configured implements Tool {
 	job.setReducerClass(ResourcesReducer.class);
 	job.setOutputKeyClass(Text.class);
 	job.setOutputValueClass(Object.class);
+	// We assign 'global' ids in the reducer. For this to work, there can be only one.
+	job.setNumReduceTasks(1);
 
 	job.setOutputFormatClass(ResourceRecordWriter.OutputFormat.class);
 

@@ -38,7 +38,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
     public static final String START_OFFSETS_EXTENSION = ".sos";
     public static final Charset DOCUMENTS_CHARSET = Charset.forName("UTF-8");
     
-    private static final int DEFAULT_SUBLIST_SIZE = 2 ^ 16;
+    private static final int DEFAULT_SUBLIST_SIZE = 1<<10;
     private int subListSize = DEFAULT_SUBLIST_SIZE;
 
     private final ArrayList<OffsetsList> offsetsLists = new ArrayList<OffsetsList>();

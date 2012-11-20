@@ -26,35 +26,48 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputCommitter;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import com.yahoo.glimmer.util.BySubjectRecord;
 
 public class BySubjectCollectionBuilder extends Configured implements Tool {
-    // Sequence that isn't possible as a Resource or word/nonWord tokenization.
-    protected static final MutableString COMMAND_KEY = new MutableString("A!");
-    protected static final MutableString END_DOC_VALUE = new MutableString("END");
-    protected static final MutableString EMPTY_DOC_VALUE = new MutableString("EMPTY");
-    
-    public static class MapClass extends Mapper<LongWritable, Text, MutableString, MutableString> {
-	
-	private final MutableString keyOut = new MutableString();
-	private final MutableString valueOut = new MutableString();
-	private BySubjectRecord bySubjectRecord = new BySubjectRecord();
-	FastBufferedReader fbr = new FastBufferedReader();
+    static class BuilderOutputWriter extends RecordWriter<LongWritable, Text> {
+	private static final String COLLECTION_PREFIX = "collection-";
 	private static int count;
-	private int docId = -1;
+
+	private BySubjectRecord bySubjectRecord = new BySubjectRecord();
+	private final MutableString word = new MutableString();
+	private final MutableString nonWord = new MutableString();
+	FastBufferedReader fbr = new FastBufferedReader();
+
+	private final DocumentCollectionBuilder builder;
+
+	public BuilderOutputWriter(TaskAttemptContext job, Path taskWorkPath) throws IllegalArgumentException, IOException {
+	    Path outputPath = FileOutputFormat.getOutputPath(job);
+	    String collectionBase = new Path(outputPath, COLLECTION_PREFIX).toString();
+
+	    FileSystem fs = FileSystem.get(job.getConfiguration());
+	    IOFactory ioFactory = new HadoopFileSystemIOFactory(fs);
+	    builder = new StartOffsetDocumentCollectionBuilder(collectionBase, new IdentityDocumentFactory(), ioFactory);
+	    // Use the id for this task. It's the same for all attempts of this
+	    // task.
+	    builder.open(Integer.toString(job.getTaskAttemptID().getTaskID().getId()));
+	}
+	
+	// Test constructor
+	public BuilderOutputWriter(DocumentCollectionBuilder builder) throws IllegalArgumentException, IOException {
+	    this.builder = builder;
+	}
 
 	@Override
-	public void map(LongWritable keyIn, Text valueIn, Context context) throws IOException, InterruptedException {
+	public void write(LongWritable key, Text value) throws IOException, InterruptedException {
 	    if (count % 100000 == 0) {
 		System.out.println("Processed " + count + " lines.");
 
@@ -73,80 +86,46 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 		long heapFreeSize = Runtime.getRuntime().freeMemory();
 
 		System.out.println("Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
-
 	    }
 	    count++;
-	    
-	    bySubjectRecord.parse(valueIn);
-	    
-	    // Start new doc.  
-	    // As the doc id's must me the same as the values from the ALL resources hash they are not consecutive.
-	    // We need to create 'empty docs' for the ALL resource hash values that aren't subjects.
-	    if (docId == -1) {
-		// As the BySubject input is split.  Each split ends up as a sub collection.
-		// The doc id's per sub collection start at 0.  So for the first record we 'skip' to that doc id.
-		docId = bySubjectRecord.getId();
-	    }
-	    while (docId < bySubjectRecord.getId()) {
-		context.write(COMMAND_KEY, EMPTY_DOC_VALUE);
-		docId++;
-	    }
-	    keyOut.setLength(0);
-	    keyOut.append(bySubjectRecord.getSubject());
-	    context.write(keyOut, keyOut);
 
+	    if (!bySubjectRecord.parse(value)) {
+		throw new IllegalArgumentException("Failed to parse subject doc:\n" + value.toString());
+	    }
+
+	    /* As the doc id's are the same as the values from the ALL
+	    * resources hash they are not consecutive.
+	    * We need to create 'empty docs' for the ALL resource hash values
+	    * that aren't subjects.
+	    * 
+	    * Also, as the BySubject input is split. Each split ends up as a sub collection.
+	    * The doc id's per sub collection are renumbered to start at 0. So for the first
+	    * record of the split we compute the docId 'offset' to the last record of the previous split.
+	    * All docId's in the split are then offset so that when the sub collections are loaded into a ConcatinatedCollection the doc's are stored under the correct id
+	    * 
+	    */
+	    for (int emptyDocId = bySubjectRecord.getPreviousId() + 1 ; emptyDocId < bySubjectRecord.getId() ; emptyDocId++) {
+		// write empty doc.
+		builder.startDocument("", "");
+		builder.endDocument();
+	    }
+
+	    // Start non-empty doc.
+	    builder.startDocument(bySubjectRecord.getSubject(), bySubjectRecord.getSubject());
+	    builder.startTextField();
+	    
 	    fbr.setReader(bySubjectRecord.getRelationsReader());
-	    while (fbr.next(keyOut, valueOut)) {
-		context.write(keyOut, valueOut);
+	    while (fbr.next(word, nonWord)) {
+		builder.add(word, nonWord);
 	    }
 
 	    // End Doc.
-	    context.write(COMMAND_KEY, END_DOC_VALUE);
-	    docId++;
-	}
-    }
-
-    private static class BuilderOutputWriter extends RecordWriter<MutableString, MutableString> {
-	private static final String COLLECTION_PREFIX = "collection-";
-	private final DocumentCollectionBuilder builder;
-	private boolean newDoc = true;
-
-	public BuilderOutputWriter(TaskAttemptContext job, Path taskWorkPath) throws IllegalArgumentException, IOException {
-	    Path outputPath = FileOutputFormat.getOutputPath(job);
-	    String collectionBase = new Path(outputPath, COLLECTION_PREFIX).toString();
-	    
-	    FileSystem fs = FileSystem.get(job.getConfiguration());
-	    IOFactory ioFactory = new HadoopFileSystemIOFactory(fs);
-	    builder = new StartOffsetDocumentCollectionBuilder(collectionBase, new IdentityDocumentFactory(), ioFactory);
-	    // Use the id for this task.  It's the same for all attempts of this task.
-	    builder.open(Integer.toString(job.getTaskAttemptID().getTaskID().getId()));
-	}
-
-	@Override
-	public void write(MutableString key, MutableString value) throws IOException, InterruptedException {
-	    if (COMMAND_KEY.equals(key)) {
-		if (EMPTY_DOC_VALUE.equals(value)) {
-		    // Empty doc.
-		    builder.startDocument("","");
-		    builder.endDocument();
-		} else if (END_DOC_VALUE.equals(value)){
-		    // End last doc.
-		    builder.endTextField();
-		    builder.endDocument();
-		    newDoc = true;
-		}
-	    } else if (newDoc) {
-		newDoc = false;
-		builder.startDocument(key.toString(), value.toString());
-		builder.startTextField();
-	    } else {
-		builder.add(key, value);
-	    }
+	    builder.endTextField();
+	    builder.endDocument();
 	}
 
 	@Override
 	public void close(TaskAttemptContext context) throws IOException, InterruptedException {
-	    newDoc = true;
 	    try {
 		builder.close();
 	    } catch (IOException e) {
@@ -155,10 +134,10 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	}
     }
 
-    private static class BuilderOutputFormat extends FileOutputFormat<MutableString, MutableString> {
+    private static class BuilderOutputFormat extends FileOutputFormat<LongWritable, Text> {
 	@Override
-	public RecordWriter<MutableString, MutableString> getRecordWriter(TaskAttemptContext task) throws IOException, InterruptedException {
-	    FileOutputCommitter committer = (FileOutputCommitter)getOutputCommitter(task);
+	public RecordWriter<LongWritable, Text> getRecordWriter(TaskAttemptContext task) throws IOException, InterruptedException {
+	    FileOutputCommitter committer = (FileOutputCommitter) getOutputCommitter(task);
 	    return new BuilderOutputWriter(task, committer.getWorkPath());
 	}
     }
@@ -179,13 +158,12 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	job.setJarByClass(BySubjectCollectionBuilder.class);
 	job.setJobName("BySubjectCollectionBuilder" + System.currentTimeMillis());
 
-	job.setOutputKeyClass(Text.class);
+	job.setInputFormatClass(TextInputFormat.class);
+	job.setOutputKeyClass(LongWritable.class);
 	job.setOutputValueClass(Text.class);
-	job.setOutputFormatClass(TextOutputFormat.class);
-
-	job.setMapperClass(MapClass.class);
-	job.setNumReduceTasks(0);
 	job.setOutputFormatClass(BuilderOutputFormat.class);
+
+	job.setNumReduceTasks(0);
 
 	FileInputFormat.addInputPath(job, new Path(args[0]));
 

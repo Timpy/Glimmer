@@ -36,8 +36,8 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
     // can add the deduce the document ID and add it to bysubjects
     // The alternative would be to generate a MPH over the list of subjects but
     // that would require more memory when building the indices.
-    private int docId = 0;
-
+    private int docId;
+    
     static enum Counters {
 	TOO_MANY_RELATIONS;
     }
@@ -57,8 +57,6 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 	outputCount.count = 0;
 	context.write(key, outputCount);
 	
-	// The docId's should match with OUTPUT.ALL hash values
-	bySubjectRecord.setId(docId++);
 	bySubjectRecord.clearRelations();
 
 	for (Text value : values) {
@@ -77,6 +75,8 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 	}
 	
 	if (relationsCount > 0) {
+	    // The docId's should match with OUTPUT.ALL hash values
+	    bySubjectRecord.setId(docId);
 	    bySubjectRecord.setSubject(key.toString());
 	    
 	    if (bySubjectRecord.getRelationsCount() != relationsCount) {
@@ -85,6 +85,8 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 		context.getCounter(Counters.TOO_MANY_RELATIONS).increment(1);
 	    }
 	    context.write(key, bySubjectRecord);
+	    
+	    bySubjectRecord.setPreviousId(docId);
 	}
 
 	if (keyPredicateCount > 0) {
@@ -102,5 +104,7 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 	    outputCount.count = keyContextCount;
 	    context.write(key, outputCount);
 	}
+	
+	docId++;
     };
 }

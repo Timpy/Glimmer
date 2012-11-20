@@ -88,7 +88,7 @@ public class ResourceRecordWriterTest {
 	e.one(objectOs).write(e.with(new ByteMatcher("http://a/key\nbNode123\n", true)), e.with(0), e.with(22));
 	e.one(predicateOs).write(e.with(new ByteMatcher("3\thttp://a/key\n", true)), e.with(0), e.with(15));
 	e.one(subjectOs).write(e.with(new ByteMatcher("http://a/key\n", true)), e.with(0), e.with(13));
-	e.one(bySubjectOs).write(e.with(new ByteMatcher("66\thttp://a/key\t<http://predicate/> <http://Object> .\n", true)), e.with(0), e.with(54));
+	e.one(bySubjectOs).write(e.with(new ByteMatcher("66\t55\thttp://a/key\t<http://predicate/> <http://Object> .\n", true)), e.with(0), e.with(57));
 	
 	context.checking(e);
 	
@@ -109,6 +109,7 @@ public class ResourceRecordWriterTest {
 	writer.write(new Text("http://a/key"), outputCount);
 	BySubjectRecord record = new BySubjectRecord();
 	record.setId(66);
+	record.setPreviousId(55);
 	record.setSubject("http://a/key");
 	record.addRelation("<http://predicate/> <http://Object> .");
 	writer.write(new Text("http://a/key"), record);

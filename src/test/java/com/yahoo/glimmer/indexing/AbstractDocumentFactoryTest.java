@@ -22,7 +22,7 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 
 public class AbstractDocumentFactoryTest {
-    protected static final byte[] CONTENT_BYTES = ("33\thttp://subject/\t" +
+    protected static final byte[] CONTENT_BYTES = ("33\t22\thttp://subject/\t" +
     		"<http://predicate/1> <http://object/1> <file:/tmp/source> .  " +
     		"<http://predicate/2> <http://object/2> .  " +
     		"<http://predicate/3> \"object 3\"@en <http://context/1> .  " + 
