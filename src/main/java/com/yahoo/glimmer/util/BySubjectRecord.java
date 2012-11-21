@@ -11,20 +11,19 @@ package com.yahoo.glimmer.util;
  *  See accompanying LICENSE file.
  */
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 
-import org.apache.hadoop.io.Text;
-
 public class BySubjectRecord {
-    private static final Charset DEFAULT_CHARSET = Charset.forName("UTF-8");
+    private static final Charset CHARSET = Charset.forName("UTF-8");
     private static final char RECORD_DELIMITER = '\n';
     private static final char FIELD_DELIMITER = '\t';
-    private static final String RELATION_DELIMITER = "  ";
     private static final int MAX_RELATIONS = 10000;
 
     private int id;
@@ -39,108 +38,89 @@ public class BySubjectRecord {
     private int previousId = -1;
     private String subject;
     private final ArrayList<String> relations = new ArrayList<String>();
+    
+    private transient StringBuilder sb;
 
-    public boolean parse(Text text) {
-	return parse(text.getBytes(), 0, text.getLength());
+    
+    public static class BySubjectRecordParseException extends Exception {
+	private static final long serialVersionUID = 421747997614595011L;
+
+	public BySubjectRecordParseException(String message) {
+	    super(message);
+	}
+
+	public BySubjectRecordParseException(NumberFormatException e) {
+	    super(e);
+	}
     }
 
     public boolean parse(final byte[] bytes, final int start, final int end) {
-	return parse(bytes, start, end, DEFAULT_CHARSET);
+	return parse(bytes, start, end, CHARSET);
     }
 
     public boolean parse(final byte[] bytes, final int start, final int end, final Charset charset) {
-	int startOfIdIndex = start;
-	int endOfIdIndex = startOfIdIndex;
-	while (endOfIdIndex < end && Character.isDigit(bytes[endOfIdIndex])) {
-	    endOfIdIndex++;
-	}
-	;
-	if (endOfIdIndex >= end || endOfIdIndex == startOfIdIndex) {
-	    return false;
-	}
+	ByteArrayInputStream inputStream = new ByteArrayInputStream(bytes, start, end);
 	try {
-	    id = Integer.parseInt(new String(bytes, startOfIdIndex, endOfIdIndex - startOfIdIndex, charset));
-	} catch (NumberFormatException e) {
-	    return false;
+	    return parse(new InputStreamReader(inputStream, charset));
+	} catch (IOException e) {
+	    // This shouldn't happen reading from a ByteArrayInputStream.
+	    throw new RuntimeException(e);
 	}
-
-	int startOfIdDeltaIndex = endOfIdIndex + 1;
-	int endOfIdDeltaIndex = startOfIdDeltaIndex + 1;
-	while (endOfIdDeltaIndex < end && Character.isDigit(bytes[endOfIdDeltaIndex])) {
-	    endOfIdDeltaIndex++;
-	}
-	;
-	if (endOfIdDeltaIndex >= end || endOfIdDeltaIndex == startOfIdDeltaIndex) {
-	    return false;
-	}
-	try {
-	    previousId = Integer.parseInt(new String(bytes, startOfIdDeltaIndex, endOfIdDeltaIndex - startOfIdDeltaIndex, charset));
-	} catch (NumberFormatException e) {
-	    return false;
-	}
-
-	int startOfSubjectIdx = endOfIdDeltaIndex + 1;
-	int endOfSubjectIndex = startOfSubjectIdx;
-	while (endOfSubjectIndex < end && !Character.isWhitespace(bytes[endOfSubjectIndex])) {
-	    endOfSubjectIndex++;
-	}
-	if (endOfSubjectIndex >= end || endOfSubjectIndex == startOfSubjectIdx) {
-	    return false;
-	}
-	subject = new String(bytes, startOfSubjectIdx, endOfSubjectIndex - startOfSubjectIdx, DEFAULT_CHARSET);
-
-	while (endOfSubjectIndex < end && bytes[endOfSubjectIndex] != FIELD_DELIMITER) {
-	    endOfSubjectIndex++;
-	}
-	if (endOfSubjectIndex >= end) {
-	    return false;
-	}
-
-	int startOfRelationIndex = endOfSubjectIndex + 1;
-
-	return parseRelations(bytes, startOfRelationIndex, end, charset);
     }
     
-    public boolean parseRelations(final byte[] bytes, final int start, final int end, final Charset charset) {
-	int startOfRelationIndex = start;
-	int endOfRelationIndex = startOfRelationIndex;
+    public boolean parse(Reader reader) throws IOException {
+	if (sb == null) {
+	    sb = new StringBuilder();
+	}
+	return parse(reader, sb);
+    }
+    public boolean parse(Reader reader, StringBuilder sb) throws IOException {
+	readUntil(reader, sb, FIELD_DELIMITER);
+	try {
+	    id = Integer.parseInt(sb.toString());
+	} catch (NumberFormatException e) {
+	    return false;
+	}
 	
+	readUntil(reader, sb, FIELD_DELIMITER);
+	try {
+	    previousId = Integer.parseInt(sb.toString());
+	} catch (NumberFormatException e) {
+	    return false;
+	}
+	
+	return parseContent(reader, sb);
+    }
+    
+    public boolean parseContent(Reader reader) throws IOException {
+	if (sb == null) {
+	    sb = new StringBuilder();
+	}
+	return parseContent(reader, sb);
+    }
+    public boolean parseContent(Reader reader, StringBuilder sb) throws IOException {
+	readUntil(reader, sb, FIELD_DELIMITER);
+	subject = sb.toString();
+
 	relations.clear();
 
-	do {
-	    int delimiterIndex = 0;
-	    while (endOfRelationIndex < end) {
-		if (bytes[endOfRelationIndex] == RELATION_DELIMITER.charAt(delimiterIndex)) {
-		    endOfRelationIndex++;
-		    delimiterIndex++;
-		    if (delimiterIndex >= RELATION_DELIMITER.length()) {
-			// RELATION_DELIMITER match.
-			int relationLength = endOfRelationIndex - startOfRelationIndex - RELATION_DELIMITER.length();
-			if (relationLength > 0) {
-			    relations.add(new String(bytes, startOfRelationIndex, relationLength, DEFAULT_CHARSET));
-			}
-			break;
-		    }
-		} else if (bytes[endOfRelationIndex] == RECORD_DELIMITER) {
-		    if (startOfRelationIndex < endOfRelationIndex) {
-			relations.add(new String(bytes, startOfRelationIndex, endOfRelationIndex - startOfRelationIndex, DEFAULT_CHARSET));
-		    }
-		    endOfRelationIndex++;
-		    break;
-		} else if (endOfRelationIndex == end - 1) {
-		    endOfRelationIndex++;
-		    if (startOfRelationIndex < endOfRelationIndex) {
-			relations.add(new String(bytes, startOfRelationIndex, endOfRelationIndex - startOfRelationIndex, DEFAULT_CHARSET));
-		    }
-		    break;
-		} else {
-		    endOfRelationIndex++;
-		    delimiterIndex = 0;
-		}
-	    }
-	    startOfRelationIndex = endOfRelationIndex;
-	} while (endOfRelationIndex < end);
+	while (readUntil(reader, sb, FIELD_DELIMITER)) {
+	    if (sb.length() > 0)
+	    relations.add(sb.toString());
+	}
 
+	return true;
+    }
+    
+    private static boolean readUntil(final Reader reader, final StringBuilder sb, final char stopChar) throws IOException {
+	sb.setLength(0);
+	int c;
+	while ((c = reader.read()) != stopChar) {
+	    if (c == -1) {
+		return false;
+	    }
+	    sb.append((char)c);
+	}
 	return true;
     }
 
@@ -201,11 +181,8 @@ public class BySubjectRecord {
 			    relationChars = new char[relationCharsLength + 4096];
 			}
 			relationsString.getChars(0, relationCharsLength, relationChars, 0);
-			if (relationsIndex < relations.size()) {
-			    // Append RELATION_DELIMITER
-			    RELATION_DELIMITER.getChars(0, RELATION_DELIMITER.length(), relationChars, relationCharsLength);
-			    relationCharsLength += RELATION_DELIMITER.length();
-			}
+			
+			relationChars[relationCharsLength++] = FIELD_DELIMITER;
 			relationIndex = 0;
 		    }
 
@@ -262,14 +239,9 @@ public class BySubjectRecord {
 	    writer.write(subject);
 	}
 	writer.write(FIELD_DELIMITER);
-	boolean first = true;
 	for (String relation : relations) {
-	    if (first) {
-		first = false;
-	    } else {
-		writer.write(RELATION_DELIMITER);
-	    }
 	    writer.write(relation);
+	    writer.write(FIELD_DELIMITER);
 	}
 	writer.write(RECORD_DELIMITER);
     }

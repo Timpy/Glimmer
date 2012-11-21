@@ -13,9 +13,6 @@ package com.yahoo.glimmer.web;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
-import it.unimi.dsi.io.WordReader;
-import it.unimi.dsi.lang.MutableString;
-import it.unimi.di.mg4j.document.Document;
 import it.unimi.di.mg4j.index.Index;
 import it.unimi.di.mg4j.query.SelectedInterval;
 import it.unimi.di.mg4j.query.nodes.Query;
@@ -23,7 +20,8 @@ import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
 import it.unimi.di.mg4j.search.score.DocumentScoreInfo;
 
 import java.io.IOException;
-import java.io.Reader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Collections;
 import java.util.List;
 
@@ -35,6 +33,7 @@ import com.yahoo.glimmer.query.QueryLogger;
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.query.RDFQueryResult;
 import com.yahoo.glimmer.query.RDFResultItem;
+import com.yahoo.glimmer.util.BySubjectRecord;
 import com.yahoo.glimmer.util.Util;
 
 /**
@@ -43,8 +42,6 @@ import com.yahoo.glimmer.util.Util;
  */
 public class Querier {
     private final static Logger LOGGER = Logger.getLogger(Querier.class);
-    private static final String RELATION_END = " .";
-    private static final String RELATION_DELIMITOR = "  ";
     private static final String DEFAULT_CONTEXT = "default:";
 
     private QueryLogger queryLogger = new QueryLogger();
@@ -98,93 +95,63 @@ public class Querier {
     }
 
     private static RDFResultItem createRdfResultItem(RDFIndex index, int docId, double score, boolean lookupObjectLabels) throws IOException {
-	Document doc = index.getDocument(docId);
-	if (doc == null || doc.title().length() == 0) {
-	    return null;
+	InputStream docInputStream = index.getDocumentInputStream(docId);
+	
+	BySubjectRecord record = new BySubjectRecord();
+	
+	if (!record.parseContent(new InputStreamReader(docInputStream))) {
+	    throw new RuntimeException("Couldn't parse doc with id:" + docId);
 	}
+	
 	RDFResultItem item = new RDFResultItem();
 	item.setSubjectId(docId);
 	item.setScore(score);
-	String subject = doc.title().toString();
-	item.setSubject(subject);
+	item.setSubject(record.getSubject());
 
-	Reader r = (Reader) doc.content(0);
-	// We need to copy the WordReader otherwise the nested calls to
-	// createRdfResultItem() share the same instance.
-	WordReader wr = doc.wordReader(0).copy().setReader(r);
-	StringBuilder sb = new StringBuilder();
-	MutableString word = new MutableString();
-	MutableString nonWord = new MutableString();
-	while (wr.next(word, nonWord)) {
-	    int i = nonWord.indexOf(RELATION_END + RELATION_DELIMITOR);
-	    if (i >= 0) {
-		sb.append(word);
-		i += RELATION_END.length();
-		sb.append(nonWord.substring(0, i));
-		parseRelation(index, sb, item, lookupObjectLabels);
-		sb.setLength(0);
-		i += RELATION_DELIMITOR.length();
-		sb.append(nonWord.substring(i));
-	    } else {
-		sb.append(word);
-		sb.append(nonWord);
+	for (String relationString : record.getRelations()) {
+	    Node[] predicateObjectContext;
+	    try {
+		predicateObjectContext = NxParser.parseNodes(relationString);
+	    } catch (Exception e) {
+		throw new RuntimeException("Error parsing tuple: " + relationString);
 	    }
+	    
+	    String predicate = predicateObjectContext[0].toString();
+	    String object = predicateObjectContext[1].toString();
+	    String context;
+	    if (predicateObjectContext.length > 2) {
+		context = predicateObjectContext[2].toString();
+	    } else {
+		context = DEFAULT_CONTEXT;
+	    }
+	    boolean indexed = index.getIndexedPredicates().contains(Util.encodeFieldName(predicate));
+	    
+	    String label = null;
+	    // if predicate is an rdfs:label or woo:label, assign the object as the
+	    // items label
+	    // TODO. Consider ...name too.
+	    if (predicate.endsWith("label") || predicate.endsWith("name")) {
+		item.setLabel(object);
+		label = object;
+	    }
+	    
+	    Integer subjectIdOfObject = index.getSubjectId(object);
+	    
+	    if (label == null && lookupObjectLabels && subjectIdOfObject != null) {
+		// If the object is also a subject Resource/BNode this will
+		// return that subjects id with is the same as the docId.
+		// Parse the subject doc that this object refers too..
+		RDFResultItem objectItem = createRdfResultItem(index, subjectIdOfObject, 0.0d, false);
+		if (objectItem != null) {
+		    label = objectItem.getLabel();
+		}
+	    }
+	    
+	    item.addRelation(predicate, object, subjectIdOfObject, context, indexed, label);
 	}
-	r.close();
-	parseRelation(index, sb, item, lookupObjectLabels);
-	doc.close();
+	
+	docInputStream.close();
 
 	return item;
-    }
-
-    private static boolean parseRelation(RDFIndex index, StringBuilder relationSb, RDFResultItem item, boolean lookupObjectLabels) throws IOException {
-	if (relationSb.length() == 0) {
-	    return false;
-	}
-	String relation = relationSb.toString().trim();
-	if (relation.isEmpty()) {
-	    return false;
-	}
-	Node[] predicateObjectContext;
-	try {
-	    predicateObjectContext = NxParser.parseNodes(relation);
-	} catch (Exception e) {
-	    System.err.println("Error parsing tuple: " + relation);
-	    return false;
-	}
-
-	String predicate = predicateObjectContext[0].toString();
-	String object = predicateObjectContext[1].toString();
-	String context;
-	if (predicateObjectContext.length > 2) {
-	    context = predicateObjectContext[2].toString();
-	} else {
-	    context = DEFAULT_CONTEXT;
-	}
-	boolean indexed = index.getIndexedPredicates().contains(Util.encodeFieldName(predicate));
-
-	String label = null;
-	// if predicate is an rdfs:label or woo:label, assign the object as the
-	// items label
-	// TODO. Consider ...name too.
-	if (predicate.endsWith("label") || predicate.endsWith("name")) {
-	    item.setLabel(object);
-	    label = object;
-	}
-
-	Integer subjectIdOfObject = index.getSubjectId(object);
-
-	if (label == null && lookupObjectLabels && subjectIdOfObject != null) {
-	    // If the object is also a subject Resource/BNode this will
-	    // return that subjects id with is the same as the docId.
-	    // Parse the subject doc that this object refers too..
-	    RDFResultItem objectItem = createRdfResultItem(index, subjectIdOfObject, 0.0d, false);
-	    if (objectItem != null) {
-		label = objectItem.getLabel();
-	    }
-	}
-
-	item.addRelation(predicate, object, subjectIdOfObject, context, indexed, label);
-	return true;
     }
 }

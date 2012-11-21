@@ -88,8 +88,8 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 		System.out.println("Heap size: current/max/free: " + heapSize + "/" + heapMaxSize + "/" + heapFreeSize);
 	    }
 	    count++;
-
-	    if (!bySubjectRecord.parse(value)) {
+	    
+	    if (!bySubjectRecord.parse(value.getBytes(), 0, value.getLength())) {
 		throw new IllegalArgumentException("Failed to parse subject doc:\n" + value.toString());
 	    }
 

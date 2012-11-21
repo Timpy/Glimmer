@@ -33,7 +33,7 @@ public class BySubjectRecordTest {
     private static final String SUBJECT_1 = "http://subject/";
     private static final String RELATION_1_1 = "<http://predicate1> \"literal\" .";
     private static final String RELATION_1_2 = "<http://predicate2> <http://resource> .";
-    private static final String SUBJECT_DOC_1 = "" + ID_1 + '\t' + PREVIOUS_ID_1 + '\t' + SUBJECT_1 + '\t' + RELATION_1_1 + "  " + RELATION_1_2;
+    private static final String SUBJECT_DOC_1 = "" + ID_1 + '\t' + PREVIOUS_ID_1 + '\t' + SUBJECT_1 + '\t' + RELATION_1_1 + '\t' + RELATION_1_2 + '\t';
     private ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(4096);
     private Writer writer;
     private BySubjectRecord record;
@@ -188,12 +188,12 @@ public class BySubjectRecordTest {
     
     @Test
     public void spacesTest() throws IOException {
-	byte[] bytes = "7\t2\thttp://sbj/ \t  \n".getBytes("UTF-8");
+	byte[] bytes = "7\t2\thttp://sbj/ \t\t\n".getBytes("UTF-8");
 	assertTrue(record.parse(bytes, 0, bytes.length));
 	
 	assertEquals(7, record.getId());
 	assertEquals(2, record.getPreviousId());
-	assertEquals("http://sbj/", record.getSubject());
+	assertEquals("http://sbj/ ", record.getSubject());
 	assertFalse(record.hasRelations());
 	assertEquals(0, record.getRelationsCount());
 	Iterator<String> relations = record.getRelations().iterator();
@@ -202,7 +202,7 @@ public class BySubjectRecordTest {
     
     @Test
     public void firstRecordTest() throws IOException {
-	byte[] bytes = "4\t-1\thttp://sbj/\t  \n".getBytes("UTF-8");
+	byte[] bytes = "4\t-1\thttp://sbj/\t\t\n".getBytes("UTF-8");
 	assertTrue(record.parse(bytes, 0, bytes.length));
 	
 	assertEquals(4, record.getId());
@@ -232,6 +232,6 @@ public class BySubjectRecordTest {
 	relationsReader = record.getRelationsReader();
 	charsRead = relationsReader.read(buffer);
 	assertEquals(72, charsRead);
-	assertEquals(RELATION_1_1 + "  " + RELATION_1_2, new String(buffer, 0, charsRead));
+	assertEquals(RELATION_1_1 + '\t' + RELATION_1_2 + '\t', new String(buffer, 0, charsRead));
     }
 }

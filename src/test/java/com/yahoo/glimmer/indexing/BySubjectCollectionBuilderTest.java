@@ -27,12 +27,12 @@ import org.junit.Test;
 public class BySubjectCollectionBuilderTest {
     private static final String SUBJECT_RECORD_1 = "3\t-1\t" +
     		"http://subject1/\t" + 
-    		"<http://predicate11> \"literal1\" .  " + 
-    		"<http://predicate12> <http://resource1> .";
+    		"<http://predicate11> \"literal1\" .\t" + 
+    		"<http://predicate12> <http://resource1> .\t";
     
     private static final String SUBJECT_RECORD_2 = "6\t3\t" +
 	    "http://subject2/\t" + 
-	    "<http://predicate21> <http://resource2> .";
+	    "<http://predicate21> <http://resource2> .\t";
     
     private Mockery context;
     private DocumentCollectionBuilder builder;
@@ -73,7 +73,7 @@ public class BySubjectCollectionBuilderTest {
 	    inSequence(writeSequence);
 	    one(builder).add(new MutableString("predicate11"), new MutableString("> \""));
 	    inSequence(writeSequence);
-	    one(builder).add(new MutableString("literal1"), new MutableString("\" .  <"));
+	    one(builder).add(new MutableString("literal1"), new MutableString("\" .\t<"));
 	    inSequence(writeSequence);
 	    one(builder).add(new MutableString("http"), new MutableString("://"));
 	    inSequence(writeSequence);
@@ -81,7 +81,7 @@ public class BySubjectCollectionBuilderTest {
 	    inSequence(writeSequence);
 	    one(builder).add(new MutableString("http"), new MutableString("://"));
 	    inSequence(writeSequence);
-	    one(builder).add(new MutableString("resource1"), new MutableString("> ."));
+	    one(builder).add(new MutableString("resource1"), new MutableString("> .\t"));
 	    inSequence(writeSequence);
 	    one(builder).endTextField();
 	    inSequence(writeSequence);
@@ -111,7 +111,7 @@ public class BySubjectCollectionBuilderTest {
 	    inSequence(writeSequence);
 	    one(builder).add(new MutableString("http"), new MutableString("://"));
 	    inSequence(writeSequence);
-	    one(builder).add(new MutableString("resource2"), new MutableString("> ."));
+	    one(builder).add(new MutableString("resource2"), new MutableString("> .\t"));
 	    inSequence(writeSequence);
 	    one(builder).endTextField();
 	    inSequence(writeSequence);

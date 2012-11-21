@@ -26,11 +26,11 @@ import com.yahoo.glimmer.indexing.RDFDocumentFactory.IndexType;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory.RdfCounters;
 import com.yahoo.glimmer.util.BySubjectRecord;
 
+
+// TODO The RDFDocument/RDFDocumentFactory classes could be simpler.  They are as they are because they were derived from MG4J's Document/DocumentFactory interfaces.
 public abstract class RDFDocument {
     public static final String NO_CONTEXT = "";
 
-    // TODO RDFDocumnet should implement Hadoop's Writable but as we have a ref
-    // to an InputStream for lazy parsing this isn't possible.
     protected final RDFDocumentFactory factory;
     private BySubjectRecord record = new BySubjectRecord();
     /** Whether we already parsed the document. */

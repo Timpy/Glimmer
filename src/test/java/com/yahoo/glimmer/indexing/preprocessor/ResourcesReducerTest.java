@@ -101,9 +101,9 @@ public class ResourcesReducerTest {
 		one(mrContext).write(
 			with(new TextMatcher("http://some/subject/uri")),
 			with(new BySubjectRecordMatcher().set("0\t-1\thttp://some/subject/uri\t"
-				+ "<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .  "
-				+ "<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .  "
-				+ "<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .")));
+				+ "<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .\t"
+				+ "<http://some/predicate/uri/2> <http://some/object/uri2> <http://some/context/uri2> .\t"
+				+ "<http://some/predicate/uri/3> \"Some literal value\" <http://some/context/uri3> .\t")));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();
@@ -180,7 +180,7 @@ public class ResourcesReducerTest {
 		one(mrContext).write(
 			with(new TextMatcher("http://some/resource/uri1")), 
 			with(new BySubjectRecordMatcher().set("0\t-1\thttp://some/resource/uri1\t<http://predicate1> <http://object1> <context> ." +
-				"  <http://predicate2> <http://object2> <context> .")));
+				"\t<http://predicate2> <http://object2> <context> .\t")));
 		inSequence(sequence);
 		one(mrContext).write(with(new TextMatcher("http://some/resource/uri1")), with(new OutputCountMatcher(OUTPUT.PREDICATE, 1)));
 		inSequence(sequence);
@@ -194,7 +194,7 @@ public class ResourcesReducerTest {
 		one(mrContext).write(
 			with(new TextMatcher("http://some/resource/uri2")), 
 			with(new BySubjectRecordMatcher().set("1\t0\thttp://some/resource/uri2\t<http://predicateX> <http://objectX> <context> ." +
-				"  <http://predicateY> <http://objectY> <context> .")));
+				"\t<http://predicateY> <http://objectY> <context> .\t")));
 		inSequence(sequence);
 	    }
 	});
@@ -223,15 +223,15 @@ public class ResourcesReducerTest {
 		one(mrContext).write(with(new TextMatcher("bnodeSubject1")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		one(mrContext).write(
 			with(new TextMatcher("bnodeSubject1")),
-			with(new BySubjectRecordMatcher().set("0\t-1\tbnodeSubject1\t<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .  "
-				+ "<http://some/predicate/uri/2> _:bnode2 <http://some/context/uri2> .")));
+			with(new BySubjectRecordMatcher().set("0\t-1\tbnodeSubject1\t<http://some/predicate/uri/1> <http://some/object/uri1> <http://some/context/uri1> .\t"
+				+ "<http://some/predicate/uri/2> _:bnode2 <http://some/context/uri2> .\t")));
 		one(mrContext).write(with(new TextMatcher("bnodeSubject1")), with(new OutputCountMatcher(OUTPUT.OBJECT, 2)));
 		one(mrContext).write(with(new TextMatcher("http://some/context/uri1")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		one(mrContext).write(with(new TextMatcher("http://some/context/uri1")), with(new OutputCountMatcher(OUTPUT.CONTEXT, 1)));
 		one(mrContext).write(with(new TextMatcher("bnodeSubject2")), with(new OutputCountMatcher(OUTPUT.ALL, 0)));
 		one(mrContext).write(
 			with(new TextMatcher("bnodeSubject2")),
-			with(new BySubjectRecordMatcher().set("2\t0\tbnodeSubject2\t<http://some/predicate/uri/3> _:bnode3 <http://some/context/uri1> .")));
+			with(new BySubjectRecordMatcher().set("2\t0\tbnodeSubject2\t<http://some/predicate/uri/3> _:bnode3 <http://some/context/uri1> .\t")));
 	    }
 	});
 	ResourcesReducer reducer = new ResourcesReducer();

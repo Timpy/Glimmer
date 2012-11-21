@@ -729,8 +729,8 @@ public class RDFIndex {
 	}
     }
 
-    public Document getDocument(int docId) throws IOException {
-	return documentCollection.document(docId);
+    public InputStream getDocumentInputStream(int docId) throws IOException {
+	return documentCollection.stream(docId);
     }
 
     public Integer getDocumentSize(int docId) {

@@ -30,8 +30,8 @@ fi
 EXCLUDE_CONTEXTS=""
 # Optionally set PrepTool's tuple filter definition file.  This is a file containing an XStream serialized instance of a TupleFilter.
 # See SchemaDotOrgRegexTupleFilter.xml as an example and http://xstream.codehaus.org/converters.html.
-PREP_FILTER_FILE="SchemaDotOrgTupleFilter.xml"
-#PREP_FILTER_FILE="TestTupleFilter.xml"
+#PREP_FILTER_FILE="SchemaDotOrgTupleFilter.xml"
+PREP_FILTER_FILE="TestTupleFilter.xml"
 
 # Number of predicates to use when building vertical indexes.  
 # The occurrences of predicates found in the source tuples are counted and then sorted by occurrence count.
@@ -458,7 +458,9 @@ function buildCollection () {
 		exit $EXIT_CODE
 	fi
 	
-	${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/collection" "${LOCAL_BUILD_DIR}"
+	CMD="${HADOOP_CMD} fs -copyToLocal ${DFS_BUILD_DIR}/collection ${LOCAL_BUILD_DIR}"
+	echo ${CMD}
+	${CMD}
 }
 
 groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep ${SUBINDICES}
