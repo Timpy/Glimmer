@@ -12,7 +12,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-		<hadoop.version>0.23.3</hadoop.version>
+		<hadoop.version>0.23.4.3.1210310949</hadoop.version>
 	</properties>
 
 	<build>
@@ -58,15 +58,9 @@
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
-			<artifactId>hadoop-common</artifactId>
-			<version>${hadoop.version}</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-client</artifactId>
 			<version>${hadoop.version}</version>
-			<scope>provided</scope>
+			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.semanticweb.yars</groupId>

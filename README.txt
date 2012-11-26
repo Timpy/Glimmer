@@ -7,14 +7,14 @@ This file also gives a basic introduction to building and using Glimmer.
 Except as specifically stated below, the 3rd party software packages are not distributed as part of
 this project, but instead are separately downloaded from the respective provider.
 
-* Hadoop version 0.20.205.0 (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
+* Hadoop version 0.23.x (Apache License 2 - http://www.apache.org/licenses/LICENSE-2.0)
   Libs for executing code on a Hadoop map reduce cluster.
   http://hadoop.apache.org/
  
-* NxParser version 1.2.2 (BSD - http://www.opensource.org/licenses/bsd-license.php)
+* NxParser version 1.2.x (BSD - http://www.opensource.org/licenses/bsd-license.php)
   http://code.google.com/p/nxparser/
   
-* MG4j version 4.0.3 (GNU Lesser General Public License - http://www.gnu.org/licenses/lgpl.html)
+* MG4j version 5.1 (GNU Lesser General Public License - http://www.gnu.org/licenses/lgpl.html)
   http://mg4j.dsi.unimi.it/
 
 * Java servlet-api version 2.5 (Oracle Binary Code License - http://www.oracle.com/technetwork/java/javase/terms/license/index.html)

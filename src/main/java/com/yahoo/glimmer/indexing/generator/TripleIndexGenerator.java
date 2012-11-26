@@ -112,8 +112,8 @@ public class TripleIndexGenerator extends Configured implements Tool {
 
 	conf.setInt(NUMBER_OF_DOCUMENTS, jsapResult.getInt("numdocs"));
 	// Set this in a attempt to get around the 2GB of ram task limit on our cluster.
-	// Although even changing this from the 16GB default to 512KB doesn't permit many more than 100 indexes to be build in parallel.
-	//conf.setInt(INDEX_WRITER_CACHE_SIZE, 1024 * 1024);
+	// Setting this in the hope of fixing Direct buffer memory errors
+	conf.setInt(INDEX_WRITER_CACHE_SIZE, 1024 * 1024);
 
 	conf.set(OUTPUT_DIR, jsapResult.getString("output"));
 
