@@ -105,13 +105,13 @@ public class StartOffsetDocumentCollectionBuilder implements DocumentCollectionB
     
     private static class ByteCountOutputStream extends OutputStream {
 	private final OutputStream wrappedOutputStream;
-	private int byteCount;
+	private long byteCount;
 	
 	public ByteCountOutputStream(OutputStream outputStream) {
 	    wrappedOutputStream = outputStream;
 	}
 	
-	public int getByteCount() {
+	public long getByteCount() {
 	    return byteCount;
 	}
 	

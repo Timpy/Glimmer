@@ -106,14 +106,6 @@ public class RDFIndex {
 
     protected RDFQueryParser parser;
 
-    private static class InstantiatableConcatenatedDocumentCollection extends ConcatenatedDocumentCollection {
-	private static final long serialVersionUID = -8965500093785084788L;
-
-	public InstantiatableConcatenatedDocumentCollection(final String[] collectionName, final DocumentCollection[] collection) {
-	    super(collectionName, collection);
-	}
-    }
-
     private static DocumentCollection loadDocumentCollection(File collectionFile) throws RDFIndexException {
 	try {
 	    DocumentCollection documentCollection = (DocumentCollection) BinIO.loadObject(collectionFile);
@@ -169,7 +161,7 @@ public class RDFIndex {
 	    if (collectionFile.isFile()) {
 		documentCollection = loadDocumentCollection(collectionFile);
 	    } else if (collectionFile.isDirectory()) {
-		// A directory of collections
+		// A directory of collections.  fileNames will hold the names of the files without their path.
 		String[] fileNames = collectionFile.list(new FilenameFilter() {
 		    @Override
 		    public boolean accept(File dir, String name) {
@@ -185,23 +177,14 @@ public class RDFIndex {
 		    File file = new File(collectionFile, fileNames[0]);
 		    documentCollection = loadDocumentCollection(file);
 		} else {
-
-		    String[] names = new String[fileNames.length];
-		    DocumentCollection[] collections = new DocumentCollection[fileNames.length];
-
 		    // Sort names to get the collection order right
 		    Arrays.sort(fileNames);
-		    for (int i = 0; i < fileNames.length; i++) {
-			File file = new File(collectionFile, fileNames[i]);
-			names[i] = file.getPath();
-			try {
-			    collections[i] = loadDocumentCollection(file);
-			} catch (Error e) {
-			    LOGGER.fatal("Exception loading sub collection " + (i + 1) + " of " + fileNames.length);
-			    throw (e);
-			}
+		    documentCollection = new ConcatenatedDocumentCollection(fileNames);
+		    try {
+			documentCollection.filename(collectionFile + "/.");
+		    } catch (IOException e) {
+			throw new RDFIndexException(e);
 		    }
-		    documentCollection = new InstantiatableConcatenatedDocumentCollection(names, collections);
 		}
 	    } else {
 		throw new RuntimeException("Expected " + collectionFile.getPath() + " to be a collection file or directory containing collection files.");

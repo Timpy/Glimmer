@@ -264,8 +264,8 @@ function generateIndex () {
 		-Dmapreduce.map.memory.mb=2000 \
 		-Dmapreduce.reduce.memory.mb=2000 \
 		-Dmapreduce.task.io.sort.mb=128 \
-		-Dmapreduce.job.user.classpath.first=true \
 		-Dmapreduce.job.queuename=${QUEUE} \
+		-Dmapreduce.job.user.classpath.first=true \
 		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
@@ -434,21 +434,21 @@ function buildCollection () {
 		${HADOOP_CMD} fs -rmr -skipTrash ${COLLECTION_DIR}
 	fi
 	
-	# The property mapred.min.split.size effects the number of mappers used to build the collection.
+	# The property mapreduce.input.fileinputformat.split.minsize effects the number of mappers used to build the collection.
 	# Each mapper builds one partition of the collection. 
 	# If the resulting collection is then loaded using a concatanation of the partition, a terms map is loaded into memory for each partition.
 	# So if you have a lot of terms and a lot of partitions, loading the resulting collection can take a lot more memory than if the collection
 	# wasn't partitioned.
-	# Increasing the mapred.min.split.size reduces the number of mappers.
+	# Increasing the mapreduce.input.fileinputformat.split.minsize reduces the number of mappers.
 	# Probably best to keep the number of mappers low (5-20) at the expense of runtime.
 	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.BySubjectCollectionBuilder \
-		-Dmapred.map.max.attempts=2 \
+		-Dmapreduce.map.maxattempts=2 \
 		-Dmapreduce.map.speculative=false \
 		-Dmapred.child.java.opts=-Xmx900m \
 		-Dmapreduce.map.memory.mb=2000 \
 		-Dmapreduce.reduce.memory.mb=2000 \
 		-Dmapreduce.job.queuename=${QUEUE} \
-		-Dmapred.min.split.size=2500000000 \
+		-Dmapreduce.input.fileinputformat.split.minsize=2500000000 \
 		${PREP_DIR}/bySubject ${COLLECTION_DIR}"
 	echo ${CMD}
 	${CMD}

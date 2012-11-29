@@ -38,7 +38,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
     public static final String START_OFFSETS_EXTENSION = ".sos";
     public static final Charset DOCUMENTS_CHARSET = Charset.forName("UTF-8");
     
-    private static final int DEFAULT_SUBLIST_SIZE = 1<<10;
+    private static final int DEFAULT_SUBLIST_SIZE = 10000;
     private int subListSize = DEFAULT_SUBLIST_SIZE;
 
     private final ArrayList<OffsetsList> offsetsLists = new ArrayList<OffsetsList>();
@@ -77,8 +77,8 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 
     @Override
     public InputStream stream(int index) throws IOException {
-	int startOffset = getOffset(index);
-	int length;
+	long startOffset = getOffset(index);
+	long length;
 	index++;
 	if (index < size()) {
 	    length = getOffset(index) - startOffset;
@@ -86,7 +86,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 	    length = (int) channel.size() - startOffset;
 	}
 
-	ByteBuffer byteBuffer = ByteBuffer.allocate(length);
+	ByteBuffer byteBuffer = ByteBuffer.allocate((int)length);
 	int read = channel.read(byteBuffer, startOffset);
 	if (read != length) {
 	    throw new IOException("Failed to read full document");
@@ -133,7 +133,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 	return documentFactory;
     }
 
-    private int getOffset(int index) {
+    private long getOffset(int index) {
 	if (index < 0 || index >= size()) {
 	    throw new IndexOutOfBoundsException("Given index " + index + " out of range 0 to " + (size() - 1));
 	}
@@ -144,7 +144,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 	return offsetsList.offsets[subOffsetIndex];
     }
     
-    protected void addOffset(int offset) {
+    protected void addOffset(long offset) {
 	int offsetsIndex = size / subListSize;
 	int subOffsetIndex = size % subListSize;
 	
@@ -162,10 +162,10 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
     private static class OffsetsList implements Serializable {
 	private static final long serialVersionUID = 5596313596485415506L;
 	
-	final int[] offsets;
+	final long[] offsets;
 
 	public OffsetsList(int length) {
-	    offsets = new int[length];
+	    offsets = new long[length];
 	}
     }
 }
