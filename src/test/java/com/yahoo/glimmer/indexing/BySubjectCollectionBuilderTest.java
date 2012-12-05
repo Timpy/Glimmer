@@ -67,6 +67,12 @@ public class BySubjectCollectionBuilderTest {
 	    inSequence(writeSequence);
 	    one(builder).startTextField();
 	    inSequence(writeSequence);
+	    one(builder).add(new MutableString("3"), new MutableString("\t"));
+	    inSequence(writeSequence);
+	    one(builder).add(new MutableString("-1"), new MutableString("\t"));
+	    inSequence(writeSequence);
+	    one(builder).add(new MutableString("http://subject1/"), new MutableString("\t"));
+	    inSequence(writeSequence);
 	    one(builder).add(new MutableString(""), new MutableString("<"));
 	    inSequence(writeSequence);
 	    one(builder).add(new MutableString("http"), new MutableString("://"));
@@ -102,6 +108,12 @@ public class BySubjectCollectionBuilderTest {
 	    one(builder).startDocument("http://subject2/", "http://subject2/");
 	    inSequence(writeSequence);
 	    one(builder).startTextField();
+	    inSequence(writeSequence);
+	    one(builder).add(new MutableString("6"), new MutableString("\t"));
+	    inSequence(writeSequence);
+	    one(builder).add(new MutableString("3"), new MutableString("\t"));
+	    inSequence(writeSequence);
+	    one(builder).add(new MutableString("http://subject2/"), new MutableString("\t"));
 	    inSequence(writeSequence);
 	    one(builder).add(new MutableString(""), new MutableString("<"));
 	    inSequence(writeSequence);

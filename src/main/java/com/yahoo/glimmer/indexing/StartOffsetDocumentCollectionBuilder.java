@@ -22,6 +22,13 @@ import it.unimi.dsi.lang.MutableString;
 import java.io.IOException;
 import java.io.OutputStream;
 
+/**
+ * A dumb DocumentCollectionBuilder that only stores fields separated by newlines.
+ * The start and end of each document is store as the byte offset in a .sos file.
+ *  
+ * @author tep
+ *
+ */
 public class StartOffsetDocumentCollectionBuilder implements DocumentCollectionBuilder {
     private final String basename;
     private final DocumentFactory documentFactory;
@@ -30,13 +37,11 @@ public class StartOffsetDocumentCollectionBuilder implements DocumentCollectionB
     private StartOffsetDocumentCollection collection;
     private ByteCountOutputStream documentsOutputStream;
     private OutputStream offsetsOutputStream;
-    private MutableString ms;
     
     public StartOffsetDocumentCollectionBuilder(String basename, DocumentFactory documentFactory, IOFactory ioFactory) {
 	this.basename = basename;
 	this.documentFactory = documentFactory;
 	this.ioFactory = ioFactory;
-	ms = new MutableString();
     }
     
     @Override
@@ -60,10 +65,6 @@ public class StartOffsetDocumentCollectionBuilder implements DocumentCollectionB
     @Override
     public void startDocument(CharSequence title, CharSequence uri) throws IOException {
 	collection.addOffset(documentsOutputStream.getByteCount());
-	ms.setLength(0);
-	ms.append(title);
-	ms.append('\t');
-	ms.writeUTF8(documentsOutputStream);
     }
 
     @Override
@@ -78,6 +79,7 @@ public class StartOffsetDocumentCollectionBuilder implements DocumentCollectionB
     
     @Override
     public void endTextField() throws IOException {
+	documentsOutputStream.write('\n');
     }
     @Override
     public void endDocument() throws IOException {

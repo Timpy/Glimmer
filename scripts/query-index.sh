@@ -21,7 +21,7 @@ LOCAL_BUILD_DIR="${HOME}/tmp/index-${BUILD_NAME}"
 INDEX_DIR="${LOCAL_BUILD_DIR}/${METHOD}"
 
 
-PROJECT_JAR="../target/Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
+JAR_FOR_HADOOP="../target/Glimmer-0.0.1-SNAPSHOT-jar-for-hadoop.jar"
 
 RLWRAP=$(which rlwrap)
 if [ -z ${RLWRAP} ] ; then
@@ -50,4 +50,4 @@ do
   fi
 done
 echo $BASENAMES
-${RLWRAP} java -Xmx3500m -cp $PROJECT_JAR it.unimi.di.mg4j.query.Query -n -v -T ${LOCAL_BUILD_DIR}/all.txt $BASENAMES
+${RLWRAP} java -Xmx3500m -cp $JAR_FOR_HADOOP it.unimi.di.mg4j.query.Query -n -v -T ${LOCAL_BUILD_DIR}/all.txt $BASENAMES

@@ -38,10 +38,9 @@ public class BySubjectRecord {
     private int previousId = -1;
     private String subject;
     private final ArrayList<String> relations = new ArrayList<String>();
-    
+
     private transient StringBuilder sb;
 
-    
     public static class BySubjectRecordParseException extends Exception {
 	private static final long serialVersionUID = 421747997614595011L;
 
@@ -67,13 +66,14 @@ public class BySubjectRecord {
 	    throw new RuntimeException(e);
 	}
     }
-    
+
     public boolean parse(Reader reader) throws IOException {
 	if (sb == null) {
 	    sb = new StringBuilder();
 	}
 	return parse(reader, sb);
     }
+
     public boolean parse(Reader reader, StringBuilder sb) throws IOException {
 	readUntil(reader, sb, FIELD_DELIMITER);
 	try {
@@ -81,37 +81,26 @@ public class BySubjectRecord {
 	} catch (NumberFormatException e) {
 	    return false;
 	}
-	
+
 	readUntil(reader, sb, FIELD_DELIMITER);
 	try {
 	    previousId = Integer.parseInt(sb.toString());
 	} catch (NumberFormatException e) {
 	    return false;
 	}
-	
-	return parseContent(reader, sb);
-    }
-    
-    public boolean parseContent(Reader reader) throws IOException {
-	if (sb == null) {
-	    sb = new StringBuilder();
-	}
-	return parseContent(reader, sb);
-    }
-    public boolean parseContent(Reader reader, StringBuilder sb) throws IOException {
+
 	readUntil(reader, sb, FIELD_DELIMITER);
 	subject = sb.toString();
 
 	relations.clear();
-
 	while (readUntil(reader, sb, FIELD_DELIMITER)) {
 	    if (sb.length() > 0)
-	    relations.add(sb.toString());
+		relations.add(sb.toString());
 	}
 
 	return true;
     }
-    
+
     private static boolean readUntil(final Reader reader, final StringBuilder sb, final char stopChar) throws IOException {
 	sb.setLength(0);
 	int c;
@@ -119,7 +108,7 @@ public class BySubjectRecord {
 	    if (c == -1) {
 		return false;
 	    }
-	    sb.append((char)c);
+	    sb.append((char) c);
 	}
 	return true;
     }
@@ -155,8 +144,6 @@ public class BySubjectRecord {
     public Reader getRelationsReader() {
 	return new Reader() {
 	    private int relationsIndex;
-	    private char[] relationChars = new char[4096];
-	    private int relationCharsLength;
 	    private int relationIndex;
 
 	    @Override
@@ -165,45 +152,46 @@ public class BySubjectRecord {
 
 	    @Override
 	    public int read(final char[] buffer, final int startIndex, final int len) throws IOException {
+		if (len == 0) {
+		    return 0;
+		}
+
 		int bufferIndex = startIndex;
+		int bufferEndIndex = startIndex + len;
 
-		while (true) {
-		    if (relationCharsLength == 0) {
-			if (relations.size() <= relationsIndex) {
-			    // No more relations. EOF or number of chars copied.
-			    return bufferIndex == startIndex ? -1 : bufferIndex - startIndex;
-			}
-
-			String relationsString = relations.get(relationsIndex++);
-			relationCharsLength = relationsString.length();
-			if (relationChars.length < relationCharsLength + 2) {
-			    // Allocate a bigger array.
-			    relationChars = new char[relationCharsLength + 4096];
-			}
-			relationsString.getChars(0, relationCharsLength, relationChars, 0);
-			
-			relationChars[relationCharsLength++] = FIELD_DELIMITER;
-			relationIndex = 0;
-		    }
-
-		    int remainingBufferChars = startIndex + len - bufferIndex;
-		    int remainingRelationChars = relationCharsLength - relationIndex;
-
-		    if (remainingBufferChars > remainingRelationChars) {
-			// Write rest of relation chars and move to next
-			// relation.
-			System.arraycopy(relationChars, relationIndex, buffer, bufferIndex, remainingRelationChars);
-			bufferIndex += remainingRelationChars;
-			relationCharsLength = 0;
-		    } else {
-			// Fill the buffer with current relation
-			System.arraycopy(relationChars, relationIndex, buffer, bufferIndex, remainingBufferChars);
-			if (remainingBufferChars == remainingRelationChars) {
-			    relationCharsLength = 0;
+		for (;;) {
+		    if (relationsIndex >= relations.size()) {
+			if (bufferIndex == startIndex) {
+			    return -1;
 			} else {
-			    relationIndex += remainingBufferChars;
+			    return bufferIndex - startIndex;
 			}
-			return bufferIndex - startIndex;
+		    }
+		    String relationString = relations.get(relationsIndex);
+
+		    if (relationIndex == relationString.length()) {
+			// case where in the last call the last char returned
+			// was the last char of the current relation.
+			buffer[bufferIndex++] = '\t';
+			
+			relationsIndex++;
+			relationIndex = 0;
+		    } else {
+			while (relationIndex < relationString.length() && bufferIndex < bufferEndIndex) {
+			    buffer[bufferIndex++] = relationString.charAt(relationIndex++);
+			}
+
+			if (bufferIndex == bufferEndIndex) {
+			    return len;
+			}
+			
+			relationsIndex++;
+			relationIndex = 0;
+
+			buffer[bufferIndex++] = '\t';
+			if (bufferIndex == bufferEndIndex) {
+			    return len;
+			}
 		    }
 		}
 	    }

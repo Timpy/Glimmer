@@ -152,6 +152,7 @@
 	border-bottom: dotted 1px #5555FF;
 	margin-left: 10px;
 }
+
 .doc-link:hover {
 	border-bottom: none;
 	color: #fff;
@@ -327,4 +328,9 @@ blockquote {
 	width: auto;
 	float: right;
 	border-left: thin dotted #000;
+}
+
+.object div {
+	word-wrap: break-word;
+	width: 800px;
 }

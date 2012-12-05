@@ -53,6 +53,7 @@ import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -585,6 +586,7 @@ public class RDFIndex {
      *            - Resource or BNode
      * @return the doc id if the given uri is a valid doc uri.
      * @throws IOException
+     * @throws RDFIndexException 
      */
     public Integer getSubjectId(String uri) throws IOException {
 	Long id = allResourcesToIds.get(uri);
@@ -592,8 +594,15 @@ public class RDFIndex {
 	    // Check that the doc is a valid doc(has contents).. TODO could use
 	    // the subjects signed hash here..
 	    Document doc = documentCollection.document(id.intValue());
-	    if (doc.title().length() == 0) {
-		id = null;
+	    Object content = doc.content(0);
+	    if (content instanceof Reader) {
+		Reader contentReader = (Reader)content;
+		if (contentReader.read() == -1) {
+		    id = null;
+		}
+		contentReader.close();
+	    } else {
+		throw new IllegalStateException("doc.content(0) for doc id " + id.intValue() + " didn't return a Reader!");
 	    }
 	    doc.close();
 	}

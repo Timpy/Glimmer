@@ -54,11 +54,19 @@ public class TuplesToResourcesMapperTest {
 	    
 	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/name")), with(new TextMatcher("PREDICATE")));
 	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85740")), with(new TextMatcher("<http://www.example.org/terms/name> \"Smith\" .")));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/name")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85741")), with(new TextMatcher("<http://www.example.org/terms/name> \"Johnson\"@en .")));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/terms/name")), with(new TextMatcher("PREDICATE")));
+	    one(mrContext).write(with(new TextMatcher("http://www.example.org/staffid/85742")), with(new TextMatcher("<http://www.example.org/terms/name> \"Ray\"@ .")));
 	}});
 	TuplesToResourcesMapper mapper = new TuplesToResourcesMapper();
 	
 	mapper.map(new LongWritable(5l), new Text(
 		"<http://www.example.org/staffid/85740> <http://www.example.org/terms/name> \"Smith\" ."), mrContext);
+	mapper.map(new LongWritable(5l), new Text(
+		"<http://www.example.org/staffid/85741> <http://www.example.org/terms/name> \"Johnson\"@en ."), mrContext);
+	mapper.map(new LongWritable(5l), new Text(
+		"<http://www.example.org/staffid/85742> <http://www.example.org/terms/name> \"Ray\"@ ."), mrContext);
 	context.assertIsSatisfied();
     }
     

@@ -25,7 +25,6 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
-import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
@@ -47,11 +46,6 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 
-import org.apache.commons.httpclient.HostConfiguration;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpException;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.httpclient.methods.GetMethod;
 import org.apache.log4j.Logger;
 import org.w3c.dom.Document;
 
@@ -59,120 +53,10 @@ public class Util {
 
     public final static SimpleDateFormat XSD_DATETIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd'T'hh:mm:ssZ");
 
-    private static final int MAX_TOTAL_CONNECTIONS = 500;
-
-    private static final int DEFAULT_MAX_CONNECTIONS_PER_HOST = 100;
-
-    private static final int SO_TIMEOUT = 60000;
-
-    private static final int CONNECTION_TIMEOUT = 60000;
-
     private final static int BUFFER_SIZE = 2048;
 
     protected static Logger _logger = Logger.getLogger(Util.class);
 
-    private static HttpClient _httpClient;
-
-    static {
-
-	_logger.info("Initializing MultiThreadedHttpConnectionManager with " + "CONNECTION_TIMEOUT=" + CONNECTION_TIMEOUT + "ms and " + "SO_TIMEOUT="
-		+ SO_TIMEOUT + "ms " + "DEFAULT_MAX_CONNECTIONS_PER_HOST=" + DEFAULT_MAX_CONNECTIONS_PER_HOST + " " + "MAX_TOTALCONNECTIONS="
-		+ MAX_TOTAL_CONNECTIONS);
-
-	MultiThreadedHttpConnectionManager mthc = new MultiThreadedHttpConnectionManager();
-	mthc.getParams().setDefaultMaxConnectionsPerHost(DEFAULT_MAX_CONNECTIONS_PER_HOST);
-	mthc.getParams().setMaxTotalConnections(MAX_TOTAL_CONNECTIONS);
-	_httpClient = new HttpClient(mthc);
-
-	mthc.getParams().setConnectionTimeout(CONNECTION_TIMEOUT);
-	mthc.getParams().setSoTimeout(SO_TIMEOUT);
-    }
-
-    /**
-     * Retrieve a document from the given URL using HTTP GET
-     * 
-     * @param url
-     * @return Document as stream
-     * @throws HttpException
-     * @throws IOException
-     * @see org.apache.commons.httpclient.methods.GetMethod
-     */
-    public static InputStream getDocumentAsInputStream(String url) throws HttpException, IOException {
-	// Execute a GET method on the URL
-	GetMethod get = new GetMethod(url);
-	get.setFollowRedirects(true);
-	get.addRequestHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 4.0)");
-	_httpClient.executeMethod(get);
-	return get.getResponseBodyAsStream();
-    }
-
-    /**
-     * Retrieve a document from the given URL using HTTP GET. The method
-     * getDocumentAsInputStream is preferred over this one, because reading a
-     * document requires to buffer a document of unknown size.
-     * 
-     * @param url
-     * @return Document as String
-     * @throws HttpException
-     * @throws IOException
-     * @see #getDocumentAsInputStream
-     * 
-     */
-    public static String getDocumentAsString(String url) throws HttpException, IOException {
-	String result = "";
-	// Execute a GET method on the URL
-	GetMethod get = new GetMethod(url);
-	get.setFollowRedirects(true);
-	get.addRequestHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 4.0)");
-	try {
-	    _httpClient.executeMethod(get);
-	    result = get.getResponseBodyAsString();
-	    if (get.getStatusCode() != 200)
-		throw new HttpException("Response code is " + get.getStatusCode());
-	} finally {
-	    get.releaseConnection();
-	}
-	return result;
-    }
-
-    /**
-     * Retrieve a document from the given URL through a proxy. The method
-     * getDocumentAsInputStream is preferred over this one, because reading a
-     * document requires to buffer a document of unknown size.
-     * 
-     * @param url
-     * @return Document as String
-     * @throws HttpException
-     * @throws IOException
-     * @see #getDocumentAsInputStream
-     * 
-     */
-    public static String getDocumentAsString(String url, String proxyURL, int proxyPort, String hlfsReturn) throws HttpException, IOException {
-	String result = "";
-	// Execute a GET method on the URL
-	GetMethod get = new GetMethod(url);
-	HostConfiguration config = new HostConfiguration();
-	config.setHost(url);
-	config.setProxy(proxyURL, proxyPort);
-	get.setFollowRedirects(true);
-	get.addRequestHeader("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 4.0)");
-	get.addRequestHeader("HLFS_Return", hlfsReturn);
-	try {
-	    _httpClient.executeMethod(config, get);
-	    result = get.getResponseBodyAsString();
-	} finally {
-	    get.releaseConnection();
-	}
-	return result;
-    }
-
-    public static String getDocumentAsString(URL url) throws HttpException, IOException {
-	return getDocumentAsString(url.toExternalForm());
-    }
-
-    public static String getDocumentAsString(URL url, String proxyURL, int proxyPort) throws HttpException, IOException {
-	return getDocumentAsString(url.toExternalForm(), proxyURL, proxyPort, "OnlyProcessed");
-    }
 
     public static Transformer initTransformer(InputStream is) throws TransformerConfigurationException {
 

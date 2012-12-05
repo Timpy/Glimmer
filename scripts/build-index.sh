@@ -52,7 +52,7 @@ LOCAL_BUILD_DIR="${HOME}/tmp/index-${BUILD_NAME}"
 
 QUEUE=${QUEUE:-default}
 
-PROJECT_JAR="../target/Glimmer-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
+JAR_FOR_HADOOP="../target/Glimmer-0.0.1-SNAPSHOT-jar-for-hadoop.jar"
 HADOOP_CACHE_FILES="../target/classes/blacklist.txt"
 
 COMPRESSION_CODEC="org.apache.hadoop.io.compress.BZip2Codec"
@@ -63,8 +63,8 @@ HASH_EXTENSION=".smap"
 #INDEX_FILE_EXTENSIONS="frequencies index offsets positions posnumbits properties stats termmap terms"
 INDEX_FILE_EXTENSIONS="counts countsoffsets frequencies occurrencies pointers pointersoffsets positions positionsoffsets properties sumsmaxpos terms"
 
-if [ ! -f ${PROJECT_JAR} ] ; then
-	echo "Projects jar file missing!! ${PROJECT_JAR}"
+if [ ! -f ${JAR_FOR_HADOOP} ] ; then
+	echo "Projects jar file missing!! ${JAR_FOR_HADOOP}"
 	exit 1
 fi
 
@@ -161,7 +161,7 @@ function groupBySubject () {
 		HADOOP_FILES="-files ${PREP_FILTER_FILE}#FilterXml"
 	fi
 	
-	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.preprocessor.PrepTool \
+	local CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.preprocessor.PrepTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapreduce.map.speculative=true \
 		-Dmapred.child.java.opts=-Xmx800m \
@@ -198,7 +198,7 @@ function computeHashes () {
 	echo "		If you get out of heap errors try setting hadoop's HADOOP_HEAPSIZE or HADOOP_CLIENT_OPTS=\"-Xmx3500m\""
 	echo
 	# Generate Hashes for subjects, predicates and objects and all
-	CMD="$HADOOP_CMD jar ${PROJECT_JAR} com.yahoo.glimmer.util.ComputeHashTool \
+	CMD="$HADOOP_CMD jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.util.ComputeHashTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-sui ${FILES}"
 	echo ${CMD}; ${CMD}
@@ -256,7 +256,7 @@ function generateIndex () {
 	fi
 	
 	echo Generating index..
-	local CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.generator.TripleIndexGenerator \
+	local CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.generator.TripleIndexGenerator \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapreduce.map.speculative=true \
 		-Dmapreduce.job.reduces=${SUBINDICES} \
@@ -352,7 +352,7 @@ function mergeSubIndexes() {
 			NO_COUNTS_OPTIONS="-cCOUNTS:NONE -cPOSITIONS:NONE"
 		fi
 		
-		CMD="java -Xmx2G -cp ${PROJECT_JAR} it.unimi.di.mg4j.tool.Merge ${NO_COUNTS_OPTIONS} ${INDEX_DIR}/${INDEX_NAME} ${SUB_INDEXES}"
+		CMD="java -Xmx2G -cp ${JAR_FOR_HADOOP} it.unimi.di.mg4j.tool.Merge ${NO_COUNTS_OPTIONS} ${INDEX_DIR}/${INDEX_NAME} ${SUB_INDEXES}"
 		echo ${CMD}
 		${CMD}
 		
@@ -367,7 +367,7 @@ function mergeSubIndexes() {
 			rm ${PART_DIR}/${INDEX_NAME}.*
 		done
 		
-		CMD="java -cp ${PROJECT_JAR} it.unimi.dsi.util.ImmutableExternalPrefixMap ${INDEX_DIR}/${INDEX_NAME}.termmap -o ${INDEX_DIR}/${INDEX_NAME}.terms"
+		CMD="java -cp ${JAR_FOR_HADOOP} it.unimi.dsi.util.ImmutableExternalPrefixMap ${INDEX_DIR}/${INDEX_NAME}.termmap -o ${INDEX_DIR}/${INDEX_NAME}.terms"
 		echo ${CMD}
 		${CMD}
 		
@@ -393,7 +393,7 @@ function generateDocSizes () {
 	DFS_SIZES_DIR="${DFS_BUILD_DIR}/${METHOD}.sizes"
 	REDUCE_TASKS=$(( 1 + ${NUMBER_OF_DOCS} / 10000000 ))
 	
-	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.DocSizesGenerator \
+	CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.DocSizesGenerator \
 		-Dmapreduce.map.failures.maxpercent=1 \
 		-Dmapreduce.map.speculative=true \
 		-Dmapreduce.job.reduces=${REDUCE_TASKS} \
@@ -441,7 +441,7 @@ function buildCollection () {
 	# wasn't partitioned.
 	# Increasing the mapreduce.input.fileinputformat.split.minsize reduces the number of mappers.
 	# Probably best to keep the number of mappers low (5-20) at the expense of runtime.
-	CMD="${HADOOP_CMD} jar ${PROJECT_JAR} com.yahoo.glimmer.indexing.BySubjectCollectionBuilder \
+	CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.BySubjectCollectionBuilder \
 		-Dmapreduce.map.maxattempts=2 \
 		-Dmapreduce.map.speculative=false \
 		-Dmapred.child.java.opts=-Xmx900m \

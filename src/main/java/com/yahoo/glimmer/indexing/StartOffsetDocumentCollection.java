@@ -16,8 +16,11 @@ import it.unimi.di.mg4j.document.Document;
 import it.unimi.di.mg4j.document.DocumentCollection;
 import it.unimi.di.mg4j.document.DocumentFactory;
 import it.unimi.di.mg4j.document.PropertyBasedDocumentFactory;
+import it.unimi.dsi.fastutil.longs.AbstractLongBigList;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
+import it.unimi.dsi.sux4j.util.EliasFanoLongBigList;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -32,24 +35,28 @@ import java.nio.charset.Charset;
 import java.util.ArrayList;
 
 public class StartOffsetDocumentCollection extends AbstractDocumentCollection implements Serializable {
+    private static final byte[] ZERO_BYTE_BUFFER = new byte[0];
+
     private static final long serialVersionUID = 7453027897721346888L;
-    
+
     public static final String DOCUMENTS_EXTENSION = ".documents";
     public static final String START_OFFSETS_EXTENSION = ".sos";
     public static final Charset DOCUMENTS_CHARSET = Charset.forName("UTF-8");
-    
-    private static final int DEFAULT_SUBLIST_SIZE = 10000;
-    private int subListSize = DEFAULT_SUBLIST_SIZE;
 
-    private final ArrayList<OffsetsList> offsetsLists = new ArrayList<OffsetsList>();
-    private final String name; 
+    private static final int SUBLIST_SIZE = 10000;
+
+    private final String name;
     private final DocumentFactory documentFactory;
+    private final ArrayList<OffsetsList> offsetsLists;
     private int size;
+    private transient OffsetsList currentSubList;
     private transient FileChannel channel;
 
     public StartOffsetDocumentCollection(String name, DocumentFactory documentFactory) {
 	this.name = new File(name).getName();
 	this.documentFactory = documentFactory;
+	offsetsLists = new ArrayList<OffsetsList>();
+	currentSubList = new OffsetsList();
     }
 
     @Override
@@ -58,7 +65,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
     }
 
     private void initFiles(File absolutePathToCollection) throws FileNotFoundException {
-	File documentsFile = new File( absolutePathToCollection, name + DOCUMENTS_EXTENSION);
+	File documentsFile = new File(absolutePathToCollection, name + DOCUMENTS_EXTENSION);
 	FileInputStream documentsInputStream = new FileInputStream(documentsFile);
 	channel = documentsInputStream.getChannel();
     }
@@ -81,45 +88,32 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 	long length;
 	index++;
 	if (index < size()) {
-	    length = getOffset(index) - startOffset;
+	    length = getOffset(index) - startOffset - 1;
 	} else {
-	    length = (int) channel.size() - startOffset;
+	    length = (int) channel.size() - startOffset - 1;
 	}
-
-	ByteBuffer byteBuffer = ByteBuffer.allocate((int)length);
-	int read = channel.read(byteBuffer, startOffset);
-	if (read != length) {
-	    throw new IOException("Failed to read full document");
+	if (length > 0) {
+	    ByteBuffer byteBuffer = ByteBuffer.allocate((int) length);
+	    int read = channel.read(byteBuffer, startOffset);
+	    if (read != length) {
+		throw new IOException("Failed to read full document");
+	    }
+	    return new ByteArrayInputStream(byteBuffer.array());
 	}
-	return new ByteArrayInputStream(byteBuffer.array());
+	return new ByteArrayInputStream(ZERO_BYTE_BUFFER);
     }
 
     @Override
     public Reference2ObjectMap<Enum<?>, Object> metadata(int index) throws IOException {
 	return getMetadata(stream(index));
     }
-    
+
     private Reference2ObjectMap<Enum<?>, Object> getMetadata(InputStream stream) throws IOException {
 	Reference2ObjectOpenHashMap<Enum<?>, Object> metadata = new Reference2ObjectOpenHashMap<Enum<?>, Object>();
-	
+
 	// TODO Why is this not picked up from the factories metadata?
 	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.ENCODING, "UTF-8");
-	
-	// read the title from the stream.
-	byte[] buffer = new byte[4096];
-	int pos = 0;
-	int b = stream.read();
-	// Cludge.  Really the DocumentFactory should extract the title from the stream and do it without treating ints as chars.
-	while (b != -1 && b != '\t') {
-	    buffer[pos++] = (byte) b;
-	    b = stream.read();
-	}
-	if (b == -1) {
-	    throw new IllegalStateException("Could not read from stream!");
-	}
-	
-	String title = new String(buffer, 0, pos, "UTF-8");
-	metadata.put(PropertyBasedDocumentFactory.MetadataKeys.TITLE, title);
+
 	return metadata;
     }
 
@@ -133,39 +127,102 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 	return documentFactory;
     }
 
+    protected void addOffset(long offset) {
+	if (currentSubList.addOffset(offset)) {
+	    currentSubList.lastOffsetAdded();
+	    offsetsLists.add(currentSubList);
+	    currentSubList = new OffsetsList();
+	}
+	size++;
+    }
+
     private long getOffset(int index) {
 	if (index < 0 || index >= size()) {
 	    throw new IndexOutOfBoundsException("Given index " + index + " out of range 0 to " + (size() - 1));
 	}
-	int offsetsIndex = index / subListSize;
-	int subOffsetIndex = index % subListSize;
+	int offsetsIndex = index / SUBLIST_SIZE;
+	int subOffsetIndex = index % SUBLIST_SIZE;
 
 	OffsetsList offsetsList = offsetsLists.get(offsetsIndex);
-	return offsetsList.offsets[subOffsetIndex];
+	return offsetsList.getOffset(subOffsetIndex);
     }
-    
-    protected void addOffset(long offset) {
-	int offsetsIndex = size / subListSize;
-	int subOffsetIndex = size % subListSize;
-	
-	OffsetsList subList;
-	if (subOffsetIndex == 0) {
-	    subList = new OffsetsList(subListSize);
-	    offsetsLists.add(subList);
-	} else {
-	    subList = offsetsLists.get(offsetsIndex);
+
+    @Override
+    public void close() throws IOException {
+	super.close();
+	currentSubList.lastOffsetAdded();
+	offsetsLists.add(currentSubList);
+	currentSubList = null;
+	if (channel != null) {
+	    channel.close();
 	}
-	subList.offsets[subOffsetIndex] = offset;
-	size++;
     }
 
-    private static class OffsetsList implements Serializable {
+    static class OffsetsList implements Serializable {
 	private static final long serialVersionUID = 5596313596485415506L;
-	
-	final long[] offsets;
 
-	public OffsetsList(int length) {
-	    offsets = new long[length];
+	private transient long[] tmpOffsets;
+	private int offsetsSize = 0;
+	private AbstractLongBigList offsets;
+
+	public OffsetsList() {
+	    tmpOffsets = new long[SUBLIST_SIZE];
+	}
+
+	public boolean addOffset(long offset) {
+	    tmpOffsets[offsetsSize++] = offset;
+	    return offsetsSize == tmpOffsets.length;
+	}
+
+	public void lastOffsetAdded() {
+	    // Convert tmpOffsets to AbstractLongBigList
+	    offsets = new EliasFanoLongBigList(new LongIterator() {
+		int index;
+
+		@Override
+		public boolean hasNext() {
+		    return index < offsetsSize;
+		}
+
+		@Override
+		public Long next() {
+		    return tmpOffsets[index++];
+		}
+
+		@Override
+		public void remove() {
+		    throw new UnsupportedOperationException();
+		}
+
+		@Override
+		public long nextLong() {
+		    return tmpOffsets[index++];
+		}
+
+		@Override
+		public int skip(int n) {
+		    int newIndex = index + n;
+		    if (newIndex < offsetsSize) {
+			index = newIndex;
+			return n;
+		    }
+		    newIndex = offsetsSize - 1;
+		    int skipped = newIndex - index;
+		    index = newIndex;
+		    return skipped;
+		}
+	    });
+	    tmpOffsets = null;
+	}
+
+	public long getOffset(int offsetIndex) {
+	    if (offsetIndex >= offsetsSize) {
+		throw new IllegalArgumentException("Requested offset index " + offsetIndex + " is >= the offset list size " + offsetsSize);
+	    }
+	    if (offsets == null) {
+		throw new IllegalStateException("lastOffsetAdded() has to be called before getOffset(i).");
+	    }
+	    return offsets.getLong(offsetIndex);
 	}
     }
 }

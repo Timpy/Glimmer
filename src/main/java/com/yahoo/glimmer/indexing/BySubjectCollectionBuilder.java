@@ -40,12 +40,14 @@ import com.yahoo.glimmer.util.BySubjectRecord;
 public class BySubjectCollectionBuilder extends Configured implements Tool {
     static class BuilderOutputWriter extends RecordWriter<LongWritable, Text> {
 	private static final String COLLECTION_PREFIX = "collection-";
-	private static int count;
+	private static final MutableString TAB_WORD = new MutableString("\t");
 
 	private BySubjectRecord bySubjectRecord = new BySubjectRecord();
 	private final MutableString word = new MutableString();
 	private final MutableString nonWord = new MutableString();
 	FastBufferedReader fbr = new FastBufferedReader();
+	
+	private int count;
 
 	private final DocumentCollectionBuilder builder;
 
@@ -114,6 +116,10 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	    builder.startDocument(bySubjectRecord.getSubject(), bySubjectRecord.getSubject());
 	    builder.startTextField();
 	    
+	    addField(Integer.toString(bySubjectRecord.getId()));
+	    addField(Integer.toString(bySubjectRecord.getPreviousId()));
+	    addField(bySubjectRecord.getSubject());
+	    
 	    fbr.setReader(bySubjectRecord.getRelationsReader());
 	    while (fbr.next(word, nonWord)) {
 		builder.add(word, nonWord);
@@ -122,6 +128,12 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	    // End Doc.
 	    builder.endTextField();
 	    builder.endDocument();
+	}
+	
+	private void addField(CharSequence value) throws IOException {
+	    word.setLength(0);
+	    word.append(value);
+	    builder.add(word, TAB_WORD);
 	}
 
 	@Override

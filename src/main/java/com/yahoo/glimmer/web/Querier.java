@@ -99,7 +99,7 @@ public class Querier {
 	
 	BySubjectRecord record = new BySubjectRecord();
 	
-	if (!record.parseContent(new InputStreamReader(docInputStream))) {
+	if (!record.parse(new InputStreamReader(docInputStream))) {
 	    throw new RuntimeException("Couldn't parse doc with id:" + docId);
 	}
 	

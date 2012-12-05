@@ -216,22 +216,50 @@ public class BySubjectRecordTest {
     
     @Test
     public void relationsReaderTest() throws IOException {
+	String expecdedRelationsString = RELATION_1_1 + '\t' + RELATION_1_2 + '\t' + RELATION_1_1 + '\t' + RELATION_1_2 + '\t';
 	Reader relationsReader = record.getRelationsReader();
 	
+	// No relations..
 	char[] buffer = new char[4096];
-	
 	int charsRead = relationsReader.read(buffer);
 	assertEquals(-1, charsRead);
 	assertTrue(Arrays.equals(new char[4096], buffer));
-	
+
 	record.setId(55);
 	record.setSubject(SUBJECT_1);
 	record.addRelation(RELATION_1_1);
 	record.addRelation(RELATION_1_2);
-	
+	record.addRelation(RELATION_1_1);
+	record.addRelation(RELATION_1_2);
+
 	relationsReader = record.getRelationsReader();
 	charsRead = relationsReader.read(buffer);
-	assertEquals(72, charsRead);
-	assertEquals(RELATION_1_1 + '\t' + RELATION_1_2 + '\t', new String(buffer, 0, charsRead));
+	assertEquals(144, charsRead);
+	assertEquals(expecdedRelationsString, new String(buffer, 0, charsRead));
+
+	// Reading with different buffer sizes.
+	StringBuilder sb = new StringBuilder();
+	charsRead = Integer.MAX_VALUE;
+	for (int bufferSize = 1 ; bufferSize < (expecdedRelationsString.length() + 10) ; bufferSize++) {
+	    buffer = new char[bufferSize];
+	    
+	    relationsReader = record.getRelationsReader();
+	    for (;;) {
+		charsRead = relationsReader.read(buffer);
+		if (charsRead == -1) {
+		    break;
+		}
+		
+		sb.append(buffer,0,charsRead);
+		
+		if (charsRead < bufferSize) {
+		    break;
+		}
+	    }
+
+	    assertEquals(expecdedRelationsString, sb.toString());
+	    
+	    sb.setLength(0);
+	}
     }
 }

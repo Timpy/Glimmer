@@ -348,7 +348,7 @@ YUI({
 				
 				var tdPredicate = Y.Node.create('<td class="predicate">' + getLocalName(predicate) + '</td>');
 				
-				var tdValues = Y.Node.create('<td></td>');
+				var tdValues = Y.Node.create('<td class="object"></td>');
 				for ( var relationIndex in map[predicate]) {
 					var item = map[predicate][relationIndex];
 					var providedName = getProviderName(item.context[0]);
