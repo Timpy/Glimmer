@@ -103,10 +103,14 @@ public class Querier {
 	    throw new RuntimeException("Couldn't parse doc with id:" + docId);
 	}
 	
+	if (docId != record.getId()) {
+	    LOGGER.error("Wanted doc id:" + docId + " but got doc id:" + record.getId());
+	}
+	
 	RDFResultItem item = new RDFResultItem();
-	item.setSubjectId(docId);
-	item.setScore(score);
+	item.setSubjectId(record.getId());
 	item.setSubject(record.getSubject());
+	item.setScore(score);
 
 	for (String relationString : record.getRelations()) {
 	    Node[] predicateObjectContext;

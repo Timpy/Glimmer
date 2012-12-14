@@ -60,7 +60,8 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	    builder = new StartOffsetDocumentCollectionBuilder(collectionBase, new IdentityDocumentFactory(), ioFactory);
 	    // Use the id for this task. It's the same for all attempts of this
 	    // task.
-	    builder.open(Integer.toString(job.getTaskAttemptID().getTaskID().getId()));
+	    String suffix = String.format("%05d", job.getTaskAttemptID().getTaskID().getId());
+	    builder.open(suffix);
 	}
 	
 	// Test constructor
