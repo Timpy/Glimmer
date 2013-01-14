@@ -63,6 +63,16 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertEquals("", nonWord.toString());
 	
 	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("@47", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(predicateReader.next(word, nonWord));
+	assertEquals("@61", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(contextReader.next(word, nonWord));
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
+	assertEquals("", nonWord.toString());
+	
+	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("object", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
@@ -104,7 +114,7 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(4l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(5l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
     
     @Test
@@ -138,6 +148,16 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	assertTrue(objectReader.next(word, nonWord));
 	assertEquals("@46", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(predicateReader.next(word, nonWord));
+	assertEquals("@61", word.toString());
+	assertEquals("", nonWord.toString());
+	assertTrue(contextReader.next(word, nonWord));
+	assertEquals(RDFDocument.NO_CONTEXT, word.toString());
+	assertEquals("", nonWord.toString());
+	
+	assertTrue(objectReader.next(word, nonWord));
+	assertEquals("@47", word.toString());
 	assertEquals("", nonWord.toString());
 	assertTrue(predicateReader.next(word, nonWord));
 	assertEquals("@61", word.toString());
@@ -188,6 +208,6 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	
 	context.assertIsSatisfied();
 	
-	assertEquals(4l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
+	assertEquals(5l, factory.getCounters().findCounter(RDFDocumentFactory.RdfCounters.INDEXED_TRIPLES).getValue());
     }
 }
