@@ -193,10 +193,12 @@ YUI({
 									return rt;
 								}
 								
-								rt['label'] = clazz.localName + " " + clazz.inheritedCount;
+								var label = '<a href="' + clazz.className + '">' + clazz.localName + ' ' + clazz.inheritedCount;
 								if (clazz.inheritedCount != clazz.count) {
-									rt['label'] +=  "(" + clazz.count + ")";
+									label += "(" + clazz.count + ")";
 								}
+								label += '</a>';
+								rt['label'] = label;
 								
 								var children = [];
 								for (i in clazz.children) {
@@ -205,7 +207,7 @@ YUI({
 								}
 								if (children.length > 0) {
 									rt['type'] = 'TreeView';
-									rt['children'] = children
+									rt['children'] = children;
 								}
 								return rt;
 							}
@@ -218,6 +220,7 @@ YUI({
 								tree.push(addClass(clazz));
 							}
 							var treeview = new Y.TreeView({
+								toggleOnLabelClick : false,
 								srcNode : '#statisticsTreeList',
 								contentBox : null,
 								type : "TreeView",
@@ -225,6 +228,18 @@ YUI({
 							});
 	
 							treeview.render();
+							
+							treeview.on("click", function (e){
+								var anchor = e.details[0].domEvent.target;
+								var typeUrl = anchor.getAttribute('href');
+								if (typeUrl != undefined) {
+									var typeClass = stats.classes[typeUrl];
+									if (typeClass != undefined && typeClass.count > 0) {
+										executeSearchByType(typeUrl);
+									}
+								}
+							}); 
+							
 							// Expand the top level of the tree
 							Y.one('#statistics-tree').removeClass('yui3-tree-collapsed');
 							
@@ -269,6 +284,10 @@ YUI({
 
 		function getDocumentByIdOrSubject(idOrSubject) {
 			Y.one("#ac-input").set('value', "doc:" + idOrSubject);
+			executeUnifiedSearch(null);
+		}
+		function executeSearchByType(type) {
+			Y.one("#ac-input").set('value', 'type:<' + type + '>');
 			executeUnifiedSearch(null);
 		}
 		
@@ -345,7 +364,12 @@ YUI({
 			function predSort(a, b) {
 				return (fieldLongNames.indexOf(encode(a.predicate)) - fieldLongNames.indexOf(encode(b.predicate)));
 			}
+			
 			result.relations.sort(predSort);
+			if (result.hasOwnProperty("label") && result.label != null) {
+				li.append('<span class="label">' + result.label + '</span>');
+			}
+			li.append("<br/>");
 
 			// Group the relations by predicate
 			var map = [];
@@ -360,23 +384,42 @@ YUI({
 						map[relation.predicate].push(relation);
 					}
 					if (relation.predicate == RDF_TYPE) {
-						types.push(stripVersion(relation.object));
+						var type = stripVersion(relation.object);
+						if (types.indexOf(type) == -1) {
+							types.push(type);
+						}
 					}
 				}
 			}
-			function typeSort(a, b) {
-				return stats.classes[b].count - stats.classes[a].count;
+			
+			if (types.length > 0) {
+				function typeSort(a, b) {
+					var countA = 0;
+					// For very long documents, there is a small chance that the class will existing in the document but not be in the list of classes.
+					if (stats.classes[a] != undefined) {
+						countA = stats.classes[a].count
+					}
+					var countB = 0;
+					if (stats.classes[b] != undefined) {
+						countB = stats.classes[b].count;
+					}
+					
+					return countA - countB;
+				}
+				types.sort(typeSort);
+				
+				for (type in types) {
+					li.append('&nbsp;<a class="type" href="' + types[type] + '">' + getLocalName(types[type]) + '</a>&nbsp;');
+				}
+				li.append('-&nbsp;');
 			}
-			types.sort(typeSort);
 
-			if (result.hasOwnProperty("label") && result.label != null) {
-				li.append('<span class="label">' + result.label + '</span>');
+			var span;
+			if (result.subject.match("^https?://")) {
+				span = Y.Node.create('<span class="id"><a href=' + result.subject + '>' + result.subject + '</a></span>');
+			} else {
+				span = Y.Node.create('<span class="id">' + result.subject + '</span>');
 			}
-			li.append("<br/>");
-			for (type in types) {
-				li.append('&nbsp;<a class="type" href="' + types[type] + '">' + getLocalName(types[type]) + '</a>&nbsp;/');
-			}
-			var span = Y.Node.create('<span class="id"><a href=' + result.subject + '>' + result.subject + '</a></span>');
 			if (result.subjectId != undefined) {
 				appendDocLink(span, result.subjectId);
 			}
