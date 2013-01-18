@@ -78,6 +78,8 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	if (filter != null) {
 	    LOG.info("Using TupleFilter:\n" + filter.toString());
 	    setFilter(filter);
+	} else {
+	    LOG.info("No TupleFilter given. Processing all tuples.");
 	}
     };
 

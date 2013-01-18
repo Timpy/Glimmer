@@ -22,6 +22,7 @@ import java.util.Properties;
 public class Context extends Properties {
     private static final long serialVersionUID = 8416864704849882837L;
 
+    private static final String RESOURCES_ID_PREFIX_KEY = "resourceIdPrefix";
     private static final String ALL_RESOURCES_MAP_KEY = "allResorcesMap";
     private static final String ALL_RESOURCES_KEY = "allResorces";
 
@@ -70,6 +71,10 @@ public class Context extends Properties {
 	    fs = new FileInputStream(new File(resource.getFile()));
 	}
 	super.load(fs);
+    }
+    
+    public String getResourceIdPrefix() {
+	return getString(RESOURCES_ID_PREFIX_KEY, "@");
     }
 
     public File getAllResourcesMapFile() {

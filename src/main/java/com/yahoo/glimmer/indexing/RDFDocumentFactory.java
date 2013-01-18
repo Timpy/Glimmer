@@ -35,14 +35,14 @@ public abstract class RDFDocumentFactory {
     private static final String CONF_FIELDNAMES_KEY = "RdfFieldNames";
     private static final String CONF_INDEX_TYPE_KEY = "IndexType";
     private static final String CONF_WITH_CONTEXTS_KEY = "WithContexts";
-    private static final String CONF_HASH_VALUE_PREFIX_KEY = "HashValuePrefix";
+    private static final String CONF_RESOURCE_ID_PREFIX_KEY = "resourceIdPrefix";
     private static final String CONF_RESOURCES_HASH_KEY = "ResourcesFilename";
 
     private static final Collection<String> PREDICATE_BLACKLIST = Arrays.asList("stag", "tagspace", "ctag", "rel", "mm");
 
     private String[] fields;
     private AbstractObject2LongFunction<CharSequence> resourcesHashFunction;
-    private String hashValuePrefix = "";
+    private String resourceIdPrefix = "";
 
     // TODO How to read these?
     private Counters counters = new Counters();
@@ -66,13 +66,13 @@ public abstract class RDFDocumentFactory {
 
     public abstract RDFDocument getDocument();
 
-    protected static void setupConf(Configuration conf, IndexType type, boolean withContexts, String resourcesHash, String hashValuePrefix, String... fields) {
+    protected static void setupConf(Configuration conf, IndexType type, boolean withContexts, String resourcesHash, String resourceIdPrefix, String... fields) {
 	conf.setEnum(CONF_INDEX_TYPE_KEY, type);
 	conf.setBoolean(CONF_WITH_CONTEXTS_KEY, withContexts);
 	if (resourcesHash != null) {
 	    conf.set(CONF_RESOURCES_HASH_KEY, resourcesHash);
 	}
-	conf.set(CONF_HASH_VALUE_PREFIX_KEY, hashValuePrefix);
+	conf.set(CONF_RESOURCE_ID_PREFIX_KEY, resourceIdPrefix);
 	conf.setStrings(CONF_FIELDNAMES_KEY, fields);
     }
 
@@ -97,7 +97,7 @@ public abstract class RDFDocumentFactory {
     }
     
     public static String getHashValuePrefix(Configuration conf) {
-	return conf.get(CONF_HASH_VALUE_PREFIX_KEY, "");
+	return conf.get(CONF_RESOURCE_ID_PREFIX_KEY, "");
     }
 
     public static RDFDocumentFactory buildFactory(Configuration conf) {
@@ -112,7 +112,7 @@ public abstract class RDFDocumentFactory {
 	}
 	factory.setFields(getFieldsFromConf(conf));
 	factory.setWithContexts(getWithContexts(conf));
-	factory.setHashValuePrefix(getHashValuePrefix(conf));
+	factory.setResourceIdPrefix(getHashValuePrefix(conf));
 	String resourcesHashFilename = conf.get(CONF_RESOURCES_HASH_KEY);
 	if (resourcesHashFilename != null) {
 	    // Load the hash func.
@@ -137,12 +137,12 @@ public abstract class RDFDocumentFactory {
 	this.resourcesHashFunction = resourcesHashFunction;
     }
 
-    public String getHashValuePrefix() {
-	return hashValuePrefix;
+    public String getResourceIdPrefix() {
+	return resourceIdPrefix;
     }
 
-    public void setHashValuePrefix(String hashValuePrefix) {
-	this.hashValuePrefix = hashValuePrefix;
+    public void setResourceIdPrefix(String resourceIdPrefix) {
+	this.resourceIdPrefix = resourceIdPrefix;
     }
 
     /**
@@ -168,7 +168,7 @@ public abstract class RDFDocumentFactory {
 	Integer intValue = lookupResource(key);
 	if (intValue != null) {
 	    if (prefixed) {
-		return hashValuePrefix + intValue.toString();
+		return resourceIdPrefix + intValue.toString();
 	    } else {
 		return intValue.toString();
 	    }

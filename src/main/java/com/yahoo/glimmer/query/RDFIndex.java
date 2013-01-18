@@ -67,7 +67,6 @@ import java.util.Set;
 
 import org.apache.log4j.Logger;
 
-import com.yahoo.glimmer.indexing.ResourceRefTermProcessor;
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
 import com.yahoo.glimmer.util.Util;
 
@@ -80,6 +79,7 @@ public class RDFIndex {
 
     private final static String ALIGNMENT_INDEX_NAME = "alignment";
     private final static String SUBJECT_INDEX_KEY = "subject";
+    private final static String SUBJECT_TEXT_INDEX_KEY = "subjectText";
     private final static String PREDICATE_INDEX_KEY = "predicate";
     private final static String OBJECT_INDEX_KEY = "object";
     private final static String CONTEXT_INDEX_KEY = "context";
@@ -99,6 +99,8 @@ public class RDFIndex {
     /** The alignment index **/
     protected Index alignmentIndex;
 
+    private String resourceIdPrefix = "@";
+    
     private Map<String, Integer> predicateDistribution;
     private Map<String, Integer> typeTermDistribution;
 
@@ -209,6 +211,8 @@ public class RDFIndex {
 	    }
 	}
 
+	resourceIdPrefix = context.getResourceIdPrefix();
+	
 	// Load all resources hash function
 	allResourcesToIds = loadObjectOfType(context.getAllResourcesMapFile());
 	if (allResourcesToIds == null) {
@@ -245,31 +249,27 @@ public class RDFIndex {
 	// Load horizontal indexes
 	indexMap.putAll(loadIndexesFromDir(horizontalIndexDir, true, context.getLoadIndexesInMemory()));
 
-	if (!indexMap.containsKey(SUBJECT_INDEX_KEY)) {
-	    throw new IllegalStateException("No subjects index found.");
-	}
-	if (!indexMap.containsKey(PREDICATE_INDEX_KEY)) {
-	    throw new IllegalStateException("No predicates index found.");
-	}
-	if (!indexMap.containsKey(OBJECT_INDEX_KEY)) {
-	    throw new IllegalStateException("No objects index found.");
+	for (String indexKey : new String[] {SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY}) {
+	    if (!indexMap.containsKey(indexKey)) {
+		throw new IllegalStateException("No " + indexKey + " index found.");
+	    }
 	}
 	if (!indexMap.containsKey(CONTEXT_INDEX_KEY)) {
 	    LOGGER.info("No context index found.");
 	}
 
 	// Loading frequencies
-	Index subjectIndex = indexMap.get(SUBJECT_INDEX_KEY);
-	String filename = (String) subjectIndex.properties.getProperty(BASENAME_INDEX_PROPERTY_KEY);
+	Index subjectTextIndex = indexMap.get(SUBJECT_TEXT_INDEX_KEY);
+	String filename = (String) subjectTextIndex.properties.getProperty(BASENAME_INDEX_PROPERTY_KEY);
 	filename += DiskBasedIndex.FREQUENCIES_EXTENSION;
 	try {
 	    LOGGER.info("Loading frequencies from " + filename);
-	    frequencies = new SemiExternalGammaList(new InputBitStream(filename), 1, subjectIndex.numberOfTerms);
-	    if (frequencies.size() != subjectIndex.numberOfDocuments) {
-		LOGGER.warn("Loaded " + frequencies.size() + " frequency values but subject.numberOfDocuments is " + subjectIndex.numberOfDocuments);
+	    frequencies = new SemiExternalGammaList(new InputBitStream(filename), 1, subjectTextIndex.numberOfTerms);
+	    if (frequencies.size() != subjectTextIndex.numberOfDocuments) {
+		LOGGER.warn("Loaded " + frequencies.size() + " frequency values but subjectTextIndex.numberOfDocuments is " + subjectTextIndex.numberOfDocuments);
 	    }
 	} catch (Exception e) {
-	    throw new IllegalArgumentException("Failed to load frequences for subject index from " + filename, e);
+	    throw new IllegalArgumentException("Failed to load frequences for subjectText index from " + filename, e);
 	}
 
 	try {
@@ -297,6 +297,7 @@ public class RDFIndex {
 	// We need to maintain insertion order and test inclusion.
 	Map<String, String> fieldNameSuffixToFieldNameOrderedMap = new LinkedHashMap<String, String>();
 	fieldNameSuffixToFieldNameOrderedMap.put(SUBJECT_INDEX_KEY, SUBJECT_INDEX_KEY);
+	fieldNameSuffixToFieldNameOrderedMap.put(SUBJECT_TEXT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY);
 	fieldNameSuffixToFieldNameOrderedMap.put(PREDICATE_INDEX_KEY, PREDICATE_INDEX_KEY);
 	fieldNameSuffixToFieldNameOrderedMap.put(OBJECT_INDEX_KEY, OBJECT_INDEX_KEY);
 
@@ -329,7 +330,7 @@ public class RDFIndex {
 
 	// This is empty for non-payload indices
 	Reference2ReferenceMap<Index, Object> index2Parser = new Reference2ReferenceOpenHashMap<Index, Object>();
-	DocumentIteratorBuilderVisitor builderVisitor = new DocumentIteratorBuilderVisitor(indexMap, index2Parser, subjectIndex, MAX_STEMMING);
+	DocumentIteratorBuilderVisitor builderVisitor = new DocumentIteratorBuilderVisitor(indexMap, index2Parser, subjectTextIndex, MAX_STEMMING);
 	// QueryParser is null as we will only pass in parsed queries
 	queryEngine = new QueryEngine(null, builderVisitor, indexMap);
 
@@ -355,7 +356,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_INDEX_KEY, termProcessors,
+	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_TEXT_INDEX_KEY, termProcessors,
 		allResourcesToIds);
     }
 
@@ -479,7 +480,7 @@ public class RDFIndex {
 	    // TODO load from file if needed
 	    b.put(getField(indexName), db);
 	}
-	b.put(queryEngine.indexMap.get(SUBJECT_INDEX_KEY), db);
+	b.put(queryEngine.indexMap.get(SUBJECT_TEXT_INDEX_KEY), db);
 	return b;
     }
 
@@ -523,7 +524,7 @@ public class RDFIndex {
 	documentWeights[Integer.parseInt(SetDocumentPriors.NEUTRAL)] = context.getWsNeutral();
 
 	StringMap<? extends CharSequence> subjectTermMap;
-	Index subjectIndex = getSubjectIndex();
+	Index subjectIndex = getSubjectTextIndex();
 	if (subjectIndex instanceof BitStreamIndex) {
 	    subjectTermMap = ((BitStreamIndex) subjectIndex).termMap;
 	} else if (subjectIndex instanceof QuasiSuccinctIndex) {
@@ -563,8 +564,8 @@ public class RDFIndex {
 
     }
 
-    private Index getSubjectIndex() {
-	return queryEngine.indexMap.get(SUBJECT_INDEX_KEY);
+    private Index getSubjectTextIndex() {
+	return queryEngine.indexMap.get(SUBJECT_TEXT_INDEX_KEY);
     }
 
     /**
@@ -583,8 +584,7 @@ public class RDFIndex {
 
     /**
      * 
-     * @param uri
-     *            - Resource or BNode
+     * @param uri - Resource or BNode
      * @return the doc id if the given uri is a valid doc uri.
      * @throws IOException
      * @throws RDFIndexException 
@@ -610,11 +610,6 @@ public class RDFIndex {
 	return id == null ? null : id.intValue();
     }
 
-    public Integer getObjectID(String uri) {
-	Long id = allResourcesToIds.get(uri);
-	return id == null ? null : id.intValue();
-    }
-
     public DocumentCollection getCollection() {
 	return documentCollection;
     }
@@ -623,9 +618,12 @@ public class RDFIndex {
 	return alignmentIndex;
     }
 
-    @Deprecated
-    public Long lookupResourceId(CharSequence key) {
-	return allResourcesToIds.get(key);
+    public String lookupIdByResourceId(String key) {
+	if (key.startsWith("_:")) {
+	    key = key.substring(2);
+	}
+	Long id = allResourcesToIds.get(key);
+	return id == null ? null : resourceIdPrefix + id.intValue();
     }
 
     public synchronized String lookupResourceById(long id) {
@@ -637,7 +635,7 @@ public class RDFIndex {
     }
 
     public String getDefaultField() {
-	return SUBJECT_INDEX_KEY;
+	return SUBJECT_TEXT_INDEX_KEY;
     }
 
     public String getTitle(int id) throws IOException {
@@ -692,17 +690,15 @@ public class RDFIndex {
 
 	Map<String, Integer> histogram = new HashMap<String, Integer>();
 
-	String hashValuePrefix = index.properties.getString(ResourceRefTermProcessor.PropertyKeys.REF_PREFIX, "@");
-	
 	for (CharSequence term : termMap.list()) {
 	    long docId = termMap.get(term);
 	    IndexIterator it = index.documents(((int) docId));
 	    if (termsAreResourceIds) {
 		String termString = term.toString();
-		if (!termString.startsWith(hashValuePrefix)) {
-		    throw new RuntimeException("Expected resource id " + termString + " to be prefix with " + hashValuePrefix);
+		if (!termString.startsWith(resourceIdPrefix)) {
+		    throw new RuntimeException("Expected resource id " + termString + " to be prefix with " + resourceIdPrefix);
 		}
-		int termAsId = Integer.parseInt(termString.substring(hashValuePrefix.length()));
+		int termAsId = Integer.parseInt(termString.substring(resourceIdPrefix.length()));
 		histogram.put(lookupResourceById(termAsId), it.frequency());
 	    } else {
 		histogram.put(term.toString(), it.frequency());
@@ -733,7 +729,7 @@ public class RDFIndex {
     }
 
     public Integer getDocumentSize(int docId) {
-	return getSubjectIndex().sizes.get(docId);
+	return getSubjectTextIndex().sizes.get(docId);
     }
 
     public Set<String> getIndexedPredicates() {
