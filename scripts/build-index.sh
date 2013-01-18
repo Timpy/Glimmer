@@ -20,13 +20,17 @@ BUILD_NAME=${2}
 # Optionally set PrepTool's tuple filter definition file.  This is a file containing an XStream serialized instance of a TupleFilter.
 # See TestTupleFilter.xml or SchemaDotOrgRegexTupleFilter.xml as examples and http://xstream.codehaus.org/converters.html.
 PREP_FILTER_FILE=""
-if [ ! -z ${3} ] ; then
+if [ ! -z ${3} -a "${3}" != "-" ] ; then
 	PREP_FILTER_FILE=${3}
 fi
 
 # Optionally set the number of reducers to use when generating indexes.
 SUBINDICES=20
 if [ ! -z ${4} ] ; then
+	if ! [[ "${4}" =~ ^[0-9]+$ ]] ; then
+		echo "Number of sub indices is not numeric: " ${4}
+		exit 1
+	fi		
 	SUBINDICES=${4}
 fi
 
@@ -66,7 +70,7 @@ JAR_FOR_HADOOP="../target/Glimmer-0.0.1-SNAPSHOT-jar-for-hadoop.jar"
 HADOOP_CACHE_FILES="../target/classes/blacklist.txt"
 
 COMPRESSION_CODEC="org.apache.hadoop.io.compress.BZip2Codec"
-COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,${COMPRESSION_CODEC}"
+COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.GzipCodec,${COMPRESSION_CODEC}"
 
 HASH_EXTENSION=".smap"
 
