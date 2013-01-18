@@ -129,7 +129,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}
 
-	conf.setInt("mapreduce.input.linerecordreader.line.maxlength", 100000);
+	conf.setInt("mapreduce.input.linerecordreader.line.maxlength", 1024 * 1024);
 
 	boolean success = job.waitForCompletion(true);
 
