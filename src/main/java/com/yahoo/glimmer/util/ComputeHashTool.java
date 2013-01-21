@@ -13,6 +13,7 @@ package com.yahoo.glimmer.util;
 
 import it.unimi.dsi.big.util.ShiftAddXorSignedStringMap;
 import it.unimi.dsi.bits.TransformationStrategies;
+import it.unimi.dsi.fastutil.Size64;
 import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.io.SafelyCloseable;
@@ -54,7 +55,6 @@ import com.martiansoftware.jsap.SimpleJSAP;
 import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
 import com.martiansoftware.jsap.stringparsers.ForNameStringParser;
-import com.martiansoftware.jsap.stringparsers.IntegerStringParser;
 
 public class ComputeHashTool extends Configured implements Tool {
     private final static Logger LOGGER = Logger.getLogger(ComputeHashTool.class);
@@ -75,7 +75,7 @@ public class ComputeHashTool extends Configured implements Tool {
 		new Switch(SIGNED_ARG, 's', SIGNED_ARG, "Generate signed hashes."),
 		new Switch(UNSIGNED_ARG, 'u', UNSIGNED_ARG, "Generate unsiged hashes."),
 		new Switch(WRITE_INFO_ARG, 'i', WRITE_INFO_ARG, "Write a .info tab seperated text file with size/width info in."),
-		new FlaggedOption(SIGNATURE_WIDTH_ARG, IntegerStringParser.getParser(), "32", JSAP.NOT_REQUIRED, 'w', "width",
+		new FlaggedOption(SIGNATURE_WIDTH_ARG, JSAP.INTEGER_PARSER, "32", JSAP.NOT_REQUIRED, 'w', "width",
 			"Sign the hash with a hash width of w bits."),
 		new FlaggedOption(FILE_ENCODING_ARG, ForNameStringParser.getParser(Charset.class), "UTF-8", JSAP.NOT_REQUIRED, 'e', "encoding",
 			"Set the input file encoding(default is UTF-8)."),
@@ -139,6 +139,8 @@ public class ComputeHashTool extends Configured implements Tool {
 	LcpMonotoneMinimalPerfectHashFunction<CharSequence> unsignedHash;
 	if (generateUnsigned) {
 	    LOGGER.info("\tBuilding unsigned hash...");
+	    // TODO Ideally we would call LcpMonotoneMinimalPerfectHashFunction(inCollection, <numElements>, TransformationStrategies.prefixFreeUtf16())
+	    // Without the numElements the inCollection is read an additional time.
 	    unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, TransformationStrategies.prefixFreeUtf16());
 	    if (signatureWidth <= 0 || keepUnsigned) {
 		LOGGER.info("\tSaving unsigned hash as " + unsigendPath.toString());
@@ -245,9 +247,9 @@ public class ComputeHashTool extends Configured implements Tool {
      * @author tep
      * 
      */
-    private static class LineReaderCollection extends AbstractCollection<MutableString> {
+    private static class LineReaderCollection extends AbstractCollection<MutableString> implements Size64 {
 	private final ReaderFactory readerFactory;
-	private int size = -1;
+	private long size = -1;
 
 	public LineReaderCollection(ReaderFactory readerFactory) {
 	    this.readerFactory = readerFactory;
@@ -322,6 +324,15 @@ public class ComputeHashTool extends Configured implements Tool {
 
 	@Override
 	public int size() {
+	    long size64 = size64();
+	    if (size64 > Integer.MAX_VALUE) {
+		throw new IndexOutOfBoundsException("LineReaderCollection.size() called on a instance with more than Integer.MAX_VALUE elements.  Use Size64.size64() instead.");
+	    }
+	    return (int)size64;
+	}
+	
+	@Override
+	public long size64() {
 	    if (size == -1) {
 		LineReaderIterator i = iterator();
 		size = 0;

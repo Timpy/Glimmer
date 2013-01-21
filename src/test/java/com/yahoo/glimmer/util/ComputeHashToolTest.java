@@ -42,7 +42,7 @@ import org.jmock.lib.legacy.ClassImposteriser;
 import org.junit.Before;
 import org.junit.Test;
 
-public class ComputeHashTest {
+public class ComputeHashToolTest {
     private static final String SOME_LINES = "a\nb\ncc\nd\n";
 
     private Mockery context;
