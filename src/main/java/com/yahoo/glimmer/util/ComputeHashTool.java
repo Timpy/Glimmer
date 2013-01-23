@@ -30,7 +30,6 @@ import java.io.SequenceInputStream;
 import java.nio.charset.Charset;
 import java.util.AbstractCollection;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
@@ -106,6 +105,7 @@ public class ComputeHashTool extends Configured implements Tool {
 	    LOGGER.info("Building unsigned hashes for " + srcFileCharset.displayName() + " files:" + srcFilenames);
 	}
 	Configuration conf = getConf();
+	// This need to be set if you want to read from a local HDFS system.
 	//conf.set("fs.default.name","hdfs://127.0.0.1:9000/");
 	JobConf job = new JobConf(conf, ComputeHashTool.class);
 	FileSystem fs = FileSystem.get(job);
@@ -125,7 +125,7 @@ public class ComputeHashTool extends Configured implements Tool {
 	    throw new RuntimeException("Failed to open " + srcFilename, e);
 	}
 
-	Collection<MutableString> inCollection = new LineReaderCollection(new LineReaderCollection.ReaderFactory() {
+	LineReaderCollection inCollection = new LineReaderCollection(new LineReaderCollection.ReaderFactory() {
 	    @Override
 	    public Reader newReader() {
 		inputStreamEnumeration.reset();
@@ -139,9 +139,12 @@ public class ComputeHashTool extends Configured implements Tool {
 	LcpMonotoneMinimalPerfectHashFunction<CharSequence> unsignedHash;
 	if (generateUnsigned) {
 	    LOGGER.info("\tBuilding unsigned hash...");
-	    // TODO Ideally we would call LcpMonotoneMinimalPerfectHashFunction(inCollection, <numElements>, TransformationStrategies.prefixFreeUtf16())
-	    // Without the numElements the inCollection is read an additional time.
-	    unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, TransformationStrategies.prefixFreeUtf16());
+	    // TODO Ideally we would pass this in as a parameter.  .size64() performs a scan of the file.
+	    long timeToGetSize = System.currentTimeMillis();
+	    long collectionSize = inCollection.size64();
+	    timeToGetSize = System.currentTimeMillis() - timeToGetSize;
+	    LOGGER.info("\tCollection size is " + collectionSize + " found in " + timeToGetSize / 1000 + " seconds");
+	    unsignedHash = new LcpMonotoneMinimalPerfectHashFunction<CharSequence>(inCollection, collectionSize, TransformationStrategies.prefixFreeUtf16());
 	    if (signatureWidth <= 0 || keepUnsigned) {
 		LOGGER.info("\tSaving unsigned hash as " + unsigendPath.toString());
 		writeMapToFile(unsignedHash, fs, unsigendPath);
@@ -293,7 +296,7 @@ public class ComputeHashTool extends Configured implements Tool {
 	    public MutableString next() {
 		if (advance) {
 		    if (!hasNext()) {
-			throw new NoSuchElementException();
+			throw new NoSuchElementException("Size is " + size);
 		    }
 		}
 		current.replace(next);
@@ -333,9 +336,9 @@ public class ComputeHashTool extends Configured implements Tool {
 	
 	@Override
 	public long size64() {
-	    if (size == -1) {
+	    if (size == -1l) {
 		LineReaderIterator i = iterator();
-		size = 0;
+		size = 0l;
 		while (i.hasNext()) {
 		    size++;
 		    i.next();

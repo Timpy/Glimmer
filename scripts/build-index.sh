@@ -225,10 +225,10 @@ function computeHashes () {
 function getDocCount () {
     local PREP_DIR=${1}
 	# The number of docs is the number of 'all' resources..
-	# Note: It's really the number of subjects but as the MG4J docId is taken from the position in the all resources hash
-	# MG4J expects that the docId be smaller that the number of docs.  Using the all resource count is simpler that using
-	# the subject count and hash to get the docIds.  The effect is that the index contains empty docs and that the
-	# Doc count it's accurate. Which may effect scoring in some cases.. 
+	# Note: The number of real docs is actually the number of subjects but as the MG4J docId is taken from the position in the
+	# all resources hash MG4J expects that the docId be smaller that the number of docs.
+	# We decided using the all resource count is simpler that using the subject count and hash to get the docIds.  The effect 
+	# is that the index contains empty docs and that the Doc count it's inaccurate. Which may effect scoring in some cases.. 
 	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${PREP_DIR}/all.mapinfo | grep size | cut -f 2`
 	if [ -z "${NUMBER_OF_DOCS}" -o $? -ne "0" ] ; then
 		echo "Failed to get the number of subjects. exiting.."

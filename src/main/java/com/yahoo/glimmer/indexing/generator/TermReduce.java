@@ -17,10 +17,12 @@ import java.util.Iterator;
 
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.log4j.Logger;
 
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue> {
+    private final static Logger LOGGER = Logger.getLogger(TermReduce.class);
     public static final String MAX_INVERTEDLIST_SIZE_PARAMETER = "maxInvertiedListSize";
     public static final String MAX_POSITIONLIST_SIZE_PARAMETER = "maxPositionListSize";
     
@@ -96,6 +98,7 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	    writerTermValue.setTermFrequency(termFrequency);
 	    writerTermValue.setSumOfMaxTermPositions(sumOfMaxTermPositions);
 
+	    LOGGER.info("Reducing " + writerTermValue);
 	    context.write(writerKey, writerTermValue);
 
 	    TermValue prevValue = new TermValue();
@@ -107,6 +110,10 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 		    if (docId != prevValue.getV1()) {
 			// New document, write out previous postings
 			writerDocValue.setDocument(prevValue.getV1());
+			
+			if ("@370".equals(key.getTerm())) {
+			    LOGGER.info("@370 occerrences " + writerDocValue);
+			}
 			context.write(writerKey, writerDocValue);
 
 			// The first occerrence of this docId/
@@ -139,6 +146,9 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 		    // This is the last occurrence: write out the remaining
 		    // positions
 		    writerDocValue.setDocument(prevValue.getV1());
+		    if ("@370".equals(key.getTerm())) {
+			LOGGER.info("@370 occerrences " + writerDocValue);
+		    }
 		    context.write(writerKey, writerDocValue);
 
 		    writerDocValue.clearOccerrences();
