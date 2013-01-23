@@ -1,0 +1,203 @@
+digraph GlimmerOverview {
+    label="Glimmer - Indexer Overview";
+	labelloc="t";
+    labeljust="left";
+    
+	nQuadFiles[
+		rank = source;
+		shape=folder;
+		style=filled;
+		fillcolor="#ffd0d0";
+		label= "nQuad Source Files
+			on HDSF";
+	];
+	ppMappers[
+		style=filled;
+		fillcolor="#e0ffff";
+		label="Pre-processor Mappers
+			TuplesToResourcesMapper.java
+			tuple parsing and filtering";
+	];
+	
+	ppReducer[
+		style=filled;
+		fillcolor="#e0ffff";
+		label= "Pre-processor Reducer
+			ResourcesReducer.java
+			Only 1
+			Sorts all URLs and BNodes and assigns IDs.
+			The IDs will match the value returned from the MPH built on the All Resources File
+			URLs/BNodes that are subjects use these IDs as there 'DocID";
+	];
+	bySubjectFile[
+		shape=note;
+		style=filled;
+		fillcolor="#ffffe0";
+		label= "bySubject File
+			Sorted - Tab delimited
+			One line for each Subject(Resource/BNode)
+			Lines start with <DocId>\t<Previous DocId>\t..";
+	];
+	predicateResourceFile[
+		shape=note;
+		style=filled;
+		fillcolor="#ffffe0";
+		label= "predicates Resources File
+			Sorted list of predicate URLs prefixed with occurence count";
+	];
+	objectResourceFile[
+		shape=note;
+		style=filled;
+		fillcolor="#ffffe0";
+		label= "objects Resources File
+			Sorted list of Object URLs/BNodes";
+	];
+	contextResourceFile[
+		shape=note;
+		style=filled;
+		fillcolor="#ffffe0";
+		label= "contexts Resources File
+			Sorted list of Resource URLs";
+	];
+	allResourceFile[
+		shape=note;
+		style=filled;
+		fillcolor="#ffffe0";
+		label= "all Resources File
+			Sorted list of all URLs and BNodes";
+	];
+	
+	topPredicatesFile[
+		shape=note;
+		style=filled;
+		fillcolor="#e0ffe0";
+		label= "topPredicates File
+			build-index.sh(groupBySubject)
+			Short list of most used predicates";
+	];
+	
+	buildHash[
+		style=filled;
+		fillcolor="#d0d0ff";
+		label="Build Hash
+			ComputeHashTool.java
+			Reads from HDFS but runs locally";
+	];
+	
+	allMapFile[
+		shape=note;
+		style=filled;
+		fillcolor="#ffffe0";
+		label= "all.map
+			Unsigned hash function";
+	];
+	allSmapFile[
+		shape=note;
+		style=filled;
+		fillcolor="#e0ffe0";
+		label= "all.smap
+			Signed hash function";
+	];
+	allInfoFile[
+		shape=note;
+		style=filled;
+		fillcolor="#ffffe0";
+		label= "all.info
+		# of entries in the hash";
+	];
+	
+	vhMappers[
+		style=filled;
+		fillcolor="#e0ffff";
+		label="Horizontal & Vertical Index Generator Mappers
+			DocumentMapper.java
+			Tokenise each field of Horizontal or Vertical 'RDFDocument'";
+	];
+	vhReducers[
+		style=filled;
+		fillcolor="#e0ffff";
+		label="Horizontal & Vertical Index Generator Reducers
+			TermReducer.java
+			Writes terms to MG4J indices";
+	];
+	
+	indexPartRFiles[
+		shape=folder;
+		style=filled;
+		fillcolor="#ffffe0";
+		label= "part-r-?????
+			on MG4J Index Fileson HDFS";
+	];
+	
+	documentCollectionMR[
+		style=filled;
+		fillcolor="#e0ffff";
+		label="Build DocumentCollection
+			BySubjectCollectionBuilder.java";
+	];
+	documentSizesMR[
+		style=filled;
+		fillcolor="#e0ffff";
+		label="Compute Doc Sizes
+			DocSizesGenerator.java";
+	];
+	
+	copyMergeIndexes[
+		style=filled;
+		fillcolor="#d0d0ff";
+		label="Copy & Merge Indexes
+			on local disk";
+	];
+	
+	localIndexFiles[
+		shape=folder;
+		style=filled;
+		fillcolor="#e0ffe0";
+		label= "Local MG4J Index Files";
+	];
+	collectionFiles[
+		shape=folder;
+		style=filled;
+		fillcolor="#e0ffe0";
+		label= "DocumentCollection Files
+			Copied from HDFS to local disk";
+	];
+	
+	nQuadFiles -> ppMappers -> ppReducer;
+	
+	ppReducer -> objectResourceFile;
+	ppReducer -> contextResourceFile;
+	ppReducer -> bySubjectFile -> vhMappers;
+	ppReducer -> predicateResourceFile -> topPredicatesFile -> vhMappers;
+	ppReducer -> allResourceFile -> buildHash;
+	
+	buildHash -> allMapFile -> vhMappers;
+	buildHash -> allSmapFile;
+	buildHash -> allInfoFile;
+	allInfoFile -> vhReducers [ label="Number of elements in 'all' hash function" ];
+
+	vhMappers -> vhReducers -> indexPartRFiles -> copyMergeIndexes -> localIndexFiles;
+	bySubjectFile -> documentSizesMR -> localIndexFiles;
+	bySubjectFile -> documentCollectionMR -> collectionFiles;
+	
+	{ Legend [shape=none, margin=1, label=<
+<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4">
+  <TR>
+    <TD COLSPAN="5"><B>Key</B></TD>
+  </TR><TR>
+    <TD width="110px">Input Files</TD>
+    <TD width="110px">MR process</TD>
+    <TD width="110px">Intermediate Files</TD>
+    <TD width="110px">Local process</TD>
+    <TD width="110px">Output Files</TD>
+  </TR><TR>
+    <TD BGCOLOR="#ffd0d0"></TD>
+    <TD BGCOLOR="#e0ffff"></TD>
+    <TD BGCOLOR="#ffffe0"></TD>
+    <TD BGCOLOR="#d0d0ff"></TD>
+    <TD BGCOLOR="#e0ffe0"></TD>
+  </TR>
+</TABLE>
+		>];
+  }
+}
