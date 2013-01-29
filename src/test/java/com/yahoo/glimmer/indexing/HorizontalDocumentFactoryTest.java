@@ -44,6 +44,10 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertFalse(subjectReader.next(word, nonWord));
 	
 	WordArrayReader subjectTextReader = (WordArrayReader)document.content(1);
+	// The subjectText contains both the ResourceID and the tokens from the URL/BNode.
+	assertTrue(subjectTextReader.next(word, nonWord));
+	assertEquals("@33", word.toString());
+	assertEquals("", nonWord.toString());
 	assertTrue(subjectTextReader.next(word, nonWord));
 	assertEquals("subject", word.toString());
 	assertEquals("", nonWord.toString());
@@ -144,6 +148,10 @@ public class HorizontalDocumentFactoryTest extends AbstractDocumentFactoryTest {
 	assertFalse(subjectReader.next(word, nonWord));
 	
 	WordArrayReader subjectTextReader = (WordArrayReader)document.content(1);
+	// The subjectText contains both the ResourceID and the tokens from the URL/BNode.
+	assertTrue(subjectTextReader.next(word, nonWord));
+	assertEquals("@33", word.toString());
+	assertEquals("", nonWord.toString());
 	assertTrue(subjectTextReader.next(word, nonWord));
 	assertEquals("subject", word.toString());
 	assertEquals("", nonWord.toString());
