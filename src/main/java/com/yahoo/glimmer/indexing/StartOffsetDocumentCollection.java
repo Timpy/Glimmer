@@ -11,11 +11,11 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.document.AbstractDocumentCollection;
-import it.unimi.di.mg4j.document.Document;
-import it.unimi.di.mg4j.document.DocumentCollection;
-import it.unimi.di.mg4j.document.DocumentFactory;
-import it.unimi.di.mg4j.document.PropertyBasedDocumentFactory;
+import it.unimi.di.big.mg4j.document.AbstractDocumentCollection;
+import it.unimi.di.big.mg4j.document.Document;
+import it.unimi.di.big.mg4j.document.DocumentCollection;
+import it.unimi.di.big.mg4j.document.DocumentFactory;
+import it.unimi.di.big.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.fastutil.longs.AbstractLongBigList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
@@ -71,19 +71,19 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
     }
 
     @Override
-    public int size() {
+    public long size() {
 	return size;
     }
 
     @Override
-    public Document document(int index) throws IOException {
+    public Document document(long index) throws IOException {
 	InputStream stream = stream(index);
 	Reference2ObjectMap<Enum<?>, Object> metadata = getMetadata(stream);
 	return documentFactory.getDocument(stream, metadata);
     }
 
     @Override
-    public InputStream stream(int index) throws IOException {
+    public InputStream stream(long index) throws IOException {
 	long startOffset = getOffset(index);
 	long length;
 	index++;
@@ -104,7 +104,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
     }
 
     @Override
-    public Reference2ObjectMap<Enum<?>, Object> metadata(int index) throws IOException {
+    public Reference2ObjectMap<Enum<?>, Object> metadata(long index) throws IOException {
 	return getMetadata(stream(index));
     }
 
@@ -136,14 +136,17 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 	size++;
     }
 
-    private long getOffset(int index) {
+    private long getOffset(long index) {
 	if (index < 0 || index >= size()) {
 	    throw new IndexOutOfBoundsException("Given index " + index + " out of range 0 to " + (size() - 1));
 	}
-	int offsetsIndex = index / SUBLIST_SIZE;
-	int subOffsetIndex = index % SUBLIST_SIZE;
+	long offsetsIndex = index / SUBLIST_SIZE;
+	long subOffsetIndex = index % SUBLIST_SIZE;
 
-	OffsetsList offsetsList = offsetsLists.get(offsetsIndex);
+	if (offsetsIndex > Integer.MAX_VALUE) {
+	    throw new IndexOutOfBoundsException();
+	}
+	OffsetsList offsetsList = offsetsLists.get((int)offsetsIndex);
 	return offsetsList.getOffset(subOffsetIndex);
     }
 
@@ -215,7 +218,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 	    tmpOffsets = null;
 	}
 
-	public long getOffset(int offsetIndex) {
+	public long getOffset(long offsetIndex) {
 	    if (offsetIndex >= offsetsSize) {
 		throw new IllegalArgumentException("Requested offset index " + offsetIndex + " is >= the offset list size " + offsetsSize);
 	    }

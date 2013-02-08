@@ -11,10 +11,10 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.document.DocumentCollectionBuilder;
-import it.unimi.di.mg4j.document.IdentityDocumentFactory;
-import it.unimi.di.mg4j.io.HadoopFileSystemIOFactory;
-import it.unimi.di.mg4j.io.IOFactory;
+import it.unimi.di.big.mg4j.document.DocumentCollectionBuilder;
+import it.unimi.di.big.mg4j.document.IdentityDocumentFactory;
+import it.unimi.di.big.mg4j.io.HadoopFileSystemIOFactory;
+import it.unimi.di.big.mg4j.io.IOFactory;
 import it.unimi.dsi.io.FastBufferedReader;
 import it.unimi.dsi.lang.MutableString;
 
@@ -107,7 +107,7 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	    * All docId's in the split are then offset so that when the sub collections are loaded into a ConcatinatedCollection the doc's are stored under the correct id
 	    * 
 	    */
-	    for (int emptyDocId = bySubjectRecord.getPreviousId() + 1 ; emptyDocId < bySubjectRecord.getId() ; emptyDocId++) {
+	    for (long emptyDocId = bySubjectRecord.getPreviousId() + 1 ; emptyDocId < bySubjectRecord.getId() ; emptyDocId++) {
 		// write empty doc.
 		builder.startDocument("", "");
 		builder.endDocument();
@@ -117,8 +117,8 @@ public class BySubjectCollectionBuilder extends Configured implements Tool {
 	    builder.startDocument(bySubjectRecord.getSubject(), bySubjectRecord.getSubject());
 	    builder.startTextField();
 	    
-	    addField(Integer.toString(bySubjectRecord.getId()));
-	    addField(Integer.toString(bySubjectRecord.getPreviousId()));
+	    addField(Long.toString(bySubjectRecord.getId()));
+	    addField(Long.toString(bySubjectRecord.getPreviousId()));
 	    addField(bySubjectRecord.getSubject());
 	    
 	    fbr.setReader(bySubjectRecord.getRelationsReader());

@@ -17,19 +17,17 @@ import java.util.Iterator;
 
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.log4j.Logger;
 
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue> {
-    private final static Logger LOGGER = Logger.getLogger(TermReduce.class);
     public static final String MAX_INVERTEDLIST_SIZE_PARAMETER = "maxInvertiedListSize";
     public static final String MAX_POSITIONLIST_SIZE_PARAMETER = "maxPositionListSize";
     
     private IntWritable writerKey;
     private IndexRecordWriterTermValue writerTermValue;
     private IndexRecordWriterDocValue writerDocValue;
-    private ArrayList<Integer> predicatedIds;
+    private ArrayList<Long> predicatedIds;
 
     @Override
     protected void setup(org.apache.hadoop.mapreduce.Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue>.Context context) throws IOException,
@@ -37,7 +35,7 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	writerKey = new IntWritable();
 	writerTermValue = new IndexRecordWriterTermValue();
 	writerDocValue = new IndexRecordWriterDocValue();
-	predicatedIds = new ArrayList<Integer>();
+	predicatedIds = new ArrayList<Long>();
     };
 
     @Override
@@ -50,7 +48,7 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	writerKey.set(key.getIndex());
 
 	if (key.getIndex() == DocumentMapper.ALIGNMENT_INDEX) {
-	    int lastPredicateId = Integer.MIN_VALUE;
+	    long lastPredicateId = Long.MIN_VALUE;
 	    for (TermValue value : values) {
 		if (value.getType() != Type.INDEX_ID) {
 		    throw new IllegalStateException("Got a " + value.getType() + " value when expecting only " + Type.INDEX_ID);
@@ -68,7 +66,7 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 
 	    context.write(writerKey, writerTermValue);
 
-	    for (Integer predicateId : predicatedIds) {
+	    for (Long predicateId : predicatedIds) {
 		writerDocValue.setDocument(predicateId);
 		context.write(writerKey, writerDocValue);
 	    }
@@ -82,7 +80,6 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	    Iterator<TermValue> valuesIt = values.iterator();
 	    while (valuesIt.hasNext()) {
 		value = valuesIt.next();
-		// LOG.warn("Value:" + value.toString());
 
 		if (value.getType() == Type.DOC_STATS) {
 		    termFrequency++;
@@ -98,7 +95,6 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	    writerTermValue.setTermFrequency(termFrequency);
 	    writerTermValue.setSumOfMaxTermPositions(sumOfMaxTermPositions);
 
-	    LOGGER.info("Reducing " + writerTermValue);
 	    context.write(writerKey, writerTermValue);
 
 	    TermValue prevValue = new TermValue();
@@ -106,14 +102,11 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 
 	    while (value != null) {
 		if (value.getType() == Type.OCCURRENCE) {
-		    int docId = value.getV1();
+		    long docId = value.getV1();
 		    if (docId != prevValue.getV1()) {
 			// New document, write out previous postings
 			writerDocValue.setDocument(prevValue.getV1());
 			
-			if ("@370".equals(key.getTerm())) {
-			    LOGGER.info("@370 occerrences " + writerDocValue);
-			}
 			context.write(writerKey, writerDocValue);
 
 			// The first occerrence of this docId/
@@ -146,9 +139,6 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 		    // This is the last occurrence: write out the remaining
 		    // positions
 		    writerDocValue.setDocument(prevValue.getV1());
-		    if ("@370".equals(key.getTerm())) {
-			LOGGER.info("@370 occerrences " + writerDocValue);
-		    }
 		    context.write(writerKey, writerDocValue);
 
 		    writerDocValue.clearOccerrences();

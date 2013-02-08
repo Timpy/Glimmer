@@ -77,7 +77,7 @@ class HorizontalDocument extends RDFDocument {
 	MutableString word = new MutableString();
 	MutableString nonWord = new MutableString();
 
-	String subjectId = factory.getResourceIdPrefix() + Integer.toString(getId());
+	String subjectId = factory.getResourceIdPrefix() + Long.toString(getId());
 	subject.add(subjectId);
 	
 	// Add the subjectId also as text.

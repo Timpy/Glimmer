@@ -13,11 +13,11 @@ package com.yahoo.glimmer.web;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
-import it.unimi.di.mg4j.index.Index;
-import it.unimi.di.mg4j.query.SelectedInterval;
-import it.unimi.di.mg4j.query.nodes.Query;
-import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.di.mg4j.search.score.DocumentScoreInfo;
+import it.unimi.di.big.mg4j.index.Index;
+import it.unimi.di.big.mg4j.query.SelectedInterval;
+import it.unimi.di.big.mg4j.query.nodes.Query;
+import it.unimi.di.big.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.big.mg4j.search.score.DocumentScoreInfo;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -94,7 +94,7 @@ public class Querier {
 	return new RDFQueryResult("", null, results.size(), results, (int)time);
     }
 
-    private static RDFResultItem createRdfResultItem(RDFIndex index, int docId, double score, boolean lookupObjectLabels) throws IOException {
+    private static RDFResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels) throws IOException {
 	InputStream docInputStream = index.getDocumentInputStream(docId);
 	
 	BySubjectRecord record = new BySubjectRecord();

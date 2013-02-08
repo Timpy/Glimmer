@@ -24,6 +24,7 @@ public class Context extends Properties {
 
     private static final String RESOURCES_ID_PREFIX_KEY = "resourceIdPrefix";
     private static final String ALL_RESOURCES_MAP_KEY = "allResorcesMap";
+    private static final String ALL_RESOURCES_SIGNATURE_KEY = "allResorcesSignature";
     private static final String ALL_RESOURCES_KEY = "allResorces";
 
     private static final String MULTIINDEX_DIR_PREFIX_KEY = "multiindex.dirprefix";
@@ -78,7 +79,11 @@ public class Context extends Properties {
     }
 
     public File getAllResourcesMapFile() {
-	return getKbRootRelativeFile(getProperty(ALL_RESOURCES_MAP_KEY, "all.smap"));
+	return getKbRootRelativeFile(getProperty(ALL_RESOURCES_MAP_KEY, "all.map"));
+    }
+    
+    public File getAllResourcesSignatureFile() {
+	return getKbRootRelativeFile(getProperty(ALL_RESOURCES_SIGNATURE_KEY, "all.smap"));
     }
 
     public File getAllResourcesFile() {

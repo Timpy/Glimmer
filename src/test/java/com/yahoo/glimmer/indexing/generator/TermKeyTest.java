@@ -26,6 +26,7 @@ import org.apache.hadoop.io.RawComparator;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.yahoo.glimmer.indexing.generator.TermKey.FirstGroupingComparator;
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class TermKeyTest {
@@ -118,5 +119,13 @@ public class TermKeyTest {
 	key2.readFields(dataInput);
 	
 	assertEquals(key1, key2);
+    }
+    
+    @Test
+    public void firstPartitionerTest() {
+	// The hashCode of "node178qbtfd0x20663837" is Integer.MIN_VALUE
+	TermKey termKey = new TermKey("node178qbtfd0x20663837", 1, new TermValue(TermValue.Type.OCCURRENCE, 1021424687, 1));
+	TermKey.FirstPartitioner partitioner = new TermKey.FirstPartitioner();
+	assertEquals(26, partitioner.getPartition(termKey, termKey.getValue(), 30));
     }
 }

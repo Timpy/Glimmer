@@ -37,6 +37,7 @@ import com.yahoo.glimmer.indexing.VerticalDocumentFactory;
  * Generate an inverted index from an input of <url, docfeed> pairs using MG4J
  */
 public class TripleIndexGenerator extends Configured implements Tool {
+    private static final String NUMBER_OF_DOCS_ARG = "numdocs";
     private static final String METHOD_ARG = "method";
     private static final String METHOD_ARG_VALUE_VERTICAL = "vertical";
     private static final String METHOD_ARG_VALUE_HORIZONTAL = "horizontal";
@@ -67,7 +68,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 			"Prefix to add to object resource hash values when indexing. Stops queries for numbers matching resource hash values. Default is '@'"),
 
 		new UnflaggedOption("input", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
-		new UnflaggedOption("numdocs", JSAP.INTEGER_PARSER, JSAP.REQUIRED, "Number of documents to index"),
+		new UnflaggedOption(NUMBER_OF_DOCS_ARG, JSAP.LONG_PARSER, JSAP.REQUIRED, "Number of documents to index"),
 		new UnflaggedOption("output", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the output."),
 		new UnflaggedOption(RESOURCES_HASH_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the resources hash file."),
 
@@ -110,7 +111,8 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	conf.setClass("mapred.output.key.comparator.class", TermKey.Comparator.class, WritableComparator.class);
 	conf.set("mapreduce.user.classpath.first", "true");
 
-	conf.setInt(NUMBER_OF_DOCUMENTS, jsapResult.getInt("numdocs"));
+	long numDocs = jsapResult.getLong(NUMBER_OF_DOCS_ARG);
+	conf.setLong(NUMBER_OF_DOCUMENTS, numDocs);
 	// Set this in a attempt to get around the 2GB of ram task limit on our cluster.
 	// Setting this in the hope of fixing Direct buffer memory errors
 	conf.setInt(INDEX_WRITER_CACHE_SIZE, 1024 * 1024);

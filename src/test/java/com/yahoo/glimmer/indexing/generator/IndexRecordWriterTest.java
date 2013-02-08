@@ -14,9 +14,9 @@ package com.yahoo.glimmer.indexing.generator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
-import it.unimi.di.mg4j.index.DiskBasedIndex;
-import it.unimi.di.mg4j.index.IndexIterator;
-import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
+import it.unimi.di.big.mg4j.index.DiskBasedIndex;
+import it.unimi.di.big.mg4j.index.IndexIterator;
+import it.unimi.di.big.mg4j.index.QuasiSuccinctIndex;
 
 import java.io.IOException;
 import java.net.URI;
@@ -57,7 +57,7 @@ public class IndexRecordWriterTest {
 	conf = new Configuration();
 	
 	conf.set("mapred.output.dir", INDEX_TMP_DIR.toString());
-	conf.setInt(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, 8);
+	conf.setLong(TripleIndexGenerator.NUMBER_OF_DOCUMENTS, 8);
 
 	fs.initialize(new URI("file:///"), new Configuration());
     }
@@ -233,7 +233,7 @@ public class IndexRecordWriterTest {
 	    if (actual.length() > 0) {
 		actual.append(' ');
 	    }
-	    Integer next = documents.nextDocument();
+	    Long next = documents.nextDocument();
 	    actual.append('(');
 	    actual.append(next);
 	    actual.append(':');

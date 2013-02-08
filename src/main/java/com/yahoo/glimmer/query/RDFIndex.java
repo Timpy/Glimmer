@@ -11,24 +11,28 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.document.ConcatenatedDocumentCollection;
-import it.unimi.di.mg4j.document.Document;
-import it.unimi.di.mg4j.document.DocumentCollection;
-import it.unimi.di.mg4j.index.BitStreamIndex;
-import it.unimi.di.mg4j.index.DiskBasedIndex;
-import it.unimi.di.mg4j.index.Index;
-import it.unimi.di.mg4j.index.Index.UriKeys;
-import it.unimi.di.mg4j.index.IndexIterator;
-import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
-import it.unimi.di.mg4j.index.TermProcessor;
-import it.unimi.di.mg4j.query.QueryEngine;
-import it.unimi.di.mg4j.query.SelectedInterval;
-import it.unimi.di.mg4j.query.nodes.Query;
-import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.di.mg4j.search.DocumentIteratorBuilderVisitor;
-import it.unimi.di.mg4j.search.score.CountScorer;
-import it.unimi.di.mg4j.search.score.DocumentScoreInfo;
-import it.unimi.di.mg4j.search.score.Scorer;
+import it.unimi.di.big.mg4j.document.ConcatenatedDocumentCollection;
+import it.unimi.di.big.mg4j.document.Document;
+import it.unimi.di.big.mg4j.document.DocumentCollection;
+import it.unimi.di.big.mg4j.index.BitStreamIndex;
+import it.unimi.di.big.mg4j.index.DiskBasedIndex;
+import it.unimi.di.big.mg4j.index.Index;
+import it.unimi.di.big.mg4j.index.Index.UriKeys;
+import it.unimi.di.big.mg4j.index.IndexIterator;
+import it.unimi.di.big.mg4j.index.QuasiSuccinctIndex;
+import it.unimi.di.big.mg4j.index.TermProcessor;
+import it.unimi.di.big.mg4j.query.QueryEngine;
+import it.unimi.di.big.mg4j.query.SelectedInterval;
+import it.unimi.di.big.mg4j.query.nodes.Query;
+import it.unimi.di.big.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.big.mg4j.search.DocumentIteratorBuilderVisitor;
+import it.unimi.di.big.mg4j.search.score.CountScorer;
+import it.unimi.di.big.mg4j.search.score.DocumentScoreInfo;
+import it.unimi.di.big.mg4j.search.score.Scorer;
+import it.unimi.dsi.big.util.LongBigListSignedStringMap;
+import it.unimi.dsi.big.util.SemiExternalGammaBigList;
+import it.unimi.dsi.big.util.StringMap;
+import it.unimi.dsi.fastutil.BigList;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.fastutil.objects.Object2LongFunction;
@@ -44,9 +48,8 @@ import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.lang.MutableString;
+import it.unimi.dsi.sux4j.io.FileLinesBigList;
 import it.unimi.dsi.sux4j.io.FileLinesList;
-import it.unimi.dsi.util.SemiExternalGammaList;
-import it.unimi.dsi.util.StringMap;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -89,7 +92,7 @@ public class RDFIndex {
     /** The document collection. */
     private DocumentCollection documentCollection = null;
     /** Term counts in the token index */
-    protected SemiExternalGammaList frequencies = null;
+    protected SemiExternalGammaBigList frequencies = null;
     /** Document priors */
     protected HashMap<Integer, Integer> documentPriors = null;
     /** Map used to encode URIs for retrieving from the collection */
@@ -200,9 +203,9 @@ public class RDFIndex {
 	    File titleListFile = context.getTitleListFile();
 	    if (titleListFile != null) {
 		LOGGER.info("Loading titlelist from " + titleListFile.getPath());
-		List<MutableString> titleList;
+		BigList<MutableString> titleList;
 		try {
-		    titleList = new FileLinesList(titleListFile.getPath(), "ASCII");
+		    titleList = new FileLinesBigList(titleListFile.getPath(), "ASCII");
 		    LOGGER.info("Loaded titlelist of size " + titleList.size() + ".");
 		    documentCollection = new TitleListDocumentCollection(titleList);
 		} catch (Exception e) {
@@ -219,6 +222,12 @@ public class RDFIndex {
 	    LOGGER.warn("Warning, no resources map specified!");
 	} else {
 	    LOGGER.info("Loaded resourses map " + context.getAllResourcesMapFile().getPath() + " with " + allResourcesToIds.size() + " entries.");
+	}
+	
+	try {
+	    allResourcesToIds = new LongBigListSignedStringMap(allResourcesToIds, context.getAllResourcesSignatureFile().getPath());
+	} catch (Exception e) {
+	    throw new RDFIndexException("Exception while creating 'all' resources signed map", e);
 	}
 
 	// Load the reverse all resource function.
@@ -264,9 +273,9 @@ public class RDFIndex {
 	filename += DiskBasedIndex.FREQUENCIES_EXTENSION;
 	try {
 	    LOGGER.info("Loading frequencies from " + filename);
-	    frequencies = new SemiExternalGammaList(new InputBitStream(filename), 1, subjectTextIndex.numberOfTerms);
-	    if (frequencies.size() != subjectTextIndex.numberOfDocuments) {
-		LOGGER.warn("Loaded " + frequencies.size() + " frequency values but subjectTextIndex.numberOfDocuments is " + subjectTextIndex.numberOfDocuments);
+	    frequencies = new SemiExternalGammaBigList(new InputBitStream(filename), 1, subjectTextIndex.numberOfTerms);
+	    if (frequencies.size64() != subjectTextIndex.numberOfDocuments) {
+		LOGGER.warn("Loaded " + frequencies.size64() + " frequency values but subjectTextIndex.numberOfDocuments is " + subjectTextIndex.numberOfDocuments);
 	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException("Failed to load frequences for subjectText index from " + filename, e);
@@ -693,15 +702,16 @@ public class RDFIndex {
 	for (CharSequence term : termMap.list()) {
 	    long docId = termMap.get(term);
 	    IndexIterator it = index.documents(((int) docId));
+	    int frequency = it.frequency() > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int)it.frequency();
 	    if (termsAreResourceIds) {
 		String termString = term.toString();
 		if (!termString.startsWith(resourceIdPrefix)) {
 		    throw new RuntimeException("Expected resource id " + termString + " to be prefix with " + resourceIdPrefix);
 		}
 		int termAsId = Integer.parseInt(termString.substring(resourceIdPrefix.length()));
-		histogram.put(lookupResourceById(termAsId), it.frequency());
+		histogram.put(lookupResourceById(termAsId), frequency);
 	    } else {
-		histogram.put(term.toString(), it.frequency());
+		histogram.put(term.toString(), frequency);
 	    }
 	    it.dispose();
 	}
@@ -724,7 +734,7 @@ public class RDFIndex {
 	}
     }
 
-    public InputStream getDocumentInputStream(int docId) throws IOException {
+    public InputStream getDocumentInputStream(long docId) throws IOException {
 	return documentCollection.stream(docId);
     }
 

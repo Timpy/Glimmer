@@ -11,15 +11,15 @@ package com.yahoo.glimmer.indexing.generator;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.index.CompressionFlags;
-import it.unimi.di.mg4j.index.CompressionFlags.Coding;
-import it.unimi.di.mg4j.index.CompressionFlags.Component;
-import it.unimi.di.mg4j.index.DiskBasedIndex;
-import it.unimi.di.mg4j.index.IndexWriter;
-import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
-import it.unimi.di.mg4j.index.QuasiSuccinctIndexWriter;
-import it.unimi.di.mg4j.io.HadoopFileSystemIOFactory;
-import it.unimi.di.mg4j.io.IOFactory;
+import it.unimi.di.big.mg4j.index.CompressionFlags;
+import it.unimi.di.big.mg4j.index.CompressionFlags.Coding;
+import it.unimi.di.big.mg4j.index.CompressionFlags.Component;
+import it.unimi.di.big.mg4j.index.DiskBasedIndex;
+import it.unimi.di.big.mg4j.index.IndexWriter;
+import it.unimi.di.big.mg4j.index.QuasiSuccinctIndex;
+import it.unimi.di.big.mg4j.index.QuasiSuccinctIndexWriter;
+import it.unimi.di.big.mg4j.io.HadoopFileSystemIOFactory;
+import it.unimi.di.big.mg4j.io.IOFactory;
 import it.unimi.dsi.bits.Fast;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.util.Properties;
@@ -47,13 +47,13 @@ public class Index {
     private FileSystem fs;
     private Path outputDir;
     private String name;
-    private int numDocs;
+    private long numDocs;
     private int indexWriterCacheSize = QuasiSuccinctIndexWriter.DEFAULT_CACHE_SIZE;
 
     private boolean positions;
     private String hashValuePrefix;
 
-    public Index(FileSystem fs, Path outputDir, String indexName, int numDocs, boolean positions, String hashValuePrefix, int indexWriterCacheSize) {
+    public Index(FileSystem fs, Path outputDir, String indexName, long numDocs, boolean positions, String hashValuePrefix, int indexWriterCacheSize) {
 	this.fs = fs;
 	this.outputDir = outputDir;
 	// It seems like MG4J doesn't like index names with the '-' char
@@ -106,13 +106,13 @@ public class Index {
     public void close(long writtenOccurrences) throws IOException {
 	try {
 	    Properties props = indexWriter.properties();
-	    System.out.println("Closing index " + name + " which has " + props.getProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.TERMS) + " terms ");
+	    System.out.println("Closing index " + name + " which has " + props.getProperty(it.unimi.di.big.mg4j.index.Index.PropertyKeys.TERMS) + " terms ");
 	    if (positions) {
-		props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.OCCURRENCES, writtenOccurrences);
+		props.setProperty(it.unimi.di.big.mg4j.index.Index.PropertyKeys.OCCURRENCES, writtenOccurrences);
 	    }
-	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.MAXCOUNT, -1);
-	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.FIELD, name);
-	    props.setProperty(it.unimi.di.mg4j.index.Index.PropertyKeys.TERMPROCESSOR, CombinedTermProcessor.getInstance());
+	    props.setProperty(it.unimi.di.big.mg4j.index.Index.PropertyKeys.MAXCOUNT, -1);
+	    props.setProperty(it.unimi.di.big.mg4j.index.Index.PropertyKeys.FIELD, name);
+	    props.setProperty(it.unimi.di.big.mg4j.index.Index.PropertyKeys.TERMPROCESSOR, CombinedTermProcessor.getInstance());
 	    props.addProperty(ResourceRefTermProcessor.PropertyKeys.REF_PREFIX, hashValuePrefix);
 
 	    props.save(properties);

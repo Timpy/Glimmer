@@ -11,10 +11,10 @@ package com.yahoo.glimmer.indexing;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.document.DocumentCollectionBuilder;
-import it.unimi.di.mg4j.document.DocumentFactory;
-import it.unimi.di.mg4j.io.IOFactory;
-import it.unimi.di.mg4j.tool.Scan.VirtualDocumentFragment;
+import it.unimi.di.big.mg4j.document.DocumentCollectionBuilder;
+import it.unimi.di.big.mg4j.document.DocumentFactory;
+import it.unimi.di.big.mg4j.io.IOFactory;
+import it.unimi.di.big.mg4j.tool.Scan.VirtualDocumentFragment;
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 import it.unimi.dsi.lang.MutableString;

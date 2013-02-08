@@ -101,7 +101,7 @@ public class DocumentMapperTest {
 	    allowing(doc).getSubject();
 	    will(returnValue("http://subject/"));
 	    allowing(doc).getId();
-	    will(returnValue(10));
+	    will(returnValue(10l));
 	    
 	    allowing(doc).getIndexType();
 	    will(returnValue(IndexType.VERTICAL));

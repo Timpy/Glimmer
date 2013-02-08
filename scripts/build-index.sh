@@ -494,6 +494,7 @@ generateDocSizes ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS}
 buildCollection ${DFS_BUILD_DIR}/prep
 
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.map" "${LOCAL_BUILD_DIR}"
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.smap" "${LOCAL_BUILD_DIR}"
 
 echo Done. Index files are here ${LOCAL_BUILD_DIR}

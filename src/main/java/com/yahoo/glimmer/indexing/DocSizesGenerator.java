@@ -14,7 +14,7 @@ package com.yahoo.glimmer.indexing;
 import it.unimi.dsi.io.OutputBitStream;
 import it.unimi.dsi.io.WordReader;
 import it.unimi.dsi.lang.MutableString;
-import it.unimi.di.mg4j.index.DiskBasedIndex;
+import it.unimi.di.big.mg4j.index.DiskBasedIndex;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -70,14 +70,15 @@ public class DocSizesGenerator extends Configured implements Tool {
     }
 
     public static class DocSize implements WritableComparable<DocSize>, Cloneable {
-	private int document, size;
+	private long document;
+	private int size;
 	private static final DocSizeComparator comparator = new DocSizeComparator();
 
 	// Hadoop needs this
 	public DocSize() {
 	}
 
-	public DocSize(int document, int size) {
+	public DocSize(long document, int size) {
 	    this.document = document;
 	    this.size = size;
 	}
@@ -87,7 +88,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    this.size = p.size;
 	}
 
-	public int getDocument() {
+	public long getDocument() {
 	    return document;
 	}
 
@@ -104,12 +105,12 @@ public class DocSizesGenerator extends Configured implements Tool {
 	}
 
 	public void readFields(DataInput in) throws IOException {
-	    document = in.readInt();
+	    document = in.readLong();
 	    size = in.readInt();
 	}
 
 	public void write(DataOutput out) throws IOException {
-	    out.writeInt(document);
+	    out.writeLong(document);
 	    out.writeInt(size);
 	}
 
@@ -126,7 +127,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	@Override
 	public int hashCode() {
 	    int hash = 7;
-	    hash = 31 * hash + document;
+	    hash = 31 * hash + (int)(document ^ document >>> 32);
 	    hash = 31 * hash + size;
 	    return hash;
 	}
@@ -362,14 +363,14 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    fs.setPermission(sizesPath, ALL_PERMISSIONS);
 
 	    long occurrences = 0;
-	    int prevDocID = -1;
+	    long prevDocID = -1;
 	    Iterator<DocSize> valueIt = values.iterator();
 	    while (valueIt.hasNext()) {
 		DocSize value = valueIt.next();
 		if ((prevDocID + 1) < value.document) {
 		    System.out.println("Writing zeroes from " + (prevDocID + 1) + " to " + value.document);
 		}
-		for (int i = prevDocID + 1; i < value.document; i++) {
+		for (long i = prevDocID + 1; i < value.document; i++) {
 		    stream.writeGamma(0);
 		}
 		stream.writeGamma(value.size);
@@ -379,7 +380,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    if ((prevDocID + 1) < numdocs) {
 		System.out.println("Writing zeroes  from " + (prevDocID + 1) + " to " + numdocs);
 	    }
-	    for (int i = prevDocID + 1; i < numdocs; i++) {
+	    for (long i = prevDocID + 1; i < numdocs; i++) {
 		stream.writeGamma(0);
 	    }
 
