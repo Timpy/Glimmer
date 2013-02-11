@@ -76,7 +76,7 @@ public class Querier {
 	}
 
 	long time = queryLogger.endQuery(query.toString(), numResults);
-	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", numResults, resultItems, (int) time);
+	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", numResults, startItem, maxNumItems,  resultItems, (int) time);
 	return result;
     }
 
@@ -91,7 +91,7 @@ public class Querier {
 	} else {
 	    results = Collections.emptyList();
 	}
-	return new RDFQueryResult("", null, results.size(), results, (int)time);
+	return new RDFQueryResult("", null, results.size(), 0, 1, results, (int)time);
     }
 
     private static RDFResultItem createRdfResultItem(RDFIndex index, int docId, double score, boolean lookupObjectLabels) throws IOException {

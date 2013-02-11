@@ -154,7 +154,6 @@
 .doc-link {
 	color: #3A4956;
 	text-decoration: none;
-	border-bottom: dotted 1px #5555FF;
 	margin-left: 10px;
 }
 
@@ -184,13 +183,11 @@
 #mainContent a:link { /*color: #5555FF*/;
 	color: #3A4956;
 	text-decoration: none;
-	border-bottom: dotted 1px #5555FF;
 }
 
 #mainContent a:visited {
 	color: #3A4956;
 	text-decoration: none;
-	border-bottom: dotted 1px #3399FF;
 }
 
 #mainContent a:hover {
@@ -205,7 +202,32 @@
 	margin: 10px 0 10px 15px;
 	width: auto;
 	float: right;
-	border-left: thin dotted #000;
+}
+
+.status {
+	clear:both;
+	text-align: center;
+}
+#result-stats {
+	float:left;
+}
+
+#results {
+	clear: both;
+}
+
+.results-pager {
+}
+.results-pager .pager-link {
+	padding: 2px;
+}
+.results-pager .pager-link-current {
+	background-color: #E4F2FF;
+}
+#results-pager-top {
+	float:right;
+}
+#results-pager-bottom {
 }
 
 /* -- general -- */
@@ -311,13 +333,11 @@ ul li {
 a:link {
 	color: #5555FF;
 	text-decoration: none;
-	border-bottom: dotted 1px #5555FF;
 }
 
 a:visited {
 	color: #3399FF;
 	text-decoration: none;
-	border-bottom: dotted 1px #3399FF;
 }
 
 a:hover {
@@ -332,7 +352,6 @@ blockquote {
 	margin: 10px 0 10px 15px;
 	width: auto;
 	float: right;
-	border-left: thin dotted #000;
 }
 
 .object div {
