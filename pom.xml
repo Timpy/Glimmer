@@ -68,8 +68,8 @@
 			<version>1.2.strictNulls-SNAPSHOT</version>
 		</dependency>
 		<dependency>
-			<groupId>it.unimi.di</groupId>
-			<artifactId>mg4j-big</artifactId>
+			<groupId>it.unimi.di.big</groupId>
+			<artifactId>mg4j</artifactId>
 			<version>5.1</version>
 			<exclusions>
 				<exclusion>

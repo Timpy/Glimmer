@@ -169,13 +169,13 @@ public class ComputeHashTool extends Configured implements Tool {
 	    LOGGER.info("\tBuilding signed hash...");
 //	    ShiftAddXorSignedStringMap signedHash = new ShiftAddXorSignedStringMap(inCollection.iterator(), unsignedHash, signatureWidth);
 	    Path signedPath = new Path(destFilename + DOT_SIGNED);
-	    OutputStream signedOutputStream = null;
+	    DataOutputStream signedDataOutputStream = null;
 	    try {
-		signedOutputStream = createOutputStream(fs, signedPath);
-		LongBigListSignedStringMap.sign(inCollection.iterator(), new DataOutputStream( new FastBufferedOutputStream(signedOutputStream)), null);
+		signedDataOutputStream  = new DataOutputStream( new FastBufferedOutputStream(createOutputStream(fs, signedPath)));
+		LongBigListSignedStringMap.sign(inCollection.iterator(), signedDataOutputStream, null);
 	    } finally {
-		if (signedOutputStream != null) {
-		    signedOutputStream.close();
+		if (signedDataOutputStream != null) {
+		    signedDataOutputStream.close();
 		}
 	    }
 		

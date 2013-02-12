@@ -14,6 +14,7 @@ package com.yahoo.glimmer.util;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import it.unimi.dsi.big.util.LongBigListSignedStringMap;
+import it.unimi.dsi.fastutil.longs.LongBigList;
 import it.unimi.dsi.lang.MutableString;
 import it.unimi.dsi.sux4j.mph.HollowTrieMonotoneMinimalPerfectHashFunction;
 import it.unimi.dsi.util.ByteBufferLongBigList;
@@ -155,7 +156,9 @@ public class ComputeHashToolTest {
 	HollowTrieMonotoneMinimalPerfectHashFunction<MutableString> unsignedMap = (HollowTrieMonotoneMinimalPerfectHashFunction<MutableString>) readObject;
 	
 	ByteBuffer signedByteBuffer = ByteBuffer.wrap(signedStream.toByteArray());
-	LongBigListSignedStringMap signedMap = new LongBigListSignedStringMap(unsignedMap, new ByteBufferLongBigList(signedByteBuffer));
+	LongBigList signatures = new MyByteBufferLongBigList(signedByteBuffer);
+	
+	LongBigListSignedStringMap signedMap = new LongBigListSignedStringMap(unsignedMap, signatures);
 	
 	assertEquals(-1, signedMap.getLong("0"));
 	assertEquals(0, signedMap.getLong("a"));
@@ -166,6 +169,13 @@ public class ComputeHashToolTest {
 	assertEquals(-1, signedMap.getLong("ca"));
 	assertEquals(3, signedMap.getLong("d"));
 	assertEquals(-1, signedMap.getLong("dx"));
+    }
+    
+    // TODO.  This is just because of an error in the constructor of ByteBufferLongBigList.  Should be removed with the next version of dsiutils. (2.0.14)
+    private class MyByteBufferLongBigList extends ByteBufferLongBigList {
+	public MyByteBufferLongBigList(final ByteBuffer byteBuffer) {
+	    super( new ByteBuffer[] { byteBuffer }, byteBuffer.capacity() / 8, new boolean[ 1 ] );
+	}
     }
     
     private class PathMatcher extends BaseMatcher<Path> {
