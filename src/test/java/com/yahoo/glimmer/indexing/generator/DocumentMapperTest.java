@@ -67,7 +67,7 @@ public class DocumentMapperTest {
 	    allowing(doc).getSubject();
 	    will(returnValue("http://subject/"));
 	    allowing(doc).getId();
-	    will(returnValue(5));
+	    will(returnValue(5l));
 	    
 	    one(mapperContext).getCounter(DocumentMapper.Counters.NUMBER_OF_RECORDS);
 	    will(returnValue(counters.findCounter(DocumentMapper.Counters.NUMBER_OF_RECORDS)));

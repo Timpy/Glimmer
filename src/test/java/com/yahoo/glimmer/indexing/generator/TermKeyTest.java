@@ -26,7 +26,6 @@ import org.apache.hadoop.io.RawComparator;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.yahoo.glimmer.indexing.generator.TermKey.FirstGroupingComparator;
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class TermKeyTest {
@@ -51,6 +50,11 @@ public class TermKeyTest {
 	
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 5, 67))) > 0);
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 7, 67))) < 0);
+	
+	assertEquals(0, compare(new TermKey("a", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("a", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67))));
+	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 5l, 67))) > 0);
+	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 7l, 67))) < 0);
+	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, Integer.MAX_VALUE + 6l, 67)), new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6l, 67))) > 0);
 	
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6)), new TermKey("term1", 4, new TermValue(Type.DOC_STATS, 6, 67))) > 0);
 	assertTrue(compare(new TermKey("term1", 4, new TermValue(Type.OCCURRENCE, 6, 67)), new TermKey("term1", 4, new TermValue(Type.INDEX_ID, 6))) > 0);

@@ -50,6 +50,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
     private final ArrayList<OffsetsList> offsetsLists;
     private int size;
     private transient OffsetsList currentSubList;
+    private transient FileInputStream documentsInputStream;
     private transient FileChannel channel;
 
     public StartOffsetDocumentCollection(String name, DocumentFactory documentFactory) {
@@ -66,7 +67,7 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
 
     private void initFiles(File absolutePathToCollection) throws FileNotFoundException {
 	File documentsFile = new File(absolutePathToCollection, name + DOCUMENTS_EXTENSION);
-	FileInputStream documentsInputStream = new FileInputStream(documentsFile);
+	documentsInputStream = new FileInputStream(documentsFile);
 	channel = documentsInputStream.getChannel();
     }
 
@@ -153,11 +154,16 @@ public class StartOffsetDocumentCollection extends AbstractDocumentCollection im
     @Override
     public void close() throws IOException {
 	super.close();
-	currentSubList.lastOffsetAdded();
-	offsetsLists.add(currentSubList);
-	currentSubList = null;
+	if (currentSubList != null) {
+	    currentSubList.lastOffsetAdded();
+	    offsetsLists.add(currentSubList);
+	    currentSubList = null;
+	}
 	if (channel != null) {
 	    channel.close();
+	}
+	if (documentsInputStream != null) {
+	    documentsInputStream.close();
 	}
     }
 

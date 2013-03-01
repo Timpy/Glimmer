@@ -81,12 +81,18 @@ public class BySubjectRecord {
 	} catch (NumberFormatException e) {
 	    return false;
 	}
+	if (id < 0) {
+	    throw new IllegalStateException("Negative doc ID:" + id);
+	}
 
 	readUntil(reader, sb, FIELD_DELIMITER);
 	try {
 	    previousId = Long.parseLong(sb.toString());
 	} catch (NumberFormatException e) {
 	    return false;
+	}
+	if (previousId < -1) {
+	    throw new IllegalStateException("Negative doc previousId:" + previousId);
 	}
 
 	readUntil(reader, sb, FIELD_DELIMITER);
@@ -118,6 +124,9 @@ public class BySubjectRecord {
     }
 
     public void setId(long id) {
+	if (id < 0) {
+	    throw new IllegalArgumentException("setId() given negative value:" + id);
+	}
 	this.id = id;
     }
 
@@ -126,6 +135,9 @@ public class BySubjectRecord {
     }
 
     public void setPreviousId(long previousId) {
+	if (previousId < 0) {
+	    throw new IllegalArgumentException("setPreviousId() given negative value:" + id);
+	}
 	this.previousId = previousId;
     }
 

@@ -58,12 +58,12 @@ LOCAL_BUILD_DIR="${HOME}/tmp/index-${BUILD_NAME}"
 QUEUE=${QUEUE:-default}
 
 echo
-echo "Using ${INPUT_ARG} as input.."
+echo "Using ${INPUT_ARG} as input and ${DFS_BUILD_DIR} as the distributed build dir.."
 if [ ! -z ${PREP_FILTER_FILE} ] ; then
     echo "filtering by ${PREP_FILTER_FILE}.."
 fi
 echo "reducing into ${SUBINDICES} sub indices.."
-echo "and writing output to ${LOCAL_BUILD_DIR}."
+echo "and writing output to local disk in ${LOCAL_BUILD_DIR}."
 echo
 
 JAR_FOR_HADOOP="../target/Glimmer-0.0.1-SNAPSHOT-jar-for-hadoop.jar"
@@ -224,11 +224,12 @@ function computeHashes () {
 
 function getDocCount () {
     local PREP_DIR=${1}
-	# The number of docs is the number of 'all' resources..
+	# The number of docs is the count of 'all' resources..
 	# Note: The number of real docs is actually the number of subjects but as the MG4J docId is taken from the position in the
-	# all resources hash MG4J expects that the docId be smaller that the number of docs.
+	# all resources hash MG4J expects that the docId be smaller that the count of all resource(which is greater than the number
+	# of real docs)
 	# We decided using the all resource count is simpler that using the subject count and hash to get the docIds.  The effect 
-	# is that the index contains empty docs and that the Doc count it's inaccurate. Which may effect scoring in some cases.. 
+	# is that the index contains empty docs and that the Doc count it's accurate. Which may effect scoring in some cases.. 
 	NUMBER_OF_DOCS=`${HADOOP_CMD} fs -cat ${PREP_DIR}/all.mapinfo | grep size | cut -f 2`
 	if [ -z "${NUMBER_OF_DOCS}" -o $? -ne "0" ] ; then
 		echo "Failed to get the number of subjects. exiting.."
@@ -272,9 +273,10 @@ function generateIndex () {
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
 		-Dmapreduce.map.speculative=true \
 		-Dmapreduce.job.reduces=${SUBINDICES} \
-		-Dmapred.child.java.opts=-Xmx900m \
-		-Dmapreduce.map.memory.mb=2000 \
-		-Dmapreduce.reduce.memory.mb=2000 \
+		-Dmapred.map.child.java.opts=-Xmx3000m \
+		-Dmapreduce.map.memory.mb=3000 \
+		-Dmapred.reduce.child.java.opts=-Xmx1800m \
+		-Dmapreduce.reduce.memory.mb=1800 \
 		-Dmapreduce.task.io.sort.mb=128 \
 		-Dmapreduce.job.queuename=${QUEUE} \
 		-Dmapreduce.job.user.classpath.first=true \
@@ -282,7 +284,7 @@ function generateIndex () {
 		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
-	
+
 	EXIT_CODE=$?
 	if [ $EXIT_CODE -ne "0" ] ; then
 		echo "TripleIndexGenerator MR job exited with code $EXIT_CODE. exiting.."
@@ -364,7 +366,7 @@ function mergeSubIndexes() {
 			NO_COUNTS_OPTIONS="-cCOUNTS:NONE -cPOSITIONS:NONE"
 		fi
 		
-		CMD="java -Xmx2G -cp ${JAR_FOR_HADOOP} it.unimi.di.mg4j.tool.Merge ${NO_COUNTS_OPTIONS} ${INDEX_DIR}/${INDEX_NAME} ${SUB_INDEXES}"
+		CMD="java -Xmx2G -cp ${JAR_FOR_HADOOP} it.unimi.di.big.mg4j.tool.Merge ${NO_COUNTS_OPTIONS} ${INDEX_DIR}/${INDEX_NAME} ${SUB_INDEXES}"
 		echo ${CMD}
 		${CMD}
 		
@@ -379,7 +381,7 @@ function mergeSubIndexes() {
 			rm ${PART_DIR}/${INDEX_NAME}.*
 		done
 		
-		CMD="java -cp ${JAR_FOR_HADOOP} it.unimi.dsi.util.ImmutableExternalPrefixMap ${INDEX_DIR}/${INDEX_NAME}.termmap -o ${INDEX_DIR}/${INDEX_NAME}.terms"
+		CMD="java -cp ${JAR_FOR_HADOOP} it.unimi.dsi.big.util.ImmutableExternalPrefixMap ${INDEX_DIR}/${INDEX_NAME}.termmap -o ${INDEX_DIR}/${INDEX_NAME}.terms"
 		echo ${CMD}
 		${CMD}
 		
@@ -395,20 +397,20 @@ function mergeSubIndexes() {
 	
 function generateDocSizes () {
 	PREP_DIR=${1}
-	METHOD=${2}
-	NUMBER_OF_DOCS=${3}
+	METHOD=horizontal
+	NUMBER_OF_DOCS=${2}
+	NUM_INDEXES=5
 	
 	echo
 	echo GENERATING DOC SIZES..
 	echo
 	
 	DFS_SIZES_DIR="${DFS_BUILD_DIR}/${METHOD}.sizes"
-	REDUCE_TASKS=$(( 1 + ${NUMBER_OF_DOCS} / 10000000 ))
 	
 	CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.DocSizesGenerator \
 		-Dmapreduce.map.failures.maxpercent=1 \
-		-Dmapreduce.map.speculative=true \
-		-Dmapreduce.job.reduces=${REDUCE_TASKS} \
+		-Dmapreduce.map.speculative=false \
+		-Dmapreduce.job.reduces=${NUM_INDEXES} \
 		-Dmapreduce.job.queuename=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} -p ${PREP_DIR}/predicate ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${PREP_DIR}/all.map"
@@ -489,7 +491,7 @@ getSubIndexes vertical
 mergeSubIndexes vertical
 
 # These could be run in parallel with index generation.
-generateDocSizes ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS}
+generateDocSizes ${DFS_BUILD_DIR}/prep ${NUMBER_OF_DOCS}
 
 buildCollection ${DFS_BUILD_DIR}/prep
 

@@ -15,12 +15,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mapreduce.Reducer;
 
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
 public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue> {
+    private static final Log LOG = LogFactory.getLog(TermReduce.class);
     public static final String MAX_INVERTEDLIST_SIZE_PARAMETER = "maxInvertiedListSize";
     public static final String MAX_POSITIONLIST_SIZE_PARAMETER = "maxPositionListSize";
     
@@ -28,6 +31,7 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
     private IndexRecordWriterTermValue writerTermValue;
     private IndexRecordWriterDocValue writerDocValue;
     private ArrayList<Long> predicatedIds;
+    private long termKeysProcessed;
 
     @Override
     protected void setup(org.apache.hadoop.mapreduce.Reducer<TermKey, TermValue, IntWritable, IndexRecordWriterValue>.Context context) throws IOException,
@@ -44,7 +48,17 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	    return;
 	}
 
-	context.setStatus(key.getIndex() + ":" + key.getTerm());
+	if (termKeysProcessed % 10000 == 0) {
+	    String statusString = "Reducing " + key.toString();
+	    context.setStatus(statusString);
+	    LOG.info(statusString);
+	}
+	
+	//TODO remove this when fixed int overflow bug fixed.
+	if (key.getTerm().startsWith("@-")) {
+	    throw new IllegalStateException("Negative referenceID. Key:" + key);
+	}
+	
 	writerKey.set(key.getIndex());
 
 	if (key.getIndex() == DocumentMapper.ALIGNMENT_INDEX) {
@@ -103,6 +117,9 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	    while (value != null) {
 		if (value.getType() == Type.OCCURRENCE) {
 		    long docId = value.getV1();
+		    if (docId < 0) {
+			throw new IllegalStateException("Negative DocID. Key:" + key + "\nValue:" + value);
+		    }
 		    if (docId != prevValue.getV1()) {
 			// New document, write out previous postings
 			writerDocValue.setDocument(prevValue.getV1());
@@ -139,6 +156,9 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 		    // This is the last occurrence: write out the remaining
 		    // positions
 		    writerDocValue.setDocument(prevValue.getV1());
+		    if (writerDocValue.getDocument() < 0) {
+			throw new IllegalStateException("Negative DocID. Key:" + key + "\nprevValue:" + prevValue + "\nValue:" + value + "\nwriterDocValue:" + writerDocValue);
+		    }
 		    context.write(writerKey, writerDocValue);
 
 		    writerDocValue.clearOccerrences();
@@ -146,5 +166,6 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 		}
 	    }
 	}
+	termKeysProcessed++;
     }
 }

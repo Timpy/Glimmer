@@ -160,6 +160,7 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	content = document.content(0);
 	assertTrue(content instanceof Reader);
 	assertEquals(-1, contentReader.read(contentBuffer));
+	contentReader.close();
 
 	contentBuffer.clear();
 	document = collection.document(2);
@@ -170,7 +171,7 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	assertEquals(17, contentReader.read(contentBuffer));
 	contentBuffer.flip();
 	assertEquals("Another document ", contentBuffer.toString());
-
+	
 	// empty doc
 	contentBuffer.clear();
 	document = collection.document(3);
@@ -178,6 +179,7 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	content = document.content(0);
 	assertTrue(content instanceof Reader);
 	assertEquals(-1, contentReader.read(contentBuffer));
+	contentReader.close();
 
 	contentBuffer.clear();
 	document = collection.document(4);
@@ -188,6 +190,7 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	assertEquals(19, contentReader.read(contentBuffer));
 	contentBuffer.flip();
 	assertEquals("The third document ", contentBuffer.toString());
+	contentReader.close();
 
 	contentBuffer.clear();
 	document = collection.document(5);
@@ -200,5 +203,9 @@ public class StartOffsetDocumentCollectionBuilderTest {
 	assertEquals("Something completely different. ", contentBuffer.toString());
 
 	assertEquals(6, collection.size());
+	
+	contentReader.close();
+	collection.close();
+	documentsInputStream.close();
     }
 }
