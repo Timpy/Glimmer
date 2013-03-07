@@ -26,7 +26,14 @@ public class RDFInputFormat extends FileInputFormat<LongWritable, RDFDocument> {
     @Override
     protected boolean isSplitable(JobContext context, Path file) {
 	CompressionCodec codec = new CompressionCodecFactory(context.getConfiguration()).getCodec(file);
-	return codec == null;
+	if (codec == null) {
+	    return true;
+	}
+	String className = codec.getClass().getSimpleName().toLowerCase();
+	if (className.contains("bzip2") || className.contains("bz2")) {
+	    return true;
+	}
+	return false;
     }
 
     @Override
