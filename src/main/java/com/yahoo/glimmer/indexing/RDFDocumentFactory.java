@@ -13,7 +13,7 @@ package com.yahoo.glimmer.indexing;
 
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.fastutil.objects.AbstractObject2LongFunction;
-import it.unimi.di.mg4j.document.DocumentFactory.FieldType;
+import it.unimi.di.big.mg4j.document.DocumentFactory.FieldType;
 
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
@@ -147,30 +147,24 @@ public abstract class RDFDocumentFactory {
 
     /**
      * @param url
-     * @return The hash value for the given URL/BNode or null if the given
-     *         URL/BNode is not in the hash function. nulls will only be
-     *         returned when the hash function being used is signed. For
-     *         unsigned hash functions some value smaller than the size of the
-     *         hash will be returned.
+     * @return The hash value for the given URL/BNode or null. The exact behavior depends on the implementation of the hash function used.
+     *  
      */
-    public Integer lookupResource(String key) {
+    public Long lookupResource(String key) {
 	Long value = resourcesHashFunction.get(key);
-	if (value == null || value < 0) {
-	    return null;
+	if (value != null && value < 0) {
+	    throw new RuntimeException("Negative hash value for " + key);
 	}
-	if (value > Integer.MAX_VALUE) {
-	    throw new RuntimeException("Hash value bigger that max int.");
-	}
-	return value.intValue();
+	return value;
     }
 
     public String lookupResource(String key, boolean prefixed) {
-	Integer intValue = lookupResource(key);
-	if (intValue != null) {
+	Long value = lookupResource(key);
+	if (value != null) {
 	    if (prefixed) {
-		return resourceIdPrefix + intValue.toString();
+		return resourceIdPrefix + value.toString();
 	    } else {
-		return intValue.toString();
+		return value.toString();
 	    }
 	}
 	return null;

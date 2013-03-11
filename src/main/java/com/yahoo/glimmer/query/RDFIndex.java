@@ -11,24 +11,28 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.document.ConcatenatedDocumentCollection;
-import it.unimi.di.mg4j.document.Document;
-import it.unimi.di.mg4j.document.DocumentCollection;
-import it.unimi.di.mg4j.index.BitStreamIndex;
-import it.unimi.di.mg4j.index.DiskBasedIndex;
-import it.unimi.di.mg4j.index.Index;
-import it.unimi.di.mg4j.index.Index.UriKeys;
-import it.unimi.di.mg4j.index.IndexIterator;
-import it.unimi.di.mg4j.index.QuasiSuccinctIndex;
-import it.unimi.di.mg4j.index.TermProcessor;
-import it.unimi.di.mg4j.query.QueryEngine;
-import it.unimi.di.mg4j.query.SelectedInterval;
-import it.unimi.di.mg4j.query.nodes.Query;
-import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.di.mg4j.search.DocumentIteratorBuilderVisitor;
-import it.unimi.di.mg4j.search.score.CountScorer;
-import it.unimi.di.mg4j.search.score.DocumentScoreInfo;
-import it.unimi.di.mg4j.search.score.Scorer;
+import it.unimi.di.big.mg4j.document.Document;
+import it.unimi.di.big.mg4j.document.DocumentCollection;
+import it.unimi.di.big.mg4j.document.IdentityDocumentFactory;
+import it.unimi.di.big.mg4j.index.BitStreamIndex;
+import it.unimi.di.big.mg4j.index.DiskBasedIndex;
+import it.unimi.di.big.mg4j.index.Index;
+import it.unimi.di.big.mg4j.index.Index.UriKeys;
+import it.unimi.di.big.mg4j.index.IndexIterator;
+import it.unimi.di.big.mg4j.index.QuasiSuccinctIndex;
+import it.unimi.di.big.mg4j.index.TermProcessor;
+import it.unimi.di.big.mg4j.query.QueryEngine;
+import it.unimi.di.big.mg4j.query.SelectedInterval;
+import it.unimi.di.big.mg4j.query.nodes.Query;
+import it.unimi.di.big.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.big.mg4j.search.DocumentIteratorBuilderVisitor;
+import it.unimi.di.big.mg4j.search.score.CountScorer;
+import it.unimi.di.big.mg4j.search.score.DocumentScoreInfo;
+import it.unimi.di.big.mg4j.search.score.Scorer;
+import it.unimi.dsi.big.util.LongBigListSignedStringMap;
+import it.unimi.dsi.big.util.SemiExternalGammaBigList;
+import it.unimi.dsi.big.util.StringMap;
+import it.unimi.dsi.fastutil.BigList;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.io.BinIO;
 import it.unimi.dsi.fastutil.objects.Object2LongFunction;
@@ -44,9 +48,8 @@ import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import it.unimi.dsi.io.InputBitStream;
 import it.unimi.dsi.lang.MutableString;
+import it.unimi.dsi.sux4j.io.FileLinesBigList;
 import it.unimi.dsi.sux4j.io.FileLinesList;
-import it.unimi.dsi.util.SemiExternalGammaList;
-import it.unimi.dsi.util.StringMap;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -55,7 +58,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -68,6 +70,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
+import com.yahoo.glimmer.util.Bz2BlockIndexedDocumentCollection;
 import com.yahoo.glimmer.util.Util;
 
 public class RDFIndex {
@@ -89,7 +92,7 @@ public class RDFIndex {
     /** The document collection. */
     private DocumentCollection documentCollection = null;
     /** Term counts in the token index */
-    protected SemiExternalGammaList frequencies = null;
+    protected SemiExternalGammaBigList frequencies = null;
     /** Document priors */
     protected HashMap<Integer, Integer> documentPriors = null;
     /** Map used to encode URIs for retrieving from the collection */
@@ -100,7 +103,7 @@ public class RDFIndex {
     protected Index alignmentIndex;
 
     private String resourceIdPrefix = "@";
-    
+
     private Map<String, Integer> predicateDistribution;
     private Map<String, Integer> typeTermDistribution;
 
@@ -109,16 +112,6 @@ public class RDFIndex {
     protected RDFIndexStatistics stats;
 
     protected RDFQueryParser parser;
-
-    private static DocumentCollection loadDocumentCollection(File collectionFile) throws RDFIndexException {
-	try {
-	    DocumentCollection documentCollection = (DocumentCollection) BinIO.loadObject(collectionFile);
-	    documentCollection.filename(collectionFile.getPath());
-	    return documentCollection;
-	} catch (Exception e) {
-	    throw new RDFIndexException(e);
-	}
-    }
 
     @SuppressWarnings("unchecked")
     private static <T> T loadObjectOfType(File file) throws RDFIndexException {
@@ -158,51 +151,23 @@ public class RDFIndex {
 	}
 
 	// Load the collection or titlelist
-	File collectionFile = context.getCollectionFile();
-	if (collectionFile != null) {
-	    LOGGER.info("Loading collection from " + collectionFile);
-
-	    if (collectionFile.isFile()) {
-		documentCollection = loadDocumentCollection(collectionFile);
-	    } else if (collectionFile.isDirectory()) {
-		// A directory of collections.  fileNames will hold the names of the files without their path.
-		String[] fileNames = collectionFile.list(new FilenameFilter() {
-		    @Override
-		    public boolean accept(File dir, String name) {
-			return name.endsWith(".collection") || name.endsWith(".sos");
-		    }
-		});
-
-		if (fileNames.length == 0) {
-		    throw new RuntimeException("No .collection files found in directory " + collectionFile.getPath());
-		}
-
-		if (fileNames.length == 1) {
-		    File file = new File(collectionFile, fileNames[0]);
-		    documentCollection = loadDocumentCollection(file);
-		} else {
-		    // Sort names to get the collection order right
-		    Arrays.sort(fileNames);
-		    documentCollection = new ConcatenatedDocumentCollection(fileNames);
-		    try {
-			documentCollection.filename(collectionFile + "/.");
-		    } catch (IOException e) {
-			throw new RDFIndexException(e);
-		    }
-		}
-	    } else {
-		throw new RuntimeException("Expected " + collectionFile.getPath() + " to be a collection file or directory containing collection files.");
-	    }
+	String indexBasename = new File(kbRootPath, "bySubject").getAbsolutePath();
+	try {
+	    Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("bySubject", new IdentityDocumentFactory());
+	    collection.filename(indexBasename);
+	    documentCollection = collection;
+	} catch (IOException e) {
+	    LOGGER.info("Couldn't open Bz2BlockIndexedDocumentCollection from " + indexBasename, e);
 	}
-
+	
 	if (documentCollection == null) {
 	    LOGGER.info("No collection specified, we will try to use a title list...");
 	    File titleListFile = context.getTitleListFile();
 	    if (titleListFile != null) {
 		LOGGER.info("Loading titlelist from " + titleListFile.getPath());
-		List<MutableString> titleList;
+		BigList<MutableString> titleList;
 		try {
-		    titleList = new FileLinesList(titleListFile.getPath(), "ASCII");
+		    titleList = new FileLinesBigList(titleListFile.getPath(), "ASCII");
 		    LOGGER.info("Loaded titlelist of size " + titleList.size() + ".");
 		    documentCollection = new TitleListDocumentCollection(titleList);
 		} catch (Exception e) {
@@ -212,13 +177,19 @@ public class RDFIndex {
 	}
 
 	resourceIdPrefix = context.getResourceIdPrefix();
-	
+
 	// Load all resources hash function
 	allResourcesToIds = loadObjectOfType(context.getAllResourcesMapFile());
 	if (allResourcesToIds == null) {
 	    LOGGER.warn("Warning, no resources map specified!");
 	} else {
 	    LOGGER.info("Loaded resourses map " + context.getAllResourcesMapFile().getPath() + " with " + allResourcesToIds.size() + " entries.");
+	}
+
+	try {
+	    allResourcesToIds = new LongBigListSignedStringMap(allResourcesToIds, context.getAllResourcesSignatureFile().getPath());
+	} catch (Exception e) {
+	    throw new RDFIndexException("Exception while creating 'all' resources signed map", e);
 	}
 
 	// Load the reverse all resource function.
@@ -235,21 +206,21 @@ public class RDFIndex {
 	// Load vertical indexes
 	Object2ReferenceMap<String, Index> indexMap = loadIndexesFromDir(verticalIndexDir, context.getLoadDocumentSizes(), context.getLoadIndexesInMemory());
 	LOGGER.info("Loaded " + indexMap.size() + " vertical indices.");
-	
+
 	verticalPredicates = Collections.unmodifiableSet(new HashSet<String>(indexMap.keySet()));
 
 	try {
 	    LOGGER.info("Loading alignment index..");
 	    String alignmentUri = new File(verticalIndexDir, ALIGNMENT_INDEX_NAME).getPath();
-	    alignmentIndex = Index.getInstance( alignmentUri + "?mapped=1" );
-	} catch( Exception e ) {
+	    alignmentIndex = Index.getInstance(alignmentUri + "?mapped=1");
+	} catch (Exception e) {
 	    LOGGER.error("Failed to load alignment index", e);
 	}
 
 	// Load horizontal indexes
 	indexMap.putAll(loadIndexesFromDir(horizontalIndexDir, true, context.getLoadIndexesInMemory()));
 
-	for (String indexKey : new String[] {SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY}) {
+	for (String indexKey : new String[] { SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY }) {
 	    if (!indexMap.containsKey(indexKey)) {
 		throw new IllegalStateException("No " + indexKey + " index found.");
 	    }
@@ -264,9 +235,10 @@ public class RDFIndex {
 	filename += DiskBasedIndex.FREQUENCIES_EXTENSION;
 	try {
 	    LOGGER.info("Loading frequencies from " + filename);
-	    frequencies = new SemiExternalGammaList(new InputBitStream(filename), 1, subjectTextIndex.numberOfTerms);
-	    if (frequencies.size() != subjectTextIndex.numberOfDocuments) {
-		LOGGER.warn("Loaded " + frequencies.size() + " frequency values but subjectTextIndex.numberOfDocuments is " + subjectTextIndex.numberOfDocuments);
+	    frequencies = new SemiExternalGammaBigList(new InputBitStream(filename), 1, subjectTextIndex.numberOfTerms);
+	    if (frequencies.size64() != subjectTextIndex.numberOfDocuments) {
+		LOGGER.warn("Loaded " + frequencies.size64() + " frequency values but subjectTextIndex.numberOfDocuments is "
+			+ subjectTextIndex.numberOfDocuments);
 	    }
 	} catch (Exception e) {
 	    throw new IllegalArgumentException("Failed to load frequences for subjectText index from " + filename, e);
@@ -288,7 +260,7 @@ public class RDFIndex {
 	try {
 	    LOGGER.info("Loading indexed predicates list..");
 	    for (MutableString line : new FileLinesList(context.getIndexedPredicatesFile().getPath(), "UTF-8")) {
-	        indexedPredicatesOrdered.add(Util.encodeFieldName(line.toString()));
+		indexedPredicatesOrdered.add(Util.encodeFieldName(line.toString()));
 	    }
 	} catch (IOException e1) {
 	    throw new RDFIndexException("Failed to load indexed predicated list from file:" + context.getIndexedPredicatesFile().getPath());
@@ -302,11 +274,11 @@ public class RDFIndex {
 	fieldNameSuffixToFieldNameOrderedMap.put(OBJECT_INDEX_KEY, OBJECT_INDEX_KEY);
 
 	List<String> shortNames = Util.generateShortNames(indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap.keySet(), '_');
-	for (int i = 0 ; i < shortNames.size() ; i++) {
+	for (int i = 0; i < shortNames.size(); i++) {
 	    fieldNameSuffixToFieldNameOrderedMap.put(shortNames.get(i), indexedPredicatesOrdered.get(i));
 	    LOGGER.info("Predicate short name: " + shortNames.get(i) + " -> " + indexedPredicatesOrdered.get(i));
 	}
-	
+
 	RDFIndexStatisticsBuilder statsBuilder = new RDFIndexStatisticsBuilder();
 	statsBuilder.setSortedPredicates(fieldNameSuffixToFieldNameOrderedMap);
 	statsBuilder.setTypeTermDistribution(typeTermDistribution);
@@ -356,8 +328,8 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_TEXT_INDEX_KEY, termProcessors,
-		allResourcesToIds);
+	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_TEXT_INDEX_KEY,
+		termProcessors, allResourcesToIds);
     }
 
     private Object2ReferenceMap<String, Index> loadIndexesFromDir(File indexDir, boolean loadDocSizes, boolean inMemory) throws RDFIndexException {
@@ -388,7 +360,7 @@ public class RDFIndex {
 	}
 
 	Reference2DoubleOpenHashMap<Index> index2Weight = new Reference2DoubleOpenHashMap<Index>();
-	return loadIndicesFromSpec(indexBasenames, documentCollection, index2Weight, loadDocSizes, indexOptionsmap);
+	return loadIndicesFromSpec(indexBasenames, documentCollection.size(), index2Weight, loadDocSizes, indexOptionsmap);
     }
 
     /**
@@ -412,7 +384,7 @@ public class RDFIndex {
      *            an empty, writable map that will be filled with a map from
      *            indices to respective weights.
      */
-    protected Object2ReferenceMap<String, Index> loadIndicesFromSpec(final List<String> indexBasenames, final DocumentCollection documentCollection,
+    protected Object2ReferenceMap<String, Index> loadIndicesFromSpec(final List<String> indexBasenames, final long documentCollectionSize,
 	    final Reference2DoubleMap<Index> index2Weight, boolean documentSizes, EnumMap<UriKeys, String> map) throws RDFIndexException {
 
 	Object2ReferenceLinkedOpenHashMap<String, Index> name2Index = new Object2ReferenceLinkedOpenHashMap<String, Index>(Hash.DEFAULT_INITIAL_SIZE, .5f);
@@ -458,14 +430,12 @@ public class RDFIndex {
 		// split));
 		index2Weight.put(index, weight);
 	    }
-	    /*
-	     * if (documentCollection != null && index.numberOfDocuments !=
-	     * documentCollection.size()) throw new
-	     * IllegalArgumentException("Index " + index + " has " +
-	     * index.numberOfDocuments +
-	     * " documents, but the document collection has size " +
-	     * documentCollection.size());
-	     */
+	    
+	    if (index.numberOfDocuments != documentCollectionSize) {
+		throw new IllegalArgumentException("Index " + index + " has " + index.numberOfDocuments + " documents, but the document collection has size "
+			+ documentCollectionSize);
+	    }
+
 	    name2Index.put(index.field != null ? index.field : indexBasename, index);
 	}
 	return name2Index;
@@ -528,7 +498,7 @@ public class RDFIndex {
 	if (subjectIndex instanceof BitStreamIndex) {
 	    subjectTermMap = ((BitStreamIndex) subjectIndex).termMap;
 	} else if (subjectIndex instanceof QuasiSuccinctIndex) {
-		subjectTermMap = ((QuasiSuccinctIndex) subjectIndex).termMap;
+	    subjectTermMap = ((QuasiSuccinctIndex) subjectIndex).termMap;
 	} else {
 	    throw new IllegalStateException("Subject index is not a BitStreamIndex. Don't know how to get its termMap.");
 	}
@@ -584,10 +554,11 @@ public class RDFIndex {
 
     /**
      * 
-     * @param uri - Resource or BNode
+     * @param uri
+     *            - Resource or BNode
      * @return the doc id if the given uri is a valid doc uri.
      * @throws IOException
-     * @throws RDFIndexException 
+     * @throws RDFIndexException
      */
     public Integer getSubjectId(String uri) throws IOException {
 	Long id = allResourcesToIds.get(uri);
@@ -597,7 +568,7 @@ public class RDFIndex {
 	    Document doc = documentCollection.document(id.intValue());
 	    Object content = doc.content(0);
 	    if (content instanceof Reader) {
-		Reader contentReader = (Reader)content;
+		Reader contentReader = (Reader) content;
 		if (contentReader.read() == -1) {
 		    id = null;
 		}
@@ -638,14 +609,6 @@ public class RDFIndex {
 	return SUBJECT_TEXT_INDEX_KEY;
     }
 
-    public String getTitle(int id) throws IOException {
-	String title;
-	Document d = documentCollection.document(id);
-	title = ((MutableString) d.title()).toString();
-	d.close();
-	return title;
-    }
-
     public RDFIndexStatistics getStatistics() {
 	return stats;
     }
@@ -683,7 +646,7 @@ public class RDFIndex {
 	} else if (index instanceof QuasiSuccinctIndex) {
 	    termMap = ((QuasiSuccinctIndex) index).termMap;
 	}
-	
+
 	if (termMap == null) {
 	    throw new IllegalArgumentException("termMap is null. Index is for field:" + index.field + ". Index class is:" + index.getClass().getSimpleName());
 	}
@@ -693,15 +656,16 @@ public class RDFIndex {
 	for (CharSequence term : termMap.list()) {
 	    long docId = termMap.get(term);
 	    IndexIterator it = index.documents(((int) docId));
+	    int frequency = it.frequency() > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) it.frequency();
 	    if (termsAreResourceIds) {
 		String termString = term.toString();
 		if (!termString.startsWith(resourceIdPrefix)) {
 		    throw new RuntimeException("Expected resource id " + termString + " to be prefix with " + resourceIdPrefix);
 		}
 		int termAsId = Integer.parseInt(termString.substring(resourceIdPrefix.length()));
-		histogram.put(lookupResourceById(termAsId), it.frequency());
+		histogram.put(lookupResourceById(termAsId), frequency);
 	    } else {
-		histogram.put(term.toString(), it.frequency());
+		histogram.put(term.toString(), frequency);
 	    }
 	    it.dispose();
 	}
@@ -724,7 +688,7 @@ public class RDFIndex {
 	}
     }
 
-    public InputStream getDocumentInputStream(int docId) throws IOException {
+    public InputStream getDocumentInputStream(long docId) throws IOException {
 	return documentCollection.stream(docId);
     }
 
