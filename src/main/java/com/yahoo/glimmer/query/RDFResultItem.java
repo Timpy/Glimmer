@@ -76,7 +76,7 @@ public class RDFResultItem {
 
     // The Subject which is the same as the title and URI.
     private String subject;
-    private int subjectId;
+    private long subjectId;
     private double score;
     private final List<Relation> relations = new ArrayList<Relation>();
 
@@ -89,10 +89,10 @@ public class RDFResultItem {
     public void setSubject(String subject) {
 	this.subject = subject;
     }
-    public int getSubjectId() {
+    public long getSubjectId() {
 	return subjectId;
     }
-    public void setSubjectId(int subjectId) {
+    public void setSubjectId(long subjectId) {
 	this.subjectId = subjectId;
     }
     

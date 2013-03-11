@@ -84,10 +84,13 @@ YUI({
 	'autocomplete',
 	'autocomplete-filters',
 	'autocomplete-highlighters',
+	'yui-pager',
 	
 	function(Y) {
 		Y.HistoryHash.hashPrefix = '!';
 		var history = new Y.HistoryHash();
+		
+		var resultsPager = new Y.Pager();
 
 		function initDataSet() {
 			fieldShortNames = [ "any" ];
@@ -306,13 +309,20 @@ YUI({
 			});
 			loadResults(query);
 		}
+		
+		function pagerPage(targetPage, pagerState) {
+			var current = history.get()
+			current.pageStart = (targetPage - 1 ) * pagerState.pageSize;
+			history.add(current);
+		}
 
 		function loadResults(query) {
 			history.add({
 				'index': Y.one("#dataset").get('value'),
 				'query': query,
-				'pageSize': Y.one("#numresults").get('value'),
 				'deref': Y.one("#dereference").get('checked'),
+				'pageSize': Y.one("#numresults").get('value'),
+				'pageStart' : 0
 			});
 		}
 
@@ -336,6 +346,7 @@ YUI({
 						Y.one("#result-stats").setContent("Found " + result.numResults + " results in " + result.time + " ms.");
 
 						var ol = Y.Node.create("<ol></ol>");
+						ol.setAttribute("start", result.pageStart + 1);
 
 						var markers = [];
 						for ( var i in result.resultItems) {
@@ -343,6 +354,12 @@ YUI({
 						}
 
 						Y.one("#results").setContent("").append(ol);
+						
+						resultsPager.setState({
+							pageSize: result.pageSize,
+							pages: Math.ceil(result.numResults / result.pageSize),
+							page: 1 + Math.floor(result.pageStart / result.pageSize)
+						});
 					},
 					failure : function(transactionid, response, arguments) {
 						var message = "";
@@ -459,7 +476,6 @@ YUI({
 
 			li.append(table);
 			node.append(li);
-
 		}
 
 		function appendDocLink(parent, docId) {
@@ -600,6 +616,10 @@ YUI({
 		// On submit, retrieve and display search results
 		Y.one('#unifiedsearchform').on('submit', executeUnifiedSearch);
 
+		resultsPager.setCallback(pagerPage);
+		resultsPager.setState({
+			elementIds: ['#results-pager-top', '#results-pager-bottom']
+		})
 		var tabview = new Y.TabView({
 			srcNode : '#resultContainer'
 		});

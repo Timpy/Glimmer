@@ -11,10 +11,10 @@ package com.yahoo.glimmer.web;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.mg4j.query.nodes.Query;
-import it.unimi.di.mg4j.query.nodes.QueryBuilderVisitorException;
-import it.unimi.di.mg4j.query.parser.QueryParserException;
-import it.unimi.di.mg4j.query.parser.SimpleParser;
+import it.unimi.di.big.mg4j.query.nodes.Query;
+import it.unimi.di.big.mg4j.query.nodes.QueryBuilderVisitorException;
+import it.unimi.di.big.mg4j.query.parser.QueryParserException;
+import it.unimi.di.big.mg4j.query.parser.SimpleParser;
 
 import java.io.IOException;
 import java.util.Collections;
