@@ -22,13 +22,14 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 
 import com.yahoo.glimmer.indexing.RDFDocument;
 import com.yahoo.glimmer.indexing.RDFDocumentFactory;
 import com.yahoo.glimmer.indexing.generator.TermValue.Type;
 
-public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, TermValue> {
+public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValue> {
     private static final Log LOG = LogFactory.getLog(DocumentMapper.class);
     
     public static final int ALIGNMENT_INDEX = -1; // special index for
@@ -39,15 +40,19 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, T
     }
 
     private String[] fields;
+    private RDFDocument doc;
 
-    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, RDFDocument, TermKey, TermValue>.Context context) throws IOException,
+    protected void setup(org.apache.hadoop.mapreduce.Mapper<LongWritable, Text, TermKey, TermValue>.Context context) throws IOException,
 	    InterruptedException {
 	Configuration conf = context.getConfiguration();
 	fields = RDFDocumentFactory.getFieldsFromConf(conf);
-    };
+	doc = RDFDocumentFactory.buildFactory(conf).getDocument();
+    }
 
     @Override
-    public void map(LongWritable key, RDFDocument doc, Context context) throws IOException, InterruptedException {
+    public void map(LongWritable key, Text record, Context context) throws IOException, InterruptedException {
+	doc.setContent(record.getBytes(), record.getLength());
+	
 	if (doc == null || doc.getSubject() == null) {
 	    // Failed parsing
 	    context.getCounter(Counters.FAILED_PARSING).increment(1);
@@ -129,9 +134,23 @@ public class DocumentMapper extends Mapper<LongWritable, RDFDocument, TermKey, T
 
 	context.getCounter(Counters.NUMBER_OF_RECORDS).increment(1);
     }
-
+    
     private static class DocStat {
 	int last;
 	int count;
+    }
+    
+    // For testing
+    String[] getFields() {
+	return fields;
+    }
+    void setFields(String[] fields) {
+	this.fields = fields;
+    }
+    RDFDocument getDoc() {
+	return doc;
+    }
+    void setDoc(RDFDocument doc) {
+	this.doc = doc;
     }
 }

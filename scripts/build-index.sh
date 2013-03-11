@@ -281,7 +281,7 @@ function generateIndex () {
 		-Dmapreduce.job.queuename=${QUEUE} \
 		-Dmapreduce.job.user.classpath.first=true \
 		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
+		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates ${PREP_DIR}/bySubject.bz2 $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 
@@ -381,7 +381,7 @@ function mergeSubIndexes() {
 			rm ${PART_DIR}/${INDEX_NAME}.*
 		done
 		
-		CMD="java -cp ${JAR_FOR_HADOOP} it.unimi.dsi.big.util.ImmutableExternalPrefixMap ${INDEX_DIR}/${INDEX_NAME}.termmap -o ${INDEX_DIR}/${INDEX_NAME}.terms"
+		CMD="java -Xmx3800m -cp ${JAR_FOR_HADOOP} it.unimi.dsi.big.util.ImmutableExternalPrefixMap ${INDEX_DIR}/${INDEX_NAME}.termmap -o ${INDEX_DIR}/${INDEX_NAME}.terms"
 		echo ${CMD}
 		${CMD}
 		
@@ -410,10 +410,14 @@ function generateDocSizes () {
 	CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.DocSizesGenerator \
 		-Dmapreduce.map.failures.maxpercent=1 \
 		-Dmapreduce.map.speculative=false \
+		-Dmapred.map.child.java.opts=-Xmx3000m \
+		-Dmapreduce.map.memory.mb=3000 \
+		-Dmapred.reduce.child.java.opts=-Xmx1800m \
+		-Dmapreduce.reduce.memory.mb=1800 \
 		-Dmapreduce.job.reduces=${NUM_INDEXES} \
 		-Dmapreduce.job.queuename=${QUEUE} \
 		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} -p ${PREP_DIR}/predicate ${PREP_DIR}/bySubject $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${PREP_DIR}/all.map"
+		-m ${METHOD} -p ${PREP_DIR}/predicate ${PREP_DIR}/bySubject.bz2 $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 	EXIT_CODE=$?
@@ -427,55 +431,6 @@ function generateDocSizes () {
 	
 	${HADOOP_CMD} fs -copyToLocal "${DFS_SIZES_DIR}/*.sizes" "${LOCAL_BUILD_DIR}/${METHOD}"
 }	
-
-function buildCollection () {
-	PREP_DIR=${1}
-	COLLECTION_DIR="${DFS_BUILD_DIR}/collection"
-	
-	echo
-	echo BUILDING COLLECTION in ${COLLECTION_DIR}
-	echo
-	
-	${HADOOP_CMD} fs -test -e "${COLLECTION_DIR}"
-	if [ $? -eq 0 ] ; then
-		read -p "${COLLECTION_DIR} exists. Delete it or otherwise quit? (D)" -n 1 -r
-		echo
-		if [[ ! $REPLY =~ ^[Dd]$ ]] ; then
-			echo Exiting..
-			exit 1
-		fi
-		echo Deleting ${COLLECTION_DIR}...
-		${HADOOP_CMD} fs -rmr -skipTrash ${COLLECTION_DIR}
-	fi
-	
-	# The property mapreduce.input.fileinputformat.split.minsize effects the number of mappers used to build the collection.
-	# Each mapper builds one partition of the collection. 
-	# If the resulting collection is then loaded using a concatanation of the partition, a terms map is loaded into memory for each partition.
-	# So if you have a lot of terms and a lot of partitions, loading the resulting collection can take a lot more memory than if the collection
-	# wasn't partitioned.
-	# Increasing the mapreduce.input.fileinputformat.split.minsize reduces the number of mappers.
-	# Probably best to keep the number of mappers low (5-20) at the expense of runtime.
-	CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.BySubjectCollectionBuilder \
-		-Dmapreduce.map.maxattempts=2 \
-		-Dmapreduce.map.speculative=false \
-		-Dmapred.child.java.opts=-Xmx900m \
-		-Dmapreduce.map.memory.mb=2000 \
-		-Dmapreduce.reduce.memory.mb=2000 \
-		-Dmapreduce.job.queuename=${QUEUE} \
-		-Dmapreduce.input.fileinputformat.split.minsize=2500000000 \
-		${PREP_DIR}/bySubject ${COLLECTION_DIR}"
-	echo ${CMD}
-	${CMD}
-	EXIT_CODE=$?
-	if [ $EXIT_CODE -ne 0 ] ; then
-		echo "BySubjectCollectionBuilder failed with value of $EXIT_CODE. exiting.."
-		exit $EXIT_CODE
-	fi
-	
-	CMD="${HADOOP_CMD} fs -copyToLocal ${DFS_BUILD_DIR}/collection ${LOCAL_BUILD_DIR}"
-	echo ${CMD}
-	${CMD}
-}
 
 groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep
 computeHashes ${DFS_BUILD_DIR}/prep/all
@@ -493,11 +448,11 @@ mergeSubIndexes vertical
 # These could be run in parallel with index generation.
 generateDocSizes ${DFS_BUILD_DIR}/prep ${NUMBER_OF_DOCS}
 
-buildCollection ${DFS_BUILD_DIR}/prep
-
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.map" "${LOCAL_BUILD_DIR}"
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.smap" "${LOCAL_BUILD_DIR}"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/bySubject.bz2" "${LOCAL_BUILD_DIR}"
+${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/bySubject.blockOffsets" "${LOCAL_BUILD_DIR}"
 
 echo Done. Index files are here ${LOCAL_BUILD_DIR}
 

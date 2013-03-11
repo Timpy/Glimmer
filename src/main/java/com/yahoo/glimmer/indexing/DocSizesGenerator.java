@@ -39,6 +39,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -248,17 +249,21 @@ public class DocSizesGenerator extends Configured implements Tool {
 	}
     }
 
-    public static class MapClass extends Mapper<LongWritable, RDFDocument, IndexDocSizePair, DocSize> {
+    public static class MapClass extends Mapper<LongWritable, Text, IndexDocSizePair, DocSize> {
 	private String[] fields;
+	private RDFDocument doc;
 
 	@Override
 	public void setup(Context context) {
-	    fields = RDFDocumentFactory.getFieldsFromConf(context.getConfiguration());
+	    Configuration conf = context.getConfiguration();
+	    fields = RDFDocumentFactory.getFieldsFromConf(conf);
+	    doc = RDFDocumentFactory.buildFactory(conf).getDocument();
 	}
 
 	@Override
-	public void map(LongWritable key, RDFDocument doc, Context context) throws IOException, InterruptedException {
-
+	public void map(LongWritable key, Text record, Context context) throws IOException, InterruptedException {
+	    doc.setContent(record.getBytes(), record.getLength());
+	    
 	    if (doc == null || doc.getSubject() == null) {
 		// Failed parsing
 		context.getCounter(Counters.FAILED_PARSING).increment(1);
@@ -401,7 +406,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 
 	job.setJobName("DocSizesGenerator" + System.currentTimeMillis());
 
-	job.setInputFormatClass(RDFInputFormat.class);
+	job.setInputFormatClass(TextInputFormat.class);
 
 	job.setOutputKeyClass(Text.class);
 	job.setOutputValueClass(Text.class);

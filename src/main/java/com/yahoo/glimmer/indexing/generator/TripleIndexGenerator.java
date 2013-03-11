@@ -18,6 +18,7 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
@@ -30,7 +31,6 @@ import com.martiansoftware.jsap.SimpleJSAP;
 import com.martiansoftware.jsap.Switch;
 import com.martiansoftware.jsap.UnflaggedOption;
 import com.yahoo.glimmer.indexing.HorizontalDocumentFactory;
-import com.yahoo.glimmer.indexing.RDFInputFormat;
 import com.yahoo.glimmer.indexing.VerticalDocumentFactory;
 
 /**
@@ -91,7 +91,7 @@ public class TripleIndexGenerator extends Configured implements Tool {
 	job.setJobName("TripleIndexGenerator" + System.currentTimeMillis());
 
 	FileInputFormat.setInputPaths(job, new Path(jsapResult.getString("input")));
-	job.setInputFormatClass(RDFInputFormat.class);
+	job.setInputFormatClass(TextInputFormat.class);
 
 	job.setMapperClass(DocumentMapper.class);
 	job.setMapOutputKeyClass(TermKey.class);
