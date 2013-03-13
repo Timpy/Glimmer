@@ -12,20 +12,23 @@ package com.yahoo.glimmer.indexing.preprocessor;
  */
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Random;
 
+import org.apache.commons.codec.binary.Hex;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -39,8 +42,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
-import ucar.unidata.io.bzip2.CBZip2InputStream;
 
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OutputCount;
@@ -100,7 +101,7 @@ public class ResourceRecordWriterTest {
     }
 
     @Test
-    public void writeSubjectAndObjectTest() throws IOException, InterruptedException {
+    public void writeSubjectAndObjectTest() throws IOException, InterruptedException, ClassNotFoundException {
 	ByteArrayOutputStream bySubjectBos = new ByteArrayOutputStream(1024);
 	FSDataOutputStream bySubjectOs = new FSDataOutputStream(bySubjectBos, null);
 	ByteArrayOutputStream bySubjectOffsetsBos = new ByteArrayOutputStream(1024);
@@ -149,38 +150,26 @@ public class ResourceRecordWriterTest {
 	
 	context.assertIsSatisfied();
 	
-	ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(bySubjectBos.toByteArray());
-	assertEquals('B', byteArrayInputStream.read());
-	assertEquals('Z', byteArrayInputStream.read());
-	InputStream inputStream = new CBZip2InputStream(byteArrayInputStream);
-	byte [] buffer = new byte[1024];
-	int bytesRead = inputStream.read(buffer);
-	assertEquals("66\t55\thttp://a/key\t<http://predicate/> <http://Object> .\t\n", new String(buffer, 0, bytesRead, "ASCII"));
-	inputStream.close();
-	
-	inputStream = new ByteArrayInputStream(bySubjectOffsetsBos.toByteArray());
-	DataInputStream dis = new DataInputStream(inputStream);
-	assertEquals(66l, dis.readLong());
-	assertEquals(4l, dis.readLong());
-	
+	Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("foo", null);
+	InputStream blockOffsetsInputStream = new ByteArrayInputStream(bySubjectOffsetsBos.toByteArray());
+	collection.init(ByteBuffer.wrap(bySubjectBos.toByteArray()), blockOffsetsInputStream);
+	blockOffsetsInputStream.close();
+
 	// Size of collection. This is the same as the number of lines written to ALL.
-	assertEquals(3l, dis.readLong());
+	assertEquals(3l, collection.size());
 	
-	boolean eOFExceptionThrown = false;
-	try {
-	    dis.readByte();
-	} catch (EOFException e) {
-	    eOFExceptionThrown = true;
-	}
-	assertTrue(eOFExceptionThrown);
+	InputStream documentInputStream = collection.stream(65l);
+	assertEquals(-1, documentInputStream.read());
+	documentInputStream = collection.stream(67l);
+	assertEquals(-1, documentInputStream.read());
+	documentInputStream = collection.stream(66l);
+	assertNotNull(documentInputStream);
 	
-	inputStream.close();
-	byteArrayInputStream.close();
-	dis.close();
+	collection.close();
     }
     
     @Test
-    public void bySubjectsTest() throws IOException, InterruptedException {
+    public void bySubjectsTest() throws IOException, InterruptedException, NoSuchAlgorithmException {
 	FSDataOutputStream bySubjectOs = new FSDataOutputStream(new FileOutputStream(new File(tempDirPath.toUri().getPath(), "bySubject.bz2")), null);
 	FSDataOutputStream bySubjectOffsetsOs = new FSDataOutputStream(new FileOutputStream(new File(tempDirPath.toUri().getPath(), "bySubject.blockOffsets")), null);
 	
@@ -208,9 +197,39 @@ public class ResourceRecordWriterTest {
 	    record.setPreviousId(l);
 	    record.clearRelations();
 	}
-	writer.close(null);
 	
-	long lastId = record.getId();
+	// Write a big record that will span multiple blocks of 100000 bytes.
+	BySubjectRecord bigRecord = new BySubjectRecord();
+	bigRecord.setId(200200l);
+	bigRecord.setSubject("Big Test Record");
+	
+	MessageDigest md5Digest = MessageDigest.getInstance("MD5");
+	StringBuilder sb = new StringBuilder();
+	// 8k x 128 byte relations.
+	for (int i = 0 ; i < 8192 ; i++) {
+	    md5Digest.update((byte)((i * 1299299) & 0xFF));
+	    byte[] digest = md5Digest.digest();
+	    sb.append(Hex.encodeHex(digest));
+	    
+	    md5Digest.update(digest);
+	    digest = md5Digest.digest();
+	    sb.append(Hex.encodeHex(digest));
+	    
+	    md5Digest.update(digest);
+	    digest = md5Digest.digest();
+	    sb.append(Hex.encodeHex(digest));
+	    
+	    md5Digest.update(digest);
+	    digest = md5Digest.digest();
+	    sb.append(Hex.encodeHex(digest));
+	    
+	    bigRecord.addRelation(sb.toString());
+	    sb.setLength(0);
+	}
+	
+	writer.write(null, bigRecord);
+	
+	writer.close(null);
 	
 	Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("bySubject", null);
 	String indexBaseName = new File(tempDirPath.toUri().getPath(), "bySubject").getCanonicalPath();
@@ -222,11 +241,17 @@ public class ResourceRecordWriterTest {
 	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
 	assertEquals(100000, record.getId());
 	
-	documentInputStream = collection.stream(lastId);
+	documentInputStream = collection.stream(record.getId());
 	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
-	assertEquals(lastId, record.getId());
+	assertEquals(record.getId(), record.getId());
 	
-	assertEquals(-1, collection.stream(lastId + 1).read());
+	assertEquals(-1, collection.stream(record.getId() + 1).read());
+	
+	documentInputStream = collection.stream(bigRecord.getId());
+	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
+	assertEquals(bigRecord, record);
+	
+	assertEquals(-1, collection.stream(bigRecord.getId() + 1).read());
 	
 	collection.close();
     }

@@ -11,6 +11,11 @@ package com.yahoo.glimmer.indexing.preprocessor;
  *  See accompanying LICENSE file.
  */
 
+import it.unimi.dsi.fastutil.io.BinIO;
+import it.unimi.dsi.fastutil.longs.LongBigArrayBigList;
+import it.unimi.dsi.fastutil.longs.LongBigList;
+import it.unimi.dsi.sux4j.util.EliasFanoMonotoneLongBigList;
+
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -31,6 +36,8 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import com.yahoo.glimmer.util.BySubjectRecord;
+import com.yahoo.glimmer.util.Bz2BlockIndexedDocumentCollection;
+import com.yahoo.glimmer.util.Bz2BlockIndexedDocumentCollection.BlockOffsetsData;
 import com.yahoo.glimmer.util.Bz2BlockIndexedOutputStream;
 
 /**
@@ -67,6 +74,8 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
     private Writer bySubjectWriter;
     private long firstDocIdInBlock = -1;
     private long allCount;
+    private final LongBigArrayBigList firstDocIds = new LongBigArrayBigList();
+    private final LongBigArrayBigList startOffsets = new LongBigArrayBigList();
 
     public ResourceRecordWriter(FileSystem fs, Path taskWorkPath, CompressionCodec codecIfAny) throws IOException {
 	if (fs.exists(taskWorkPath)) {
@@ -98,8 +107,8 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	    @Override
 	    public void blockStart(int blockIndex, long startOffset) throws IOException {
 		if (firstDocIdInBlock != -1) {
-		    bySubjectOffsetsDataOutput.writeLong(firstDocIdInBlock);
-		    bySubjectOffsetsDataOutput.writeLong(startOffset);
+		    firstDocIds.add(firstDocIdInBlock);
+		    startOffsets.add(startOffset);
 		    firstDocIdInBlock = -1;
 		}
 	    }
@@ -163,7 +172,10 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	}
 	bySubjectWriter.close();
 	
-	bySubjectOffsetsDataOutput.writeLong(allCount);
+	LongBigList compressedFirstDocIds = new EliasFanoMonotoneLongBigList(firstDocIds);
+	LongBigList compressedStartOffsets = new EliasFanoMonotoneLongBigList(startOffsets);
+	BlockOffsetsData blockOffsetsData = new Bz2BlockIndexedDocumentCollection.BlockOffsetsData(compressedFirstDocIds, compressedStartOffsets, allCount);
+	BinIO.storeObject(blockOffsetsData, bySubjectOffsetsDataOutput);
 	bySubjectOffsetsDataOutput.close();
     }
 
