@@ -16,7 +16,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
-import java.nio.MappedByteBuffer;
+import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 
@@ -31,16 +31,21 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 
     private static final byte[] ZERO_BYTE_BUFFER = new byte[0];
 
+    // We use the smallest block size during compression to improve retrieve time.
     private static final int BZ2_BLOCK_SIZE = 100000;
     public static final String BZ2_EXTENSION = ".bz2";
     public static final String BLOCK_OFFSETS_EXTENSION = ".blockOffsets";
     private static final int BLOCK_OFFSETS_RECORD_SIZE = 2 * Long.SIZE / 8;
+
+    // 6 Seems to work as it's the size of the block header I guess.
+    private static final int FOOTER_LENGTH = 6;
+    
     private final String name;
     private final DocumentFactory documentFactory;
 
     private transient long[] firstDocIds;
     private transient long[] blockOffsets;
-    private transient MappedByteBuffer bz2ByteBuffer;
+    private transient ByteBuffer bz2ByteBuffer;
     private transient long size;
 
     public Bz2BlockIndexedDocumentCollection(String name, DocumentFactory documentFactory) {
@@ -54,27 +59,34 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
     }
 
     private void initFiles(File absolutePathToCollection) throws IOException {
+	File bz2File = new File(absolutePathToCollection, name + BZ2_EXTENSION);
+	FileInputStream bz2InputStream = new FileInputStream(bz2File);
+	ByteBuffer bz2ByteBuffer = bz2InputStream.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, bz2File.length());
+	bz2InputStream.close();
+
 	File blockOffsetsFile = new File(absolutePathToCollection, name + BLOCK_OFFSETS_EXTENSION);
 	if ((blockOffsetsFile.length() % BLOCK_OFFSETS_RECORD_SIZE) != Long.SIZE / 8) {
 	    throw new IllegalArgumentException("The block offsets file " + blockOffsetsFile.getCanonicalPath() + " has a size(" + blockOffsetsFile.length()
 		    + "). Should be equal to (n * 16) + 8.");
 	}
 	int entries = (int) (blockOffsetsFile.length() / BLOCK_OFFSETS_RECORD_SIZE);
+	InputStream blockOffsetsInputStream = new FileInputStream(blockOffsetsFile);
+
+	init(bz2ByteBuffer, blockOffsetsInputStream, entries);
+	blockOffsetsInputStream.close();
+    }
+
+    public void init(ByteBuffer bz2ByteBuffer, InputStream blockOffsetsInputStream, int entries) throws IOException {
+	this.bz2ByteBuffer = bz2ByteBuffer;
 
 	firstDocIds = new long[entries];
 	blockOffsets = new long[entries];
-	DataInputStream blockOffsetsDataInput = new DataInputStream(new FileInputStream(blockOffsetsFile));
+	DataInputStream blockOffsetsDataInput = new DataInputStream(blockOffsetsInputStream);
 	for (int i = 0; i < entries; i++) {
 	    firstDocIds[i] = blockOffsetsDataInput.readLong();
 	    blockOffsets[i] = blockOffsetsDataInput.readLong();
 	}
 	size = blockOffsetsDataInput.readLong();
-	blockOffsetsDataInput.close();
-
-	File bz2File = new File(absolutePathToCollection, name + BZ2_EXTENSION);
-	FileInputStream bz2InputStream = new FileInputStream(bz2File);
-	bz2ByteBuffer = bz2InputStream.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, bz2File.length());
-	bz2InputStream.close();
     }
 
     @Override
@@ -91,7 +103,7 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 
     @Override
     public InputStream stream(long index) throws IOException {
-	InputStream inputStream = getInputStreamStartingAtDocStart(index, BZ2_BLOCK_SIZE);
+	InputStream inputStream = getInputStreamStartingAtDocStart(index, BZ2_BLOCK_SIZE * 2);
 	if (inputStream == null) {
 	    inputStream = new ByteArrayInputStream(ZERO_BYTE_BUFFER);
 	}
@@ -135,7 +147,7 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 
 	int retries = 2;
 	while (retries > 0) {
-	    final InputStream is = getInputStreamStartingAt(blockOffsets[probableBlockOffsetIndex]);
+	    final InputStream is = getInputStreamStartingAt(probableBlockOffsetIndex);
 	    PositionResult result = positionInputStreamAtDocStart(is, docId, maxBytesToRead, probableBlockOffsetIndex == 0);
 	    switch (result) {
 	    case FOUND:
@@ -159,6 +171,9 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 	    case TRY_PREVIOUS_BLOCK:
 		retries--;
 		probableBlockOffsetIndex--;
+		if (probableBlockOffsetIndex < 0) {
+		    return null;
+		}
 		break;
 	    default:
 		throw new IllegalStateException("Don't know what to do with a " + result);
@@ -172,25 +187,94 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 	if (index < 0) {
 	    index = -index - 2;
 	}
+	if (index > 0) {
+	    // If a record spans multiple blocks the value at index in
+	    // firstDocIds will be repeated.
+	    // Find the first element equal to the value at firstDocIds[index].
+	    long value = firstDocIds[index];
+	    index--;
+	    while (index >= 0 && firstDocIds[index] == value) {
+		index--;
+	    }
+	    index++;
+	}
 	return index;
     }
 
-    private InputStream getInputStreamStartingAt(final long blockOffset) throws IOException {
-	if (blockOffset > Integer.MAX_VALUE) {
-	    throw new IllegalArgumentException("Given offset " + blockOffset + " is bigger than MAX_INT!");
+    private int getBlockOffset(int blockOffsetIndex) throws IOException {
+	if (blockOffsetIndex < blockOffsets.length) {
+	    long blockOffset = blockOffsets[blockOffsetIndex];
+
+	    // We can only map files smaller that Integer.MAX_VALUE.
+	    if (blockOffset > Integer.MAX_VALUE) {
+		throw new IOException("Given offset " + blockOffset + " is bigger than MAX_INT!");
+	    }
+	    return (int) blockOffset;
+	} else if (blockOffsetIndex == blockOffsets.length) {
+	    return bz2ByteBuffer.capacity() - FOOTER_LENGTH;
+	} else {
+	    return -1;
 	}
-	InputStream compressedInputStream = new InputStream() {
-	    private int index = (int) blockOffset;
+    }
+
+    /**
+     * @param blockOffsetIndex
+     * @return an InputStream that reads the contents on one compressed block
+     * @throws IOException
+     */
+    private InputStream getCompressedBlockInputStream(final int blockOffsetIndex) throws IOException {
+	final int startOffset = getBlockOffset(blockOffsetIndex);
+	final int endOffset = getBlockOffset(blockOffsetIndex + 1) + FOOTER_LENGTH;
+
+	return new InputStream() {
+	    private int offset = startOffset;
+
 	    @Override
 	    public int read() throws IOException {
-		if (index >= bz2ByteBuffer.capacity()) {
+		if (offset >= endOffset) {
 		    return -1;
 		}
-		// This takes an int!!
-		return bz2ByteBuffer.get(index++) & 0xFF;
+		return bz2ByteBuffer.get(offset++) & 0xFF;
 	    }
 	};
-	return new BufferedInputStream(new CBZip2InputStream(compressedInputStream, READ_MODE.BYBLOCK));
+    }
+
+    private InputStream getInputStreamStartingAt(final int startBlockOffsetIndex) throws IOException {
+	// As documents will span blocks, we need to create a new de-compressor
+	// when there are no more bytes available from the current
+	// de-compressor.
+	// Note that the Hadoop CBZip2InputStream class often reads multiple
+	// blocks when in BYBLOCK mode!
+
+	InputStream uncompressedInputStream = new InputStream() {
+	    private int blockOffsetIndex = startBlockOffsetIndex;
+	    private CBZip2InputStream uncompressedInputStream = new CBZip2InputStream(getCompressedBlockInputStream(blockOffsetIndex), READ_MODE.BYBLOCK);
+
+	    @Override
+	    public int read() throws IOException {
+		int b = uncompressedInputStream.read();
+		return b;
+	    }
+
+	    @Override
+	    public int read(byte[] b, int off, int len) throws IOException {
+		int bytesRead = uncompressedInputStream.read(b, off, len);
+		if (bytesRead < 0) {
+		    // Next block
+		    blockOffsetIndex++;
+		    if (blockOffsetIndex < blockOffsets.length) {
+			InputStream compressedInputStream = getCompressedBlockInputStream(blockOffsetIndex);
+			uncompressedInputStream = new CBZip2InputStream(compressedInputStream, READ_MODE.BYBLOCK);
+			bytesRead = uncompressedInputStream.read(b, off, len);
+		    } else {
+			return -1;
+		    }
+		}
+		return bytesRead;
+	    }
+	};
+
+	return new BufferedInputStream(uncompressedInputStream);
     }
 
     private static final int BYTE_BUFFER_LENGTH = 32;

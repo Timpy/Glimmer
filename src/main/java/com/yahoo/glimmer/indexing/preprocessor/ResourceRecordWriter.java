@@ -65,7 +65,8 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
     private HashMap<OUTPUT, Writer> writersMap = new HashMap<OUTPUT, Writer>();
     private DataOutputStream bySubjectOffsetsDataOutput;
     private Writer bySubjectWriter;
-    private long firstDocIdInBlock = -1;
+    private boolean firstDocIdInBlockSet;
+    private long firstDocIdInBlock;
     private long allCount;
 
     public ResourceRecordWriter(FileSystem fs, Path taskWorkPath, CompressionCodec codecIfAny) throws IOException {
@@ -92,16 +93,18 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	file = new Path(taskWorkPath, "bySubject.blockOffsets");
 	bySubjectOffsetsDataOutput =  new DataOutputStream(fs.create(file, false));
 	
-	// Create a Writer on a BZip2 compressed OutputStream with the smallest block size(100K).
-	Bz2BlockIndexedOutputStream blockDataOut = Bz2BlockIndexedOutputStream.newInstance(dataOut, 1);
+	// Create a Writer on a BZip2 compressed OutputStream with a small block size( * 100K).
+	Bz2BlockIndexedOutputStream blockDataOut = Bz2BlockIndexedOutputStream.newInstance(dataOut, 2);
 	blockDataOut.setCallback(new Bz2BlockIndexedOutputStream.BlockCallback() {
 	    @Override
 	    public void blockStart(int blockIndex, long startOffset) throws IOException {
-		if (firstDocIdInBlock != -1) {
-		    bySubjectOffsetsDataOutput.writeLong(firstDocIdInBlock);
-		    bySubjectOffsetsDataOutput.writeLong(startOffset);
-		    firstDocIdInBlock = -1;
+		// Save all block start offsets.
+		// If the record spans multiple blocks we use the same docId for all blocks
+		bySubjectOffsetsDataOutput.writeLong(firstDocIdInBlock);
+		if (firstDocIdInBlockSet) {
+		    firstDocIdInBlockSet = false;
 		}
+		bySubjectOffsetsDataOutput.writeLong(startOffset);
 	    }
 
 	    @Override
@@ -144,9 +147,10 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	    // SUBJECT
 	    subjectWriter.write(record.getSubject());
 	    subjectWriter.write('\n');
-	    
+
 	    // bySubject
-	    if (firstDocIdInBlock == -1) {
+	    if (!firstDocIdInBlockSet) {
+		firstDocIdInBlockSet = true;
 		firstDocIdInBlock = record.getId();
 	    }
 	    record.writeTo(bySubjectWriter);
