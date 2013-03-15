@@ -6,7 +6,6 @@ import it.unimi.di.big.mg4j.document.DocumentCollection;
 import it.unimi.di.big.mg4j.document.DocumentFactory;
 import it.unimi.di.big.mg4j.document.PropertyBasedDocumentFactory;
 import it.unimi.dsi.fastutil.io.BinIO;
-import it.unimi.dsi.fastutil.longs.LongBigList;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectOpenHashMap;
 
@@ -32,28 +31,19 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 
     private static final byte[] ZERO_BYTE_BUFFER = new byte[0];
 
-    private static final int BZ2_BLOCK_SIZE = 100000;
+    // We use the smallest block size during compression to improve retrieve
+    // time(100KB). Use twice this when scanning for the record's doc id.
+    private static final int N_BYTES_TO_SEARCH_FOR_DOC_ID_ = 200000;
     public static final String BZ2_EXTENSION = ".bz2";
     public static final String BLOCK_OFFSETS_EXTENSION = ".blockOffsets";
 
-    public static class BlockOffsetsData implements Serializable {
-	private static final long serialVersionUID = 6997859749849192991L;
-
-	public final LongBigList firstDocIds;
-	public final LongBigList blockOffsets;
-	public final long size;
-
-	public BlockOffsetsData(LongBigList firstDocIds, LongBigList blockOffsets, long size) {
-	    this.firstDocIds = firstDocIds;
-	    this.blockOffsets = blockOffsets;
-	    this.size = size;
-	}
-    }
+    // 6 Seems to work as it's the size of the block header I guess.
+    static final int FOOTER_LENGTH = 6;
 
     private final String name;
     private final DocumentFactory documentFactory;
 
-    private transient BlockOffsetsData blockOffsetsData;
+    private transient BlockOffsets blockOffsets;
     private transient ByteBuffer bz2ByteBuffer;
 
     public Bz2BlockIndexedDocumentCollection(String name, DocumentFactory documentFactory) {
@@ -69,7 +59,7 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
     private void initFiles(File absolutePathToCollection) throws IOException {
 	File bz2File = new File(absolutePathToCollection, name + BZ2_EXTENSION);
 	FileInputStream bz2InputStream = new FileInputStream(bz2File);
-	bz2ByteBuffer = bz2InputStream.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, bz2File.length());
+	ByteBuffer bz2ByteBuffer = bz2InputStream.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, bz2File.length());
 	bz2InputStream.close();
 
 	File blockOffsetsFile = new File(absolutePathToCollection, name + BLOCK_OFFSETS_EXTENSION);
@@ -83,7 +73,7 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 
 	DataInputStream blockOffsetsDataInput = new DataInputStream(blockOffsetsInputStream);
 	try {
-	    blockOffsetsData = (BlockOffsetsData) BinIO.loadObject(blockOffsetsDataInput);
+	    blockOffsets = (BlockOffsets) BinIO.loadObject(blockOffsetsDataInput);
 	} catch (ClassNotFoundException e) {
 	    throw new RuntimeException("BinIO.loadObject() threw:" + e);
 	}
@@ -91,7 +81,7 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 
     @Override
     public long size() {
-	return blockOffsetsData.size;
+	return blockOffsets.getRecordCount();
     }
 
     @Override
@@ -103,7 +93,7 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 
     @Override
     public InputStream stream(long index) throws IOException {
-	InputStream inputStream = getInputStreamStartingAtDocStart(index, BZ2_BLOCK_SIZE + BZ2_BLOCK_SIZE >> 4);
+	InputStream inputStream = getInputStreamStartingAtDocStart(index);
 	if (inputStream == null) {
 	    inputStream = new ByteArrayInputStream(ZERO_BYTE_BUFFER);
 	}
@@ -134,11 +124,11 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 	return documentFactory;
     }
 
-    private InputStream getInputStreamStartingAtDocStart(long docId, int maxBytesToRead) throws IOException {
+    private InputStream getInputStreamStartingAtDocStart(long docId) throws IOException {
 	// When/If the BZip2 block start marker occurs naturally in the
 	// compressed data there will be blockOffsets entries that aren't
 	// actually start of block. They are very rare.
-	int probableBlockOffsetIndex = getBlockOffsetIndex(docId);
+	int probableBlockOffsetIndex = blockOffsets.getBlockOffsetIndex(docId);
 
 	if (probableBlockOffsetIndex < 0) {
 	    // docId is smaller that the first doc in the collection.
@@ -148,7 +138,7 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 	int retries = 2;
 	while (retries > 0) {
 	    final InputStream is = getInputStreamStartingAt(probableBlockOffsetIndex);
-	    PositionResult result = positionInputStreamAtDocStart(is, docId, maxBytesToRead, probableBlockOffsetIndex == 0);
+	    PositionResult result = positionInputStreamAtDocStart(is, docId, N_BYTES_TO_SEARCH_FOR_DOC_ID_, probableBlockOffsetIndex == 0);
 	    switch (result) {
 	    case FOUND:
 		return new InputStream() {
@@ -171,6 +161,9 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 	    case TRY_PREVIOUS_BLOCK:
 		retries--;
 		probableBlockOffsetIndex--;
+		if (probableBlockOffsetIndex < 0) {
+		    return null;
+		}
 		break;
 	    default:
 		throw new IllegalStateException("Don't know what to do with a " + result);
@@ -179,109 +172,66 @@ public class Bz2BlockIndexedDocumentCollection extends AbstractDocumentCollectio
 	return null;
     }
 
-    private int getBlockOffsetIndex(long docId) {
-	long index = longBigListBinarySearch(blockOffsetsData.firstDocIds, docId);
-	if (index < 0) {
-	    index = -index - 2;
-	}
-	return (int) index;
-    }
+    /**
+     * @param blockOffsetIndex
+     * @return an InputStream that reads the contents on one compressed block
+     * @throws IOException
+     */
+    private InputStream getCompressedBlockInputStream(final int blockOffsetIndex) throws IOException {
+	final long startOffset = blockOffsets.getBlockOffset(blockOffsetIndex);
+	final long endOffset = blockOffsets.getBlockOffset(blockOffsetIndex + 1) + FOOTER_LENGTH;
 
-    // Surprisingly there doesn't seem to be a binary search method on
-    // LongBigLists in fastutil..
-    private static long longBigListBinarySearch(final LongBigList list, final long key) {
-	long midVal;
-	long from = 0;
-	long to = list.size64() - 1;
-	while (from <= to) {
-	    final long mid = (from + to) >>> 1;
-	    midVal = list.getLong(mid);
-	    if (midVal < key) {
-		from = mid + 1;
-	    } else if (midVal > key) {
-		to = mid - 1;
-	    } else {
-		return mid;
-	    }
-	}
-	return -(from + 1);
-    }
-
-    private InputStream getInputStreamStartingAt(final int blockOffsetIndex) throws IOException {
-	InputStream compressedInputStream = new InputStream() {
-	    int index = (int) blockOffsetsData.blockOffsets.getLong(blockOffsetIndex);
+	return new InputStream() {
+	    private long offset = startOffset;
 
 	    @Override
 	    public int read() throws IOException {
-		if (index >= bz2ByteBuffer.capacity()) {
-			return -1;
+		if (offset >= endOffset) {
+		    return -1;
 		}
-		return bz2ByteBuffer.get(index++) & 0xFF;
+		if (offset > Long.MAX_VALUE) {
+		    throw new IOException("Trying to read passed the 2^31 limit of mapped files! Byte offset was:" + offset);
+		}
+		int b = bz2ByteBuffer.get((int)offset) & 0xFF;
+		offset++;
+		return b;
 	    }
 	};
-	return new BufferedInputStream(new CBZip2InputStream(compressedInputStream, READ_MODE.BYBLOCK));
     }
-    
-    private InputStream getInputStreamStartingAt2(final int firstBlockOffsetIndex) throws IOException {
+
+    private InputStream getInputStreamStartingAt(final int startBlockOffsetIndex) throws IOException {
 	// As documents will span blocks, we need to create a new de-compressor
-	// when there are no more
-	// bytes available from the current de-compressor.
-	// Note that often the CBZip2InputStream reads multiple blocks.
-	InputStream inputStream = new InputStream() {
-	    private int blockOffsetIndex = firstBlockOffsetIndex;
-	    private int index = getBlockOffset(blockOffsetIndex);
-
-	    private int getBlockOffset(int blockOffsetIndex) throws IOException {
-		long blockOffset = blockOffsetsData.blockOffsets.getLong(blockOffsetIndex);
-
-		// We can only map files smaller that Integer.MAX_VALUE.
-		if (blockOffset > Integer.MAX_VALUE) {
-		    throw new IOException("Given offset " + blockOffset + " is bigger than MAX_INT!");
-		}
-		return (int) blockOffset;
-	    }
-
-	    private int getBeginningOfBlockOffset(int indexInCompressedData) {
-		long beginningOfBlockOffsetIndex = longBigListBinarySearch(blockOffsetsData.blockOffsets, indexInCompressedData);
-		if (beginningOfBlockOffsetIndex < 0) {
-		    beginningOfBlockOffsetIndex = -beginningOfBlockOffsetIndex - 2;
-		}
-		return (int) beginningOfBlockOffsetIndex;
-	    }
-
-	    private final InputStream compressedInputStream = new InputStream() {
-		@Override
-		public int read() throws IOException {
-		    if (index >= bz2ByteBuffer.capacity()) {
-			return -1;
-		    }
-		    return bz2ByteBuffer.get(index++) & 0xFF;
-		}
-	    };
-
-	    private CBZip2InputStream uncompressedInputStream = new CBZip2InputStream(compressedInputStream, READ_MODE.BYBLOCK);
+	// when there are no more bytes available from the current
+	// de-compressor.
+	InputStream uncompressedInputStream = new InputStream() {
+	    private int blockOffsetIndex = startBlockOffsetIndex;
+	    private CBZip2InputStream uncompressedInputStream = new CBZip2InputStream(getCompressedBlockInputStream(blockOffsetIndex), READ_MODE.BYBLOCK);
 
 	    @Override
 	    public int read() throws IOException {
 		int b = uncompressedInputStream.read();
-//		if (b == -1) {
-//		    // If we are near the end of the byteBuffer assume there are
-//		    // no more blocks.
-//		    if (index >= (bz2ByteBuffer.capacity() - 100)) {
-//			return -1;
-//		    } else {
-//			// Re-position the compressedInputStream to the
-//			// beginning of the current block.
-//			index = getBeginningOfBlockOffset(index);
-//			uncompressedInputStream = new CBZip2InputStream(compressedInputStream, READ_MODE.BYBLOCK);
-//			b = uncompressedInputStream.read();
-//		    }
-//		}
 		return b;
+	    }
+
+	    @Override
+	    public int read(byte[] b, int off, int len) throws IOException {
+		int bytesRead = uncompressedInputStream.read(b, off, len);
+		if (bytesRead < 0) {
+		    // Next block
+		    blockOffsetIndex++;
+		    if (blockOffsetIndex < blockOffsets.getFileSize()) {
+			InputStream compressedInputStream = getCompressedBlockInputStream(blockOffsetIndex);
+			uncompressedInputStream = new CBZip2InputStream(compressedInputStream, READ_MODE.BYBLOCK);
+			bytesRead = uncompressedInputStream.read(b, off, len);
+		    } else {
+			return -1;
+		    }
+		}
+		return bytesRead;
 	    }
 	};
 
-	return new BufferedInputStream(inputStream);
+	return new BufferedInputStream(uncompressedInputStream);
     }
 
     private static final int BYTE_BUFFER_LENGTH = 32;

@@ -185,7 +185,7 @@ public class ResourceRecordWriterTest {
 	
 	BySubjectRecord record = new BySubjectRecord();
 	Random random = new Random();
-	for (long l = 100000 ; l < 200000 ; l += Math.abs(random.nextInt() % 20)) {
+	for (long l = 100000 ; l < 200000 ; l += (random.nextInt(19) + 2)) {
 	    record.setId(l);
 	    record.setSubject("Subject:" + Integer.toString(random.nextInt()));
 	    for (int i = 0 ; i < random.nextInt() % 4 ; i++) {
@@ -198,9 +198,16 @@ public class ResourceRecordWriterTest {
 	    record.clearRelations();
 	}
 	
+	BySubjectRecord beforeBigRecord = new BySubjectRecord();
+	beforeBigRecord.setId(200200l);
+	beforeBigRecord.setPreviousId(record.getId());
+	beforeBigRecord.setSubject("Before Big Test Record");
+	writer.write(null, beforeBigRecord);
+	
 	// Write a big record that will span multiple blocks of 100000 bytes.
 	BySubjectRecord bigRecord = new BySubjectRecord();
-	bigRecord.setId(200200l);
+	bigRecord.setId(200201l);
+	bigRecord.setPreviousId(beforeBigRecord.getId());
 	bigRecord.setSubject("Big Test Record");
 	
 	MessageDigest md5Digest = MessageDigest.getInstance("MD5");
@@ -229,6 +236,12 @@ public class ResourceRecordWriterTest {
 	
 	writer.write(null, bigRecord);
 	
+	BySubjectRecord afterBigRecord = new BySubjectRecord();
+	afterBigRecord.setId(200202l);
+	afterBigRecord.setPreviousId(bigRecord.getId());
+	afterBigRecord.setSubject("After Big Test Record");
+	writer.write(null, afterBigRecord);
+	
 	writer.close(null);
 	
 	Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("bySubject", null);
@@ -244,14 +257,27 @@ public class ResourceRecordWriterTest {
 	documentInputStream = collection.stream(record.getId());
 	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
 	assertEquals(record.getId(), record.getId());
+
+	record.setPreviousId(3);
+	record.setSubject(null);
+	documentInputStream = collection.stream(record.getId() + 1);
+	assertEquals(-1, documentInputStream.read());
+
+	documentInputStream = collection.stream(beforeBigRecord.getId());
+	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
+	assertEquals(beforeBigRecord, record);
 	
-	assertEquals(-1, collection.stream(record.getId() + 1).read());
+	documentInputStream = collection.stream(afterBigRecord.getId());
+	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
+	assertEquals(afterBigRecord, record);
 	
 	documentInputStream = collection.stream(bigRecord.getId());
 	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
+	System.out.println(record.getRelationsCount());
+	assertEquals(bigRecord.getRelationsCount(), record.getRelationsCount());
 	assertEquals(bigRecord, record);
 	
-	assertEquals(-1, collection.stream(bigRecord.getId() + 1).read());
+	assertEquals(-1, collection.stream(afterBigRecord.getId() + 1).read());
 	
 	collection.close();
     }

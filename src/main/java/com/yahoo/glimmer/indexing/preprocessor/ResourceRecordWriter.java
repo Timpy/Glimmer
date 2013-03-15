@@ -35,9 +35,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 
+import com.yahoo.glimmer.util.BlockOffsets;
 import com.yahoo.glimmer.util.BySubjectRecord;
-import com.yahoo.glimmer.util.Bz2BlockIndexedDocumentCollection;
-import com.yahoo.glimmer.util.Bz2BlockIndexedDocumentCollection.BlockOffsetsData;
 import com.yahoo.glimmer.util.Bz2BlockIndexedOutputStream;
 
 /**
@@ -72,8 +71,10 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
     private HashMap<OUTPUT, Writer> writersMap = new HashMap<OUTPUT, Writer>();
     private DataOutputStream bySubjectOffsetsDataOutput;
     private Writer bySubjectWriter;
-    private long firstDocIdInBlock = -1;
+    private boolean firstDocIdInBlockSet;
+    private long firstDocIdInBlock;
     private long allCount;
+    private long lastEndOffset;
     private final LongBigArrayBigList firstDocIds = new LongBigArrayBigList();
     private final LongBigArrayBigList startOffsets = new LongBigArrayBigList();
 
@@ -101,20 +102,23 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	file = new Path(taskWorkPath, "bySubject.blockOffsets");
 	bySubjectOffsetsDataOutput =  new DataOutputStream(fs.create(file, false));
 	
-	// Create a Writer on a BZip2 compressed OutputStream with the smallest block size(100K).
-	Bz2BlockIndexedOutputStream blockDataOut = Bz2BlockIndexedOutputStream.newInstance(dataOut, 1);
+	// Create a Writer on a BZip2 compressed OutputStream with a small block size( * 100K).
+	Bz2BlockIndexedOutputStream blockDataOut = Bz2BlockIndexedOutputStream.newInstance(dataOut, 2);
 	blockDataOut.setCallback(new Bz2BlockIndexedOutputStream.BlockCallback() {
 	    @Override
 	    public void blockStart(int blockIndex, long startOffset) throws IOException {
-		if (firstDocIdInBlock != -1) {
-		    firstDocIds.add(firstDocIdInBlock);
-		    startOffsets.add(startOffset);
-		    firstDocIdInBlock = -1;
+		// Save all block start offsets.
+		// If the record spans multiple blocks we use the same docId for all blocks
+		firstDocIds.add(firstDocIdInBlock);
+		startOffsets.add(startOffset);
+		if (firstDocIdInBlockSet) {
+		    firstDocIdInBlockSet = false;
 		}
 	    }
 
 	    @Override
 	    public void blockEnd(int blockIndex, long startOffset, long endOffset) {
+		lastEndOffset = endOffset;
 	    }
 	});
 	bySubjectWriter = new OutputStreamWriter(blockDataOut);
@@ -153,9 +157,10 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	    // SUBJECT
 	    subjectWriter.write(record.getSubject());
 	    subjectWriter.write('\n');
-	    
+
 	    // bySubject
-	    if (firstDocIdInBlock == -1) {
+	    if (!firstDocIdInBlockSet) {
+		firstDocIdInBlockSet = true;
 		firstDocIdInBlock = record.getId();
 	    }
 	    record.writeTo(bySubjectWriter);
@@ -174,7 +179,7 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	
 	LongBigList compressedFirstDocIds = new EliasFanoMonotoneLongBigList(firstDocIds);
 	LongBigList compressedStartOffsets = new EliasFanoMonotoneLongBigList(startOffsets);
-	BlockOffsetsData blockOffsetsData = new Bz2BlockIndexedDocumentCollection.BlockOffsetsData(compressedFirstDocIds, compressedStartOffsets, allCount);
+	BlockOffsets blockOffsetsData = new BlockOffsets(compressedFirstDocIds, compressedStartOffsets, allCount, lastEndOffset);
 	BinIO.storeObject(blockOffsetsData, bySubjectOffsetsDataOutput);
 	bySubjectOffsetsDataOutput.close();
     }
