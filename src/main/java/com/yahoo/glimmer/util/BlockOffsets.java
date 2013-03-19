@@ -14,22 +14,22 @@ public class BlockOffsets implements Serializable {
     private final long fileSize;
 
     public BlockOffsets(LongBigList firstDocIds, LongBigList blockOffsets, long recordCount, long fileSize) {
-        this.firstDocIds = firstDocIds;
-        this.blockOffsets = blockOffsets;
-        this.recordCount = recordCount;
-        this.fileSize = fileSize;
+	this.firstDocIds = firstDocIds;
+	this.blockOffsets = blockOffsets;
+	this.recordCount = recordCount;
+	this.fileSize = fileSize;
     }
 
-    public long getBlockOffset(int index) throws IOException {
-        if (index < blockOffsets.size()) {
-    	return blockOffsets.getLong(index);
-        } else if (index == blockOffsets.size()) {
-    	return (int)fileSize - Bz2BlockIndexedDocumentCollection.FOOTER_LENGTH;
-        }
-        return -1;
+    public long getBlockOffset(long index) throws IOException {
+	if (index < blockOffsets.size()) {
+	    return blockOffsets.getLong(index);
+	} else if (index == blockOffsets.size()) {
+	    return fileSize - Bz2BlockIndexedDocumentCollection.FOOTER_LENGTH;
+	}
+	return -1;
     }
-    
-    public int getBlockOffsetIndex(long docId) {
+
+    public long getBlockOffsetIndex(long docId) {
 	long index = longBigListBinarySearch(firstDocIds, docId);
 	if (index < 0) {
 	    index = -index - 2;
@@ -45,16 +45,22 @@ public class BlockOffsets implements Serializable {
 	    }
 	    index++;
 	}
-	return (int) index;
+	return index;
     }
-    
+
     public long getRecordCount() {
 	return recordCount;
     }
+
     public long getFileSize() {
 	return fileSize;
     }
-    
+
+    public long getBlockCount() {
+	// TODO Auto-generated method stub
+	return blockOffsets.size64();
+    }
+
     // Surprisingly there doesn't seem to be a binary search method on
     // LongBigLists in fastutil..
     private static long longBigListBinarySearch(final LongBigList list, final long key) {

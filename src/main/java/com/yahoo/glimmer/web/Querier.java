@@ -69,9 +69,10 @@ public class Querier {
 		LOGGER.debug("score " + dsi.score);
 		RDFResultItem item = createRdfResultItem(index, dsi.document, dsi.score, deref);
 		if (item == null) {
-		    throw new IllegalStateException("Document id " + dsi.document + " isn't in collection(or has null content).");
+		    LOGGER.error("Document id " + dsi.document + " isn't in collection(or has null content).");
+		} else {
+		    resultItems.add(item);
 		}
-		resultItems.add(item);
 	    }
 	}
 
@@ -95,7 +96,13 @@ public class Querier {
     }
 
     private static RDFResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels) throws IOException {
-	InputStream docInputStream = index.getDocumentInputStream(docId);
+	InputStream docInputStream;
+	try {
+	    docInputStream = index.getDocumentInputStream(docId);
+	} catch (IOException e) {
+	    //TODO fix end of stream errors on BZip2.
+	    return null;
+	}
 	
 	BySubjectRecord record = new BySubjectRecord();
 	

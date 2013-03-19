@@ -15,6 +15,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import it.unimi.dsi.io.ByteBufferInputStream;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -152,7 +154,8 @@ public class ResourceRecordWriterTest {
 	
 	Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("foo", null);
 	InputStream blockOffsetsInputStream = new ByteArrayInputStream(bySubjectOffsetsBos.toByteArray());
-	collection.init(ByteBuffer.wrap(bySubjectBos.toByteArray()), blockOffsetsInputStream);
+	ByteBufferInputStream byteBufferInputStream = new ByteBufferInputStream(ByteBuffer.wrap(bySubjectBos.toByteArray()));
+	collection.init(byteBufferInputStream, blockOffsetsInputStream);
 	blockOffsetsInputStream.close();
 
 	// Size of collection. This is the same as the number of lines written to ALL.
