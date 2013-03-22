@@ -6,16 +6,6 @@ import java.io.OutputStream;
 import org.apache.hadoop.io.compress.bzip2.CBZip2OutputStream;
 
 
-/**
- * CBZip2InputStream that this class extends often reads multiple blocks when in BYBLOCK mode.
- * Given the blockSize100k this class limits the amount of uncompressed data that can be read from
- * the stream to something a little bigger than the block size.
- * 
- * To be used with Bz2BlockIndexedOutputStream
- * 
- * @author tep
- *
- */
 public class Bz2BlockIndexedOutputStream extends CBZip2OutputStream {
     private final static long BLOCK_DELIMITER = 0x314159265359l;
     private final static byte BLOCK_DELIMITER_BIT_LENGTH = 6 * 8;

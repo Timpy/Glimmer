@@ -18,12 +18,12 @@ public class RDFResultItem {
     public static class Relation {
 	private final String predicate;
 	private final String object;
-	private final Integer subjectIdOfObject;
+	private final Long subjectIdOfObject;
 	private final String context;
 	private final boolean indexed;
 	private final String label;
 	
-	private Relation(String predicate, String object, Integer subjectIdOfObject, String context, boolean indexed, String label) {
+	private Relation(String predicate, String object, Long subjectIdOfObject, String context, boolean indexed, String label) {
 	    this.predicate = predicate;
 	    this.object = object;
 	    this.subjectIdOfObject = subjectIdOfObject;
@@ -40,7 +40,7 @@ public class RDFResultItem {
 	    return object;
 	}
 	
-	public int getSubjectIdOfObject() {
+	public Long getSubjectIdOfObject() {
 	    return subjectIdOfObject;
 	}
 
@@ -106,7 +106,7 @@ public class RDFResultItem {
     public List<Relation> getRelations() {
 	return relations;
     }
-    public void addRelation(String predicate, String object, Integer subjectIdOfObject, String context, boolean indexed, String label) {
+    public void addRelation(String predicate, String object, Long subjectIdOfObject, String context, boolean indexed, String label) {
 	relations.add(new Relation(predicate, object, subjectIdOfObject, context, indexed, label));
     }
 

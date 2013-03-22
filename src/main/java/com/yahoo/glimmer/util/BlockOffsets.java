@@ -3,7 +3,11 @@ package com.yahoo.glimmer.util;
 import it.unimi.dsi.fastutil.longs.LongBigList;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.Serializable;
+import java.util.Arrays;
+
+import org.apache.commons.codec.digest.DigestUtils;
 
 public class BlockOffsets implements Serializable {
     private static final long serialVersionUID = 6997859749849192991L;
@@ -12,19 +16,21 @@ public class BlockOffsets implements Serializable {
     private final LongBigList blockOffsets;
     private final long recordCount;
     private final long fileSize;
+    private final byte[] md5Digest;
 
-    public BlockOffsets(LongBigList firstDocIds, LongBigList blockOffsets, long recordCount, long fileSize) {
+    public BlockOffsets(LongBigList firstDocIds, LongBigList blockOffsets, long recordCount, long fileSize, byte[] md5Digest) {
 	this.firstDocIds = firstDocIds;
 	this.blockOffsets = blockOffsets;
 	this.recordCount = recordCount;
 	this.fileSize = fileSize;
+	this.md5Digest = Arrays.copyOf(md5Digest, md5Digest.length);
     }
 
     public long getBlockOffset(long index) throws IOException {
 	if (index < blockOffsets.size()) {
 	    return blockOffsets.getLong(index);
 	} else if (index == blockOffsets.size()) {
-	    return fileSize - Bz2BlockIndexedDocumentCollection.FOOTER_LENGTH;
+	    return fileSize - BlockCompressedDocumentCollection.FOOTER_LENGTH;
 	}
 	return -1;
     }
@@ -57,8 +63,11 @@ public class BlockOffsets implements Serializable {
     }
 
     public long getBlockCount() {
-	// TODO Auto-generated method stub
 	return blockOffsets.size64();
+    }
+    
+    public byte[] getMd5Digest() {
+	return md5Digest;
     }
 
     // Surprisingly there doesn't seem to be a binary search method on
@@ -79,5 +88,17 @@ public class BlockOffsets implements Serializable {
 	    }
 	}
 	return -(from + 1);
+    }
+    
+    public void printTo(PrintStream ps) {
+	ps.println("Doc count:" + recordCount);
+	ps.println("Bz2 file size:" + fileSize);
+	if (md5Digest != null) {
+	    ps.println("Bz2 MD5 hash:" + DigestUtils.md5Hex(md5Digest));
+	}
+	ps.println("FirstDoc\tBlockStart");
+	for (long i = 0 ; i < firstDocIds.size64() ; i++) {
+	    ps.printf("%d\t%d\n", firstDocIds.get(i), blockOffsets.get(i));
+	}
     }
 }

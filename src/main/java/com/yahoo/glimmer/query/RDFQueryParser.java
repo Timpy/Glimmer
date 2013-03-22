@@ -11,9 +11,6 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.fastutil.objects.Object2LongFunction;
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.lang.MutableString;
 import it.unimi.di.big.mg4j.index.Index;
 import it.unimi.di.big.mg4j.index.IndexIterator;
 import it.unimi.di.big.mg4j.index.TermProcessor;
@@ -42,6 +39,9 @@ import it.unimi.di.big.mg4j.query.parser.QueryParser;
 import it.unimi.di.big.mg4j.query.parser.QueryParserException;
 import it.unimi.di.big.mg4j.query.parser.SimpleParser;
 import it.unimi.di.big.mg4j.search.DocumentIterator;
+import it.unimi.dsi.fastutil.objects.Object2LongFunction;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.lang.MutableString;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -344,7 +344,5 @@ public class RDFQueryParser implements QueryParser {
 	public MyVisitor copy() {
 	    return new MyVisitor();
 	}
-
     }
-
 }

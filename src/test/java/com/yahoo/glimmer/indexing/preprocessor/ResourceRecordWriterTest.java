@@ -48,7 +48,7 @@ import org.junit.rules.TemporaryFolder;
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OutputCount;
 import com.yahoo.glimmer.util.BySubjectRecord;
-import com.yahoo.glimmer.util.Bz2BlockIndexedDocumentCollection;
+import com.yahoo.glimmer.util.BlockCompressedDocumentCollection;
 
 public class ResourceRecordWriterTest {
     private Mockery context;
@@ -152,7 +152,7 @@ public class ResourceRecordWriterTest {
 	
 	context.assertIsSatisfied();
 	
-	Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("foo", null);
+	BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("foo", null, 10);
 	InputStream blockOffsetsInputStream = new ByteArrayInputStream(bySubjectOffsetsBos.toByteArray());
 	ByteBufferInputStream byteBufferInputStream = new ByteBufferInputStream(ByteBuffer.wrap(bySubjectBos.toByteArray()));
 	collection.init(byteBufferInputStream, blockOffsetsInputStream);
@@ -247,7 +247,7 @@ public class ResourceRecordWriterTest {
 	
 	writer.close(null);
 	
-	Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("bySubject", null);
+	BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("bySubject", null, 10);
 	String indexBaseName = new File(tempDirPath.toUri().getPath(), "bySubject").getCanonicalPath();
 	collection.filename(indexBaseName);
 	

@@ -110,10 +110,10 @@ public class QueryController {
 	case YAHOO:
 	    if (query.startsWith(DOC_PSEUDO_FIELD)) {
 		String idOrSubject = query.substring(DOC_PSEUDO_FIELD.length());
-		Integer id;
+		Long id;
 		if (Character.isDigit(idOrSubject.charAt(0))) {
 		    try {
-			id = Integer.parseInt(idOrSubject);
+			id = Long.parseLong(idOrSubject);
 		    } catch (NumberFormatException e) {
 			throw new IllegalArgumentException("Query " + query + " failed to parse as a numeric subject ID(int)");
 		    }
