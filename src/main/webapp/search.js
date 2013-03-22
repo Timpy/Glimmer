@@ -98,7 +98,6 @@ YUI({
 			Y.one("#results").setContent("");
 			Y.one("#result-stats").setContent("");
 			Y.one("#class-select").setContent("");
-			Y.one("#resultContainer").hide();
 
 			Y.one("#statistics-tree").setContent("");
 			Y.one("#statistics-loader").show();
@@ -274,6 +273,9 @@ YUI({
 						 * dtScrollingY.plug(Y.Plugin.DataTableScroll, { height :
 						 * "400px" }); dtScrollingY.render("#statistics");
 						 */
+						
+						// Only do the URL's search once the stats are loaded.
+						doQuery(history.get());
 					},
 					failure : function(transactionid, response, arguments) {
 						Y.one("#statistics-loader").hide();
@@ -329,7 +331,6 @@ YUI({
 		function doQuery(paramsMap) {
 			if (paramsMap['index'] == undefined || paramsMap['query'] == undefined) { // || paramsMap['query'].length == 0) {
 				Y.one("#result-loader").hide();
-				Y.one("#resultContainer").hide();
 				return;
 			}
 			
@@ -342,7 +343,6 @@ YUI({
 						var result = Y.JSON.parse(response.response);
 						
 						Y.one("#result-loader").hide();
-						Y.one("#resultContainer").show();
 						Y.one("#result-stats").setContent("Found " + result.numResults + " results in " + result.time + " ms.");
 
 						var ol = Y.Node.create("<ol></ol>");
@@ -368,7 +368,6 @@ YUI({
 						}
 						alert("Failed to get results from server. " + message);
 						Y.one("#result-loader").hide();
-						Y.one("#resultContainer").hide();
 					}
 				}
 			}
@@ -599,8 +598,6 @@ YUI({
 					
 					initDataSet();
 					Y.one('#dataset').on('change', initDataSet);
-					
-					doQuery(history.get());
 				},
 				failure: function(transactionid, response, arguments) {
 					alert("Failed to load data set list.");
