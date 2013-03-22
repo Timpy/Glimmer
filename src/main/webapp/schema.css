@@ -204,6 +204,10 @@
 	float: right;
 }
 
+#statistics-loader {
+	padding: 6px;
+}
+
 .status {
 	clear:both;
 	text-align: center;

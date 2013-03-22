@@ -76,7 +76,7 @@ public class QueryController {
     }
 
     @RequestMapping(value = "/indexStatistics", method = RequestMethod.GET)
-    public Map<String, ?> getIndextStatistics(@ModelAttribute(INDEX_KEY) RDFIndex index, @RequestParam(required = false) String callback) {
+    public Map<String, ?> getIndexStatistics(@ModelAttribute(INDEX_KEY) RDFIndex index, @RequestParam(required = false) String callback) {
 	if (index == null) {
 	    throw new HttpMessageConversionException("No index given");
 	}
