@@ -23,9 +23,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
+import org.apache.log4j.Logger;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -40,6 +42,8 @@ import com.yahoo.glimmer.query.RDFQueryResult;
 
 @Controller()
 public class QueryController {
+    private final static Logger LOGGER = Logger.getLogger(QueryController.class);
+    
     public final static String INDEX_KEY = "index";
     public final static String OBJECT_KEY = "object";
     
@@ -106,10 +110,10 @@ public class QueryController {
 	case YAHOO:
 	    if (query.startsWith(DOC_PSEUDO_FIELD)) {
 		String idOrSubject = query.substring(DOC_PSEUDO_FIELD.length());
-		Integer id;
+		Long id;
 		if (Character.isDigit(idOrSubject.charAt(0))) {
 		    try {
-			id = Integer.parseInt(idOrSubject);
+			id = Long.parseLong(idOrSubject);
 		    } catch (NumberFormatException e) {
 			throw new IllegalArgumentException("Query " + query + " failed to parse as a numeric subject ID(int)");
 		    }
@@ -137,7 +141,8 @@ public class QueryController {
     }
 
     @ExceptionHandler(Exception.class)
-    public Map<String, ?> handleException(Exception ex, HttpServletResponse response) {
+    public Map<String, ?> handleException(Exception ex,  HttpServletRequest request, HttpServletResponse response) {
+	LOGGER.error("Exception when processing:" + request.getQueryString(), ex);
 	response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 	return Collections.singletonMap(OBJECT_KEY, ex.getMessage());
     }

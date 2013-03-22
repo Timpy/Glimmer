@@ -15,6 +15,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import it.unimi.dsi.io.ByteBufferInputStream;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -46,7 +48,7 @@ import org.junit.rules.TemporaryFolder;
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OUTPUT;
 import com.yahoo.glimmer.indexing.preprocessor.ResourceRecordWriter.OutputCount;
 import com.yahoo.glimmer.util.BySubjectRecord;
-import com.yahoo.glimmer.util.Bz2BlockIndexedDocumentCollection;
+import com.yahoo.glimmer.util.BlockCompressedDocumentCollection;
 
 public class ResourceRecordWriterTest {
     private Mockery context;
@@ -150,9 +152,10 @@ public class ResourceRecordWriterTest {
 	
 	context.assertIsSatisfied();
 	
-	Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("foo", null);
+	BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("foo", null, 10);
 	InputStream blockOffsetsInputStream = new ByteArrayInputStream(bySubjectOffsetsBos.toByteArray());
-	collection.init(ByteBuffer.wrap(bySubjectBos.toByteArray()), blockOffsetsInputStream, 1);
+	ByteBufferInputStream byteBufferInputStream = new ByteBufferInputStream(ByteBuffer.wrap(bySubjectBos.toByteArray()));
+	collection.init(byteBufferInputStream, blockOffsetsInputStream);
 	blockOffsetsInputStream.close();
 
 	// Size of collection. This is the same as the number of lines written to ALL.
@@ -203,7 +206,7 @@ public class ResourceRecordWriterTest {
 	beforeBigRecord.setPreviousId(record.getId());
 	beforeBigRecord.setSubject("Before Big Test Record");
 	writer.write(null, beforeBigRecord);
-	
+
 	// Write a big record that will span multiple blocks of 100000 bytes.
 	BySubjectRecord bigRecord = new BySubjectRecord();
 	bigRecord.setId(200201l);
@@ -243,8 +246,8 @@ public class ResourceRecordWriterTest {
 	writer.write(null, afterBigRecord);
 	
 	writer.close(null);
-	
-	Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("bySubject", null);
+
+	BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("bySubject", null, 10);
 	String indexBaseName = new File(tempDirPath.toUri().getPath(), "bySubject").getCanonicalPath();
 	collection.filename(indexBaseName);
 	
@@ -257,7 +260,7 @@ public class ResourceRecordWriterTest {
 	documentInputStream = collection.stream(record.getId());
 	assertTrue(record.parse(new InputStreamReader(documentInputStream)));
 	assertEquals(record.getId(), record.getId());
-	
+
 	record.setPreviousId(3);
 	record.setSubject(null);
 	documentInputStream = collection.stream(record.getId() + 1);

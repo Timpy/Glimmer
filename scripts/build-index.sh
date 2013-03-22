@@ -381,7 +381,10 @@ function mergeSubIndexes() {
 			rm ${PART_DIR}/${INDEX_NAME}.*
 		done
 		
-		CMD="java -Xmx3800m -cp ${JAR_FOR_HADOOP} it.unimi.dsi.big.util.ImmutableExternalPrefixMap ${INDEX_DIR}/${INDEX_NAME}.termmap -o ${INDEX_DIR}/${INDEX_NAME}.terms"
+		CMD="java -Xmx3800m -cp ${JAR_FOR_HADOOP} it.unimi.dsi.big.util.ImmutableExternalPrefixMap \
+			-o ${INDEX_DIR}/${INDEX_NAME}.terms \
+			${INDEX_DIR}/${INDEX_NAME}.termmap \
+			${INDEX_DIR}/${INDEX_NAME}.termmap.dump"
 		echo ${CMD}
 		${CMD}
 		

@@ -11,7 +11,6 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.big.mg4j.document.Document;
 import it.unimi.di.big.mg4j.document.DocumentCollection;
 import it.unimi.di.big.mg4j.document.IdentityDocumentFactory;
 import it.unimi.di.big.mg4j.index.BitStreamIndex;
@@ -29,6 +28,7 @@ import it.unimi.di.big.mg4j.search.DocumentIteratorBuilderVisitor;
 import it.unimi.di.big.mg4j.search.score.CountScorer;
 import it.unimi.di.big.mg4j.search.score.DocumentScoreInfo;
 import it.unimi.di.big.mg4j.search.score.Scorer;
+import it.unimi.dsi.big.util.ImmutableExternalPrefixMap;
 import it.unimi.dsi.big.util.LongBigListSignedStringMap;
 import it.unimi.dsi.big.util.SemiExternalGammaBigList;
 import it.unimi.dsi.big.util.StringMap;
@@ -56,7 +56,6 @@ import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -70,7 +69,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
-import com.yahoo.glimmer.util.Bz2BlockIndexedDocumentCollection;
+import com.yahoo.glimmer.util.BlockCompressedDocumentCollection;
 import com.yahoo.glimmer.util.Util;
 
 public class RDFIndex {
@@ -153,13 +152,13 @@ public class RDFIndex {
 	// Load the collection or titlelist
 	String indexBasename = new File(kbRootPath, "bySubject").getAbsolutePath();
 	try {
-	    Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("bySubject", new IdentityDocumentFactory());
+	    BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("bySubject", new IdentityDocumentFactory(), 10000);
 	    collection.filename(indexBasename);
 	    documentCollection = collection;
 	} catch (IOException e) {
 	    LOGGER.info("Couldn't open Bz2BlockIndexedDocumentCollection from " + indexBasename, e);
 	}
-	
+
 	if (documentCollection == null) {
 	    LOGGER.info("No collection specified, we will try to use a title list...");
 	    File titleListFile = context.getTitleListFile();
@@ -211,8 +210,9 @@ public class RDFIndex {
 
 	try {
 	    LOGGER.info("Loading alignment index..");
-	    String alignmentUri = new File(verticalIndexDir, ALIGNMENT_INDEX_NAME).getPath();
-	    alignmentIndex = Index.getInstance(alignmentUri + "?mapped=1");
+	    String alignmentBasename = new File(verticalIndexDir, ALIGNMENT_INDEX_NAME).getPath();
+	    alignmentIndex = Index.getInstance(alignmentBasename + "?mapped=1");
+	    setTermMapDumpFile(alignmentIndex, alignmentBasename);
 	} catch (Exception e) {
 	    LOGGER.error("Failed to load alignment index", e);
 	}
@@ -430,15 +430,29 @@ public class RDFIndex {
 		// split));
 		index2Weight.put(index, weight);
 	    }
-	    
+
 	    if (index.numberOfDocuments != documentCollectionSize) {
 		throw new IllegalArgumentException("Index " + index + " has " + index.numberOfDocuments + " documents, but the document collection has size "
 			+ documentCollectionSize);
 	    }
+	    
+	    setTermMapDumpFile(index, indexBasename);
 
 	    name2Index.put(index.field != null ? index.field : indexBasename, index);
 	}
 	return name2Index;
+    }
+
+    private void setTermMapDumpFile(final Index index, final String indexBasename) throws RDFIndexException {
+	// See the section of the MG4J Manual entitled 'Setup Time'
+	if (index.termMap instanceof ImmutableExternalPrefixMap) {
+	    ImmutableExternalPrefixMap termMap = (ImmutableExternalPrefixMap) index.termMap;
+	    try {
+		termMap.setDumpStream(indexBasename + DiskBasedIndex.TERMMAP_EXTENSION + ".dump");
+	    } catch (FileNotFoundException e) {
+		throw new RDFIndexException("Failed to set dump file for index " + indexBasename, e);
+	    }
+	}
     }
 
     private Reference2DoubleOpenHashMap<Index> loadB(Context context) {
@@ -560,25 +574,18 @@ public class RDFIndex {
      * @throws IOException
      * @throws RDFIndexException
      */
-    public Integer getSubjectId(String uri) throws IOException {
+    public Long getSubjectId(String uri) throws IOException {
 	Long id = allResourcesToIds.get(uri);
 	if (id != null) {
 	    // Check that the doc is a valid doc(has contents).. TODO could use
 	    // the subjects signed hash here..
-	    Document doc = documentCollection.document(id.intValue());
-	    Object content = doc.content(0);
-	    if (content instanceof Reader) {
-		Reader contentReader = (Reader) content;
-		if (contentReader.read() == -1) {
-		    id = null;
-		}
-		contentReader.close();
-	    } else {
-		throw new IllegalStateException("doc.content(0) for doc id " + id.intValue() + " didn't return a Reader!");
+	    InputStream docStream = documentCollection.stream(id);
+	    if (docStream.read() == -1) {
+		id = null;
 	    }
-	    doc.close();
+	    docStream.close();
 	}
-	return id == null ? null : id.intValue();
+	return id;
     }
 
     public DocumentCollection getCollection() {

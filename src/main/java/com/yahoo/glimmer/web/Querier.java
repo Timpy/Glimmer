@@ -11,19 +11,21 @@ package com.yahoo.glimmer.web;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.di.big.mg4j.index.Index;
 import it.unimi.di.big.mg4j.query.SelectedInterval;
 import it.unimi.di.big.mg4j.query.nodes.Query;
 import it.unimi.di.big.mg4j.query.nodes.QueryBuilderVisitorException;
 import it.unimi.di.big.mg4j.search.score.DocumentScoreInfo;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.semanticweb.yars.nx.Node;
@@ -43,8 +45,32 @@ import com.yahoo.glimmer.util.Util;
 public class Querier {
     private final static Logger LOGGER = Logger.getLogger(Querier.class);
     private static final String DEFAULT_CONTEXT = "default:";
+    private static final int CACHE_SIZE = 10000;
+
+    private final Map<String, Long> objectsSubjectsIdCache;
+    private final Map<Long, String> objectLabelCache;
 
     private QueryLogger queryLogger = new QueryLogger();
+
+    public Querier() {
+	LinkedHashMap<String, Long> idCache = new LinkedHashMap<String, Long>(CACHE_SIZE + 1, 1.1f, true) {
+	    private static final long serialVersionUID = -8171861525079261380L;
+
+	    protected boolean removeEldestEntry(java.util.Map.Entry<String, Long> eldest) {
+		return size() > CACHE_SIZE;
+	    };
+	};
+	objectsSubjectsIdCache = Collections.synchronizedMap(idCache);
+
+	LinkedHashMap<Long, String> labelCache = new LinkedHashMap<Long, String>(CACHE_SIZE + 1, 1.1f, true) {
+	    private static final long serialVersionUID = -6916960713013021549L;
+
+	    protected boolean removeEldestEntry(java.util.Map.Entry<Long, String> eldest) {
+		return size() > CACHE_SIZE;
+	    };
+	};
+	objectLabelCache = Collections.synchronizedMap(labelCache);
+    }
 
     public RDFQueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref) throws QueryBuilderVisitorException, IOException {
 	if (startItem < 0 || maxNumItems < 0 || maxNumItems > 10000) {
@@ -69,44 +95,51 @@ public class Querier {
 		LOGGER.debug("score " + dsi.score);
 		RDFResultItem item = createRdfResultItem(index, dsi.document, dsi.score, deref);
 		if (item == null) {
-		    throw new IllegalStateException("Document id " + dsi.document + " isn't in collection(or has null content).");
+		    LOGGER.error("Document id " + dsi.document + " isn't in collection(or has null content).");
+		} else {
+		    resultItems.add(item);
 		}
-		resultItems.add(item);
 	    }
 	}
 
 	long time = queryLogger.endQuery(query.toString(), numResults);
-	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", numResults, startItem, maxNumItems,  resultItems, (int) time);
+	RDFQueryResult result = new RDFQueryResult(null, query != null ? query.toString() : "", numResults, startItem, maxNumItems, resultItems, (int) time);
 	return result;
     }
 
-    public RDFQueryResult doQueryForDocId(RDFIndex index, int id, boolean deref) throws IOException {
+    public RDFQueryResult doQueryForDocId(RDFIndex index, long id, boolean deref) throws IOException {
 	queryLogger.start();
-	RDFResultItem resultItem = Querier.createRdfResultItem(index, id, 1.0d, deref);
-	long time = queryLogger.endQuery("getDoc " + Integer.toString(id), 1);
-	
+	RDFResultItem resultItem = createRdfResultItem(index, id, 1.0d, deref);
+	long time = queryLogger.endQuery("getDoc " + Long.toString(id), 1);
+
 	List<RDFResultItem> results;
 	if (resultItem != null) {
 	    results = Collections.singletonList(resultItem);
 	} else {
 	    results = Collections.emptyList();
 	}
-	return new RDFQueryResult("", null, results.size(), 0, 1, results, (int)time);
+	return new RDFQueryResult("", null, results.size(), 0, 1, results, (int) time);
     }
 
-    private static RDFResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels) throws IOException {
-	InputStream docInputStream = index.getDocumentInputStream(docId);
-	
+    private RDFResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels) throws IOException {
+	InputStream docInputStream;
+	try {
+	    docInputStream = index.getDocumentInputStream(docId);
+	} catch (IOException e) {
+	    // TODO fix end of stream errors on BZip2.
+	    return null;
+	}
+
 	BySubjectRecord record = new BySubjectRecord();
-	
+
 	if (!record.parse(new InputStreamReader(docInputStream))) {
 	    throw new RuntimeException("Couldn't parse doc with id:" + docId);
 	}
-	
+
 	if (docId != record.getId()) {
 	    LOGGER.error("Wanted doc id:" + docId + " but got doc id:" + record.getId());
 	}
-	
+
 	RDFResultItem item = new RDFResultItem();
 	item.setSubjectId(record.getId());
 	item.setSubject(record.getSubject());
@@ -119,7 +152,7 @@ public class Querier {
 	    } catch (Exception e) {
 		throw new RuntimeException("Error parsing tuple: " + relationString);
 	    }
-	    
+
 	    String predicate = predicateObjectContext[0].toString();
 	    String object = predicateObjectContext[1].toString();
 	    String context;
@@ -129,31 +162,45 @@ public class Querier {
 		context = DEFAULT_CONTEXT;
 	    }
 	    boolean indexed = index.getIndexedPredicates().contains(Util.encodeFieldName(predicate));
-	    
+
 	    String label = null;
-	    // if predicate is an rdfs:label or woo:label, assign the object as the
+	    // if predicate is an rdfs:label or woo:label, assign the object as
+	    // the
 	    // items label
 	    // TODO. Consider ...name too.
 	    if (predicate.endsWith("label") || predicate.endsWith("name")) {
 		item.setLabel(object);
 		label = object;
 	    }
-	    
-	    Integer subjectIdOfObject = index.getSubjectId(object);
-	    
-	    if (label == null && lookupObjectLabels && subjectIdOfObject != null) {
-		// If the object is also a subject Resource/BNode this will
-		// return that subjects id with is the same as the docId.
-		// Parse the subject doc that this object refers too..
-		RDFResultItem objectItem = createRdfResultItem(index, subjectIdOfObject, 0.0d, false);
-		if (objectItem != null) {
-		    label = objectItem.getLabel();
+
+	    Long subjectIdOfObject;
+
+	    if (objectsSubjectsIdCache.containsKey(object)) {
+		subjectIdOfObject = objectsSubjectsIdCache.get(object);
+	    } else {
+		subjectIdOfObject = index.getSubjectId(object);
+		objectsSubjectsIdCache.put(object, subjectIdOfObject);
+	    }
+
+	    if (label == null && subjectIdOfObject != null && lookupObjectLabels) {
+		if (objectLabelCache.containsKey(subjectIdOfObject)) {
+		    label = objectLabelCache.get(subjectIdOfObject);
+		} else {
+		    // If the object is also a subject Resource/BNode this
+		    // will return that subjects id with is the same as the
+		    // docId. Parse the subject doc that this object refers
+		    // too..
+		    RDFResultItem objectItem = createRdfResultItem(index, subjectIdOfObject, 0.0d, false);
+		    if (objectItem != null) {
+			label = objectItem.getLabel();
+		    }
+		    objectLabelCache.put(subjectIdOfObject, label);
 		}
 	    }
-	    
+
 	    item.addRelation(predicate, object, subjectIdOfObject, context, indexed, label);
 	}
-	
+
 	docInputStream.close();
 
 	return item;
