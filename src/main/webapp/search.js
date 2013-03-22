@@ -170,7 +170,7 @@ YUI({
 							    if(a.localName<b.localName) return -1;
 							    if(a.localName>b.localName) return 1;
 							    return 0;
-							})
+							});
 							
 							var frag = '<select>';
 							for (i in classesWithProperties) {
@@ -187,7 +187,10 @@ YUI({
 								changeProperties(classesWithProperties[i]);
 							});
 
-							var tree = [];
+							function classSortOrderCompare(a,b) {
+								return b.inheritedCount - a.inheritedCount;
+							}
+
 							function addClass(clazz) {
 								var rt = {};
 								
@@ -202,25 +205,36 @@ YUI({
 								label += '</a>';
 								rt['label'] = label;
 								
-								var children = [];
-								for (i in clazz.children) {
-									var childClass = clazz.children[i];
-									children.push(addClass(childClass));
-								}
-								if (children.length > 0) {
+								if (clazz.children != undefined) {
+									// Sort childern nodes highest inherited count first.
+									clazz.children.sort(classSortOrderCompare);
+									var children = [];
+									for (i in clazz.children) {
+										var childClass = clazz.children[i];
+										children.push(addClass(childClass));
+									}
 									rt['type'] = 'TreeView';
 									rt['children'] = children;
 								}
 								return rt;
 							}
 	
-							// Render TreeView
-							Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
+							// The right TreeView
+							var rootClasses = [];
 							for (i in stats.rootClasses) {
 								var className = stats.rootClasses[i];
-								var clazz = stats.classes[className];
-								tree.push(addClass(clazz));
+								rootClasses.push(stats.classes[className]);
 							}
+
+							// Sort roots highest inherited count first.
+							rootClasses.sort(classSortOrderCompare);
+							
+							var tree = [];
+							for (i in rootClasses) {
+								tree.push(addClass(rootClasses[i]));
+							}
+							
+							Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
 							var treeview = new Y.TreeView({
 								toggleOnLabelClick : false,
 								srcNode : '#statisticsTreeList',
