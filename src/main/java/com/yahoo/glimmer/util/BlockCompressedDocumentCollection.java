@@ -30,9 +30,6 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
     private final static Logger LOGGER = Logger.getLogger(BlockCompressedDocumentCollection.class);
     private static final long serialVersionUID = -7943857364950329249L;
 
-    private static final char RECORD_DELIMITER = '\n';
-    private static final char FIELD_DELIMITER = '\t';
-
     private static final byte[] ZERO_BYTE_BUFFER = new byte[0];
 
     // We use the smallest block size during compression to improve retrieval
@@ -166,7 +163,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 	    // When/If the BZip2 block start marker occurs naturally in the
 	    // compressed data there will be blockOffsets entries that aren't
 	    // actually start of block. They are very rare.
-	    probableBlockOffsetIndex = blockOffsets.getBlockOffsetIndex(docId);
+	    probableBlockOffsetIndex = blockOffsets.getBlockIndex(docId);
 	}
 
 	if (probableBlockOffsetIndex < 0) {
@@ -179,7 +176,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 
 	int retries = 3;
 	while (retries > 0) {
-	    uncompressedInputStream.setCompressedPosition(blockOffsets.getBlockOffset(probableBlockOffsetIndex));
+	    uncompressedInputStream.setCompressedPosition(blockOffsets.getBlockStartOffset(probableBlockOffsetIndex));
 	    final BufferedInputStream bis = new BufferedInputStream(uncompressedInputStream);
 	    
 	    PositionResult result = positionInputStreamAtDocStart(bis, docId, probableBlockOffsetIndex == 0);
@@ -201,7 +198,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 		    public int read() throws IOException {
 			if (b != -1) {
 			    b = bis.read();
-			    if (b == RECORD_DELIMITER) {
+			    if (b == BySubjectRecord.RECORD_DELIMITER) {
 				b = -1;
 			    }
 			}
@@ -266,7 +263,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 		    if (bytesRead == byteBuffer.length) {
 			throw new IllegalStateException("Doc ID too long. Record started with " + new String(byteBuffer, 0, bytesRead));
 		    }
-		} else if (b == FIELD_DELIMITER) {
+		} else if (b == BySubjectRecord.FIELD_DELIMITER) {
 		    break;
 		} else {
 		    throw new IllegalStateException("Unexpected byte in doc ID >" + b + "<. Record started with " + new String(byteBuffer, 0, bytesRead));
@@ -318,7 +315,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 	int byteCount = 0;
 	while ((b = is.read()) != -1) {
 	    byteCount++;
-	    if (b == RECORD_DELIMITER) {
+	    if (b == BySubjectRecord.RECORD_DELIMITER) {
 		return byteCount;
 	    }
 	}
@@ -349,7 +346,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 		long time = System.currentTimeMillis();
 		InputStream docStream = collection.stream(docId);
 		time = System.currentTimeMillis() - time;
-		System.out.println("Milliseconds to retrieve:" + time);
+		System.out.println(time + " milliseconds.");
 		IOUtils.copy(docStream, System.out);
 		System.out.println();
 	    }

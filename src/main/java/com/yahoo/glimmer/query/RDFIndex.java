@@ -85,6 +85,8 @@ public class RDFIndex {
     private final static String PREDICATE_INDEX_KEY = "predicate";
     private final static String OBJECT_INDEX_KEY = "object";
     private final static String CONTEXT_INDEX_KEY = "context";
+    private static final String[] HORIZONTAL_INDECIES = new String[] {SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY, CONTEXT_INDEX_KEY};
+    private static final String[] MANDITORY_HORIZONTAL_INDECIES = new String[] {PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY};
 
     /** The query engine. */
     private QueryEngine queryEngine;
@@ -220,28 +222,29 @@ public class RDFIndex {
 	// Load horizontal indexes
 	indexMap.putAll(loadIndexesFromDir(horizontalIndexDir, true, context.getLoadIndexesInMemory()));
 
-	for (String indexKey : new String[] { SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY }) {
+	for (String indexKey : MANDITORY_HORIZONTAL_INDECIES) {
 	    if (!indexMap.containsKey(indexKey)) {
 		throw new IllegalStateException("No " + indexKey + " index found.");
 	    }
 	}
+	
 	if (!indexMap.containsKey(CONTEXT_INDEX_KEY)) {
 	    LOGGER.info("No context index found.");
 	}
 
 	// Loading frequencies
-	Index subjectTextIndex = indexMap.get(SUBJECT_TEXT_INDEX_KEY);
-	String filename = (String) subjectTextIndex.properties.getProperty(BASENAME_INDEX_PROPERTY_KEY);
+	Index objectIndex = indexMap.get(OBJECT_INDEX_KEY);
+	String filename = (String) objectIndex.properties.getProperty(BASENAME_INDEX_PROPERTY_KEY);
 	filename += DiskBasedIndex.FREQUENCIES_EXTENSION;
 	try {
 	    LOGGER.info("Loading frequencies from " + filename);
-	    frequencies = new SemiExternalGammaBigList(new InputBitStream(filename), 1, subjectTextIndex.numberOfTerms);
-	    if (frequencies.size64() != subjectTextIndex.numberOfDocuments) {
-		LOGGER.warn("Loaded " + frequencies.size64() + " frequency values but subjectTextIndex.numberOfDocuments is "
-			+ subjectTextIndex.numberOfDocuments);
+	    frequencies = new SemiExternalGammaBigList(new InputBitStream(filename), 1, objectIndex.numberOfTerms);
+	    if (frequencies.size64() != objectIndex.numberOfDocuments) {
+		LOGGER.warn("Loaded " + frequencies.size64() + " frequency values but objectIndex.numberOfDocuments is "
+			+ objectIndex.numberOfDocuments);
 	    }
 	} catch (Exception e) {
-	    throw new IllegalArgumentException("Failed to load frequences for subjectText index from " + filename, e);
+	    throw new IllegalArgumentException("Failed to load frequences for objectText index from " + filename, e);
 	}
 
 	try {
@@ -268,10 +271,12 @@ public class RDFIndex {
 
 	// We need to maintain insertion order and test inclusion.
 	Map<String, String> fieldNameSuffixToFieldNameOrderedMap = new LinkedHashMap<String, String>();
-	fieldNameSuffixToFieldNameOrderedMap.put(SUBJECT_INDEX_KEY, SUBJECT_INDEX_KEY);
-	fieldNameSuffixToFieldNameOrderedMap.put(SUBJECT_TEXT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY);
-	fieldNameSuffixToFieldNameOrderedMap.put(PREDICATE_INDEX_KEY, PREDICATE_INDEX_KEY);
-	fieldNameSuffixToFieldNameOrderedMap.put(OBJECT_INDEX_KEY, OBJECT_INDEX_KEY);
+	
+	for (String indexKey : HORIZONTAL_INDECIES) {
+	    if (indexMap.containsKey(indexKey)) {
+		fieldNameSuffixToFieldNameOrderedMap.put(indexKey, indexKey);
+	    }
+	}
 
 	List<String> shortNames = Util.generateShortNames(indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap.keySet(), '_');
 	for (int i = 0; i < shortNames.size(); i++) {
@@ -302,7 +307,7 @@ public class RDFIndex {
 
 	// This is empty for non-payload indices
 	Reference2ReferenceMap<Index, Object> index2Parser = new Reference2ReferenceOpenHashMap<Index, Object>();
-	DocumentIteratorBuilderVisitor builderVisitor = new DocumentIteratorBuilderVisitor(indexMap, index2Parser, subjectTextIndex, MAX_STEMMING);
+	DocumentIteratorBuilderVisitor builderVisitor = new DocumentIteratorBuilderVisitor(indexMap, index2Parser, objectIndex, MAX_STEMMING);
 	// QueryParser is null as we will only pass in parsed queries
 	queryEngine = new QueryEngine(null, builderVisitor, indexMap);
 
@@ -328,7 +333,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_TEXT_INDEX_KEY,
+	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, OBJECT_INDEX_KEY,
 		termProcessors, allResourcesToIds);
     }
 
@@ -464,7 +469,7 @@ public class RDFIndex {
 	    // TODO load from file if needed
 	    b.put(getField(indexName), db);
 	}
-	b.put(queryEngine.indexMap.get(SUBJECT_TEXT_INDEX_KEY), db);
+	b.put(queryEngine.indexMap.get(OBJECT_INDEX_KEY), db);
 	return b;
     }
 
@@ -507,17 +512,17 @@ public class RDFIndex {
 	documentWeights[Integer.parseInt(SetDocumentPriors.UNIMPORTANT)] = context.getWsUnimportant();
 	documentWeights[Integer.parseInt(SetDocumentPriors.NEUTRAL)] = context.getWsNeutral();
 
-	StringMap<? extends CharSequence> subjectTermMap;
-	Index subjectIndex = getSubjectTextIndex();
-	if (subjectIndex instanceof BitStreamIndex) {
-	    subjectTermMap = ((BitStreamIndex) subjectIndex).termMap;
-	} else if (subjectIndex instanceof QuasiSuccinctIndex) {
-	    subjectTermMap = ((QuasiSuccinctIndex) subjectIndex).termMap;
+	StringMap<? extends CharSequence> objectTermMap;
+	Index objectIndex = getObjectIndex();
+	if (objectIndex instanceof BitStreamIndex) {
+	    objectTermMap = ((BitStreamIndex) objectIndex).termMap;
+	} else if (objectIndex instanceof QuasiSuccinctIndex) {
+	    objectTermMap = ((QuasiSuccinctIndex) objectIndex).termMap;
 	} else {
 	    throw new IllegalStateException("Subject index is not a BitStreamIndex. Don't know how to get its termMap.");
 	}
-	return new WOOScorer(context.getK1(), bByIndex, subjectTermMap, frequencies, subjectIndex.sizes, (double) subjectIndex.numberOfOccurrences
-		/ subjectIndex.numberOfDocuments, subjectIndex.numberOfDocuments, context.getWMatches(), documentWeights, context.getDlCutoff(),
+	return new WOOScorer(context.getK1(), bByIndex, objectTermMap, frequencies, objectIndex.sizes, (double) objectIndex.numberOfOccurrences
+		/ objectIndex.numberOfDocuments, objectIndex.numberOfDocuments, context.getWMatches(), documentWeights, context.getDlCutoff(),
 		documentPriors, context.getMaxNumberOfDieldsNorm());
     }
 
@@ -548,8 +553,8 @@ public class RDFIndex {
 
     }
 
-    private Index getSubjectTextIndex() {
-	return queryEngine.indexMap.get(SUBJECT_TEXT_INDEX_KEY);
+    private Index getObjectIndex() {
+	return queryEngine.indexMap.get(OBJECT_INDEX_KEY);
     }
 
     /**
@@ -613,7 +618,7 @@ public class RDFIndex {
     }
 
     public String getDefaultField() {
-	return SUBJECT_TEXT_INDEX_KEY;
+	return OBJECT_INDEX_KEY;
     }
 
     public RDFIndexStatistics getStatistics() {
@@ -636,14 +641,6 @@ public class RDFIndex {
 	} catch (IOException e) {
 	    e.printStackTrace();
 	}
-    }
-
-    public Map<String, Integer> getPredicateTermDistribution() throws IOException {
-	return predicateDistribution;
-    }
-
-    public Map<String, Integer> getTypeTermDistribution() throws IOException {
-	return typeTermDistribution;
     }
 
     private Map<String, Integer> getTermDistribution(Index index, boolean termsAreResourceIds) throws IOException {
@@ -700,7 +697,7 @@ public class RDFIndex {
     }
 
     public Integer getDocumentSize(int docId) {
-	return getSubjectTextIndex().sizes.get(docId);
+	return getObjectIndex().sizes.get(docId);
     }
 
     public Set<String> getIndexedPredicates() {

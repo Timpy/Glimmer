@@ -11,18 +11,11 @@ package com.yahoo.glimmer.indexing.preprocessor;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.dsi.fastutil.io.BinIO;
-import it.unimi.dsi.fastutil.longs.LongBigArrayBigList;
-import it.unimi.dsi.fastutil.longs.LongBigList;
-import it.unimi.dsi.sux4j.util.EliasFanoMonotoneLongBigList;
-
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.charset.Charset;
-import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 
 import org.apache.hadoop.conf.Configuration;
@@ -39,7 +32,6 @@ import org.apache.hadoop.util.ReflectionUtils;
 import com.yahoo.glimmer.util.BlockOffsets;
 import com.yahoo.glimmer.util.BySubjectRecord;
 import com.yahoo.glimmer.util.Bz2BlockIndexedOutputStream;
-import com.yahoo.glimmer.util.DigestOutputStream;
 
 /**
  * Writes to different output files depending on the contents of the value.
@@ -63,7 +55,7 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
     public static class OutputCount {
 	public OUTPUT output;
 	public int count;
-	
+
 	@Override
 	public String toString() {
 	    return (output == null ? null : output.toString()) + "(" + count + ")";
@@ -71,15 +63,10 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
     }
 
     private HashMap<OUTPUT, Writer> writersMap = new HashMap<OUTPUT, Writer>();
-    private DataOutputStream bySubjectOffsetsDataOutput;
-    private DigestOutputStream bySubjectDigestOutputStream;
+    private OutputStream bySubjectOffsetsOutputStream;
     private Writer bySubjectWriter;
-    private boolean firstDocIdInBlockSet;
-    private long firstDocIdInBlock;
-    private long allCount;
-    private long lastEndOffset;
-    private final LongBigArrayBigList firstDocIds = new LongBigArrayBigList();
-    private final LongBigArrayBigList startOffsets = new LongBigArrayBigList();
+    private BlockOffsets.BlockOffsetsCallback blockOffsetsCallback;
+    private long recordCount = 0;
 
     public ResourceRecordWriter(FileSystem fs, Path taskWorkPath, CompressionCodec codecIfAny) throws IOException {
 	if (fs.exists(taskWorkPath)) {
@@ -99,37 +86,16 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	    }
 	    writersMap.put(output, new OutputStreamWriter(out, Charset.forName("UTF-8")));
 	}
-	
-	Path file = new Path(taskWorkPath, "bySubject.bz2");
-	OutputStream dataOut = fs.create(file, false);
-	file = new Path(taskWorkPath, "bySubject.blockOffsets");
-	bySubjectOffsetsDataOutput =  new DataOutputStream(fs.create(file, false));
-	
-	try {
-	    bySubjectDigestOutputStream = new DigestOutputStream(dataOut, "MD5");
-	} catch (NoSuchAlgorithmException e) {
-	    throw new RuntimeException(e);
-	}
-	
-	// Create a Writer on a BZip2 compressed OutputStream with a small block size( * 100K).
-	Bz2BlockIndexedOutputStream blockDataOut = Bz2BlockIndexedOutputStream.newInstance(bySubjectDigestOutputStream, 2);
-	blockDataOut.setCallback(new Bz2BlockIndexedOutputStream.BlockCallback() {
-	    @Override
-	    public void blockStart(int blockIndex, long startOffset) throws IOException {
-		// Save all block start offsets.
-		// If the record spans multiple blocks we use the same docId for all blocks
-		firstDocIds.add(firstDocIdInBlock);
-		startOffsets.add(startOffset);
-		if (firstDocIdInBlockSet) {
-		    firstDocIdInBlockSet = false;
-		}
-	    }
 
-	    @Override
-	    public void blockEnd(int blockIndex, long startOffset, long endOffset) {
-		lastEndOffset = endOffset;
-	    }
-	});
+	Path file = new Path(taskWorkPath, "bySubject.bz2");
+	OutputStream compressedOutputStream = fs.create(file, false);
+	file = new Path(taskWorkPath, "bySubject.blockOffsets");
+	bySubjectOffsetsOutputStream = fs.create(file, false);
+
+	blockOffsetsCallback = new BlockOffsets.BlockOffsetsCallback();
+	// Create a Writer on a BZip2 compressed OutputStream with a small block
+	// size( * 100K).
+	Bz2BlockIndexedOutputStream blockDataOut = Bz2BlockIndexedOutputStream.newInstance(compressedOutputStream, 2, blockOffsetsCallback);
 	bySubjectWriter = new OutputStreamWriter(blockDataOut);
     }
 
@@ -155,23 +121,20 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	    }
 	    writer.write(key.toString());
 	    writer.write('\n');
-	    
+
 	    if (outputCount.output == OUTPUT.ALL) {
-		allCount++;
+		recordCount++;
 	    }
 	} else if (value instanceof BySubjectRecord) {
 	    BySubjectRecord record = (BySubjectRecord) value;
 	    Writer subjectWriter = writersMap.get(OUTPUT.SUBJECT);
-	    
+
 	    // SUBJECT
 	    subjectWriter.write(record.getSubject());
 	    subjectWriter.write('\n');
 
 	    // bySubject
-	    if (!firstDocIdInBlockSet) {
-		firstDocIdInBlockSet = true;
-		firstDocIdInBlock = record.getId();
-	    }
+	    blockOffsetsCallback.setDocId(record.getId());
 	    record.writeTo(bySubjectWriter);
 	    record.getId();
 	} else {
@@ -185,12 +148,10 @@ public class ResourceRecordWriter extends RecordWriter<Text, Object> {
 	    writer.close();
 	}
 	bySubjectWriter.close();
-	
-	LongBigList compressedFirstDocIds = new EliasFanoMonotoneLongBigList(firstDocIds);
-	LongBigList compressedStartOffsets = new EliasFanoMonotoneLongBigList(startOffsets);
-	BlockOffsets blockOffsetsData = new BlockOffsets(compressedFirstDocIds, compressedStartOffsets, allCount, lastEndOffset, bySubjectDigestOutputStream.getDigest());
-	BinIO.storeObject(blockOffsetsData, bySubjectOffsetsDataOutput);
-	bySubjectOffsetsDataOutput.close();
+
+	BlockOffsets blockOffsets = blockOffsetsCallback.getBlockOffsets(recordCount);
+	blockOffsets.save(bySubjectOffsetsOutputStream);
+	bySubjectOffsetsOutputStream.close();
     }
 
     public static class OutputFormat extends FileOutputFormat<Text, Object> {
