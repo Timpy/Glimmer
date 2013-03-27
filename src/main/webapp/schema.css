@@ -211,6 +211,8 @@
 .status {
 	clear:both;
 	text-align: center;
+	padding-right: 4px;
+	padding-left: 4px;
 }
 #result-stats {
 	float:left;
@@ -218,6 +220,10 @@
 
 #results {
 	clear: both;
+}
+#results ol{
+	list-style: decimal inside;
+	margin-left: 1em;
 }
 
 .results-pager {
@@ -228,7 +234,11 @@
 .results-pager .pager-link-current {
 	background-color: #E4F2FF;
 }
+#results-pager-top-status {
+	float: right;
+}
 #results-pager-top {
+	clear:both;
 	float:right;
 }
 #results-pager-bottom {

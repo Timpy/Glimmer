@@ -371,7 +371,7 @@ YUI({
 						
 						resultsPager.setState({
 							pageSize: result.pageSize,
-							pages: Math.ceil(result.numResults / result.pageSize),
+							items: result.numResults,
 							page: 1 + Math.floor(result.pageStart / result.pageSize)
 						});
 					},
@@ -629,7 +629,8 @@ YUI({
 
 		resultsPager.setCallback(pagerPage);
 		resultsPager.setState({
-			elementIds: ['#results-pager-top', '#results-pager-bottom']
+			pagerElements: ['#results-pager-top', '#results-pager-bottom'],
+			statusElements: ["#results-pager-top-status"]
 		})
 		var tabview = new Y.TabView({
 			srcNode : '#resultContainer'
