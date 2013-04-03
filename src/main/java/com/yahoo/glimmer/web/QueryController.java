@@ -50,10 +50,13 @@ public class QueryController {
     private static final String DOC_PSEUDO_FIELD = "doc:";
     // This defines how resources are written in the command objects query string.
     private static final Pattern RESOURCE_PATTERN = Pattern.compile("(<(?:https?://[^>]+|_:[A-Za-z][A-Za-z0-9]*)>)");
-    //private static final Pattern RESOURCE_PATTERN = Pattern.compile("(<(?:https?://[^>]+)>)");
+
+    private static final Integer DEFAULT_OBJECT_LENGTH_LIMIT = 300;
 
     private IndexMap indexMap;
     private Querier querier;
+    
+    private Integer defaultObjectLengthLimit = DEFAULT_OBJECT_LENGTH_LIMIT;
 
     // / For every request populate the dataset model attribute from the request
     // parameter.
@@ -105,7 +108,7 @@ public class QueryController {
 	switch (command.getType()) {
 	case MG4J:
 	    parsedQuery = new SimpleParser().parse(query);
-	    result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref());
+	    result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref(), defaultObjectLengthLimit);
 	    break;
 	case YAHOO:
 	    if (query.startsWith(DOC_PSEUDO_FIELD)) {
@@ -123,14 +126,14 @@ public class QueryController {
 			throw new IllegalArgumentException("subject " + idOrSubject + " is not in collection.");
 		    }
 		}
-		result = querier.doQueryForDocId(index, id, command.isDeref());
+		result = querier.doQueryForDocId(index, id, command.isDeref(), defaultObjectLengthLimit);
 	    } else {
 		try {
 		    parsedQuery = index.getParser().parse(query);
 		} catch (QueryParserException e) {
 		    throw new IllegalArgumentException("Query failed to parse:" + query, e);
 		}
-		result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref());
+		result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref(), defaultObjectLengthLimit);
 	    }
 	    break;
 	default:
@@ -193,6 +196,10 @@ public class QueryController {
     @Resource
     public void setIndexMap(IndexMap indexMap) {
 	this.indexMap = indexMap;
+    }
+    
+    public void setDefaultObjectLengthLimit(Integer defaultObjectLengthLimit) {
+	this.defaultObjectLengthLimit = defaultObjectLengthLimit;
     }
 }
 
