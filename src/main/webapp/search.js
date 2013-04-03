@@ -427,7 +427,7 @@ YUI({
 				types.sort(typeSort);
 				
 				for (type in types) {
-					li.append('&nbsp;<a class="type" href="' + Y.Escape.html(types[type]) + '">' + getLocalName(Y.Escape.html(types[type])) + '</a>&nbsp;');
+					li.append('&nbsp;<a class="type" href="' + Y.Escape.html(types[type]) + '">' + Y.Escape.html(getLocalName(types[type])) + '</a>&nbsp;');
 				}
 				li.append('-&nbsp;');
 			}
