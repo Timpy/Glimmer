@@ -13,8 +13,10 @@
 	width: 100%;
 	text-align: left;
 	margin: 0;
-	/* -- background: #fff; -- */
-	/* -- background-image: url("bg.gif"); -- */
+	min-height: 100%;
+	height: auto !important;
+	height: 100%;
+	margin: 0 auto -20px; 
 }
 
 #intro {
@@ -51,16 +53,12 @@
 	float: left;
 }
 
-#footer {
-	max-width: 960px;
-	min-width: 350px;
-	margin: 0 auto;
-	padding: 0 40px;
-}
-
-#footer {
+#footer, #footer-push {
+	padding: 0 10px;
+	height: 20px;
 	text-align: right;
 	font-size: x-small;
+	clear:both;
 }
 
 #pageHeader h1 {
@@ -254,6 +252,7 @@ body {
 	margin: 0;
 	padding: 0;
 	text-align: center;
+	height: 100%;
 }
 
 code {
