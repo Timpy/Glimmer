@@ -22,8 +22,8 @@ import java.util.ArrayList;
 
 public class BySubjectRecord {
     private static final Charset CHARSET = Charset.forName("UTF-8");
-    private static final char RECORD_DELIMITER = '\n';
-    private static final char FIELD_DELIMITER = '\t';
+    public static final char RECORD_DELIMITER = '\n';
+    public static final char FIELD_DELIMITER = '\t';
     private static final int MAX_RELATIONS = 10000;
 
     private long id;

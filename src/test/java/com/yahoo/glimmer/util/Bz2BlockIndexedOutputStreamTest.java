@@ -16,8 +16,6 @@ import org.apache.hadoop.io.compress.SplittableCompressionCodec;
 import org.apache.hadoop.io.compress.bzip2.CBZip2InputStream;
 import org.junit.Test;
 
-import com.yahoo.glimmer.util.Bz2BlockIndexedOutputStream.BlockCallback;
-
 public class Bz2BlockIndexedOutputStreamTest {
     private CBZip2InputStream cbZip2InputStream;
     private Map<Long, BlockInfo> firstRecordToBlockMap = new TreeMap<Long, BlockInfo>();
@@ -28,13 +26,28 @@ public class Bz2BlockIndexedOutputStreamTest {
 	File dataFile = File.createTempFile("temp", ".bz2");
 	dataFile.deleteOnExit();
 
-	BlockCallback callback = new BlockCallback() {
+	BitSequenceMonitor.Callback callback = new BitSequenceMonitor.Callback() {
+	    private int blockIndex = -1;
+	    private long startOffset = 4;
 	    private BlockInfo lastBlockInfo;
 	    private long compressTime;
 
 	    @Override
-	    public void blockStart(int blockIndex, long startOffset) {
+	    public void sequenceStart(long byteOffset, int bitInByte) {
+		if (blockIndex >= 0) {
+		    // End last block
+		    compressTime = System.currentTimeMillis() - compressTime;
+		    System.out.println("blockEnd(" + blockIndex + ", " + startOffset + ", " + byteOffset + ") first:" + firstRecordInBlock + " t:"
+			    + compressTime);
+		    if (lastBlockInfo != null) {
+			lastBlockInfo.end = byteOffset;
+		    }
+		}
+
+		blockIndex++;
+		startOffset = byteOffset;
 		System.out.println("blockStart(" + blockIndex + ", " + startOffset + ") first:" + firstRecordInBlock);
+
 		if (firstRecordInBlock != null) {
 		    lastBlockInfo = new BlockInfo(blockIndex, startOffset, 0);
 		    firstRecordToBlockMap.put(firstRecordInBlock, lastBlockInfo);
@@ -44,23 +57,17 @@ public class Bz2BlockIndexedOutputStreamTest {
 	    }
 
 	    @Override
-	    public void blockEnd(int blockIndex, long startOffset, long endOffset) {
-		compressTime = System.currentTimeMillis() - compressTime;
-		System.out.println("blockEnd(" + blockIndex + ", " + startOffset + ", " + endOffset + ") first:" + firstRecordInBlock + " t:" + compressTime);
-		if (lastBlockInfo != null) {
-		    lastBlockInfo.end = endOffset;
-		}
+	    public void close(long byteOffset) {
+		lastBlockInfo.end = byteOffset;
 	    }
 	};
+	Bz2BlockIndexedOutputStream compressedDataOut = Bz2BlockIndexedOutputStream.newInstance(new FileOutputStream(dataFile), 1, callback);
 
-	Bz2BlockIndexedOutputStream compressedDataOut = Bz2BlockIndexedOutputStream.newInstance(new FileOutputStream(dataFile), 1);
-	compressedDataOut.setCallback(callback);
-	
 	for (long l = 100000000; l < 100200000; l++) {
 	    if (firstRecordInBlock == null) {
 		firstRecordInBlock = l;
 	    }
-	    
+
 	    compressedDataOut.write(Long.toString(l).getBytes("ASCII"));
 	    compressedDataOut.write('\n');
 	}

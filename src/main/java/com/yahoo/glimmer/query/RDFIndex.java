@@ -11,7 +11,6 @@ package com.yahoo.glimmer.query;
  *  See accompanying LICENSE file.
  */
 
-import it.unimi.di.big.mg4j.document.Document;
 import it.unimi.di.big.mg4j.document.DocumentCollection;
 import it.unimi.di.big.mg4j.document.IdentityDocumentFactory;
 import it.unimi.di.big.mg4j.index.BitStreamIndex;
@@ -29,6 +28,7 @@ import it.unimi.di.big.mg4j.search.DocumentIteratorBuilderVisitor;
 import it.unimi.di.big.mg4j.search.score.CountScorer;
 import it.unimi.di.big.mg4j.search.score.DocumentScoreInfo;
 import it.unimi.di.big.mg4j.search.score.Scorer;
+import it.unimi.dsi.big.util.ImmutableExternalPrefixMap;
 import it.unimi.dsi.big.util.LongBigListSignedStringMap;
 import it.unimi.dsi.big.util.SemiExternalGammaBigList;
 import it.unimi.dsi.big.util.StringMap;
@@ -56,7 +56,6 @@ import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -70,7 +69,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
-import com.yahoo.glimmer.util.Bz2BlockIndexedDocumentCollection;
+import com.yahoo.glimmer.util.BlockCompressedDocumentCollection;
 import com.yahoo.glimmer.util.Util;
 
 public class RDFIndex {
@@ -86,6 +85,8 @@ public class RDFIndex {
     private final static String PREDICATE_INDEX_KEY = "predicate";
     private final static String OBJECT_INDEX_KEY = "object";
     private final static String CONTEXT_INDEX_KEY = "context";
+    private static final String[] HORIZONTAL_INDECIES = new String[] {SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY, CONTEXT_INDEX_KEY};
+    private static final String[] MANDITORY_HORIZONTAL_INDECIES = new String[] {PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY};
 
     /** The query engine. */
     private QueryEngine queryEngine;
@@ -153,13 +154,13 @@ public class RDFIndex {
 	// Load the collection or titlelist
 	String indexBasename = new File(kbRootPath, "bySubject").getAbsolutePath();
 	try {
-	    Bz2BlockIndexedDocumentCollection collection = new Bz2BlockIndexedDocumentCollection("bySubject", new IdentityDocumentFactory());
+	    BlockCompressedDocumentCollection collection = new BlockCompressedDocumentCollection("bySubject", new IdentityDocumentFactory(), 10000);
 	    collection.filename(indexBasename);
 	    documentCollection = collection;
 	} catch (IOException e) {
 	    LOGGER.info("Couldn't open Bz2BlockIndexedDocumentCollection from " + indexBasename, e);
 	}
-	
+
 	if (documentCollection == null) {
 	    LOGGER.info("No collection specified, we will try to use a title list...");
 	    File titleListFile = context.getTitleListFile();
@@ -211,8 +212,9 @@ public class RDFIndex {
 
 	try {
 	    LOGGER.info("Loading alignment index..");
-	    String alignmentUri = new File(verticalIndexDir, ALIGNMENT_INDEX_NAME).getPath();
-	    alignmentIndex = Index.getInstance(alignmentUri + "?mapped=1");
+	    String alignmentBasename = new File(verticalIndexDir, ALIGNMENT_INDEX_NAME).getPath();
+	    alignmentIndex = Index.getInstance(alignmentBasename + "?mapped=1");
+	    setTermMapDumpFile(alignmentIndex, alignmentBasename);
 	} catch (Exception e) {
 	    LOGGER.error("Failed to load alignment index", e);
 	}
@@ -220,28 +222,29 @@ public class RDFIndex {
 	// Load horizontal indexes
 	indexMap.putAll(loadIndexesFromDir(horizontalIndexDir, true, context.getLoadIndexesInMemory()));
 
-	for (String indexKey : new String[] { SUBJECT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY, PREDICATE_INDEX_KEY, OBJECT_INDEX_KEY }) {
+	for (String indexKey : MANDITORY_HORIZONTAL_INDECIES) {
 	    if (!indexMap.containsKey(indexKey)) {
 		throw new IllegalStateException("No " + indexKey + " index found.");
 	    }
 	}
+	
 	if (!indexMap.containsKey(CONTEXT_INDEX_KEY)) {
 	    LOGGER.info("No context index found.");
 	}
 
 	// Loading frequencies
-	Index subjectTextIndex = indexMap.get(SUBJECT_TEXT_INDEX_KEY);
-	String filename = (String) subjectTextIndex.properties.getProperty(BASENAME_INDEX_PROPERTY_KEY);
+	Index objectIndex = indexMap.get(OBJECT_INDEX_KEY);
+	String filename = (String) objectIndex.properties.getProperty(BASENAME_INDEX_PROPERTY_KEY);
 	filename += DiskBasedIndex.FREQUENCIES_EXTENSION;
 	try {
 	    LOGGER.info("Loading frequencies from " + filename);
-	    frequencies = new SemiExternalGammaBigList(new InputBitStream(filename), 1, subjectTextIndex.numberOfTerms);
-	    if (frequencies.size64() != subjectTextIndex.numberOfDocuments) {
-		LOGGER.warn("Loaded " + frequencies.size64() + " frequency values but subjectTextIndex.numberOfDocuments is "
-			+ subjectTextIndex.numberOfDocuments);
+	    frequencies = new SemiExternalGammaBigList(new InputBitStream(filename), 1, objectIndex.numberOfTerms);
+	    if (frequencies.size64() != objectIndex.numberOfDocuments) {
+		LOGGER.warn("Loaded " + frequencies.size64() + " frequency values but objectIndex.numberOfDocuments is "
+			+ objectIndex.numberOfDocuments);
 	    }
 	} catch (Exception e) {
-	    throw new IllegalArgumentException("Failed to load frequences for subjectText index from " + filename, e);
+	    throw new IllegalArgumentException("Failed to load frequences for objectText index from " + filename, e);
 	}
 
 	try {
@@ -268,10 +271,12 @@ public class RDFIndex {
 
 	// We need to maintain insertion order and test inclusion.
 	Map<String, String> fieldNameSuffixToFieldNameOrderedMap = new LinkedHashMap<String, String>();
-	fieldNameSuffixToFieldNameOrderedMap.put(SUBJECT_INDEX_KEY, SUBJECT_INDEX_KEY);
-	fieldNameSuffixToFieldNameOrderedMap.put(SUBJECT_TEXT_INDEX_KEY, SUBJECT_TEXT_INDEX_KEY);
-	fieldNameSuffixToFieldNameOrderedMap.put(PREDICATE_INDEX_KEY, PREDICATE_INDEX_KEY);
-	fieldNameSuffixToFieldNameOrderedMap.put(OBJECT_INDEX_KEY, OBJECT_INDEX_KEY);
+	
+	for (String indexKey : HORIZONTAL_INDECIES) {
+	    if (indexMap.containsKey(indexKey)) {
+		fieldNameSuffixToFieldNameOrderedMap.put(indexKey, indexKey);
+	    }
+	}
 
 	List<String> shortNames = Util.generateShortNames(indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap.keySet(), '_');
 	for (int i = 0; i < shortNames.size(); i++) {
@@ -302,7 +307,7 @@ public class RDFIndex {
 
 	// This is empty for non-payload indices
 	Reference2ReferenceMap<Index, Object> index2Parser = new Reference2ReferenceOpenHashMap<Index, Object>();
-	DocumentIteratorBuilderVisitor builderVisitor = new DocumentIteratorBuilderVisitor(indexMap, index2Parser, subjectTextIndex, MAX_STEMMING);
+	DocumentIteratorBuilderVisitor builderVisitor = new DocumentIteratorBuilderVisitor(indexMap, index2Parser, objectIndex, MAX_STEMMING);
 	// QueryParser is null as we will only pass in parsed queries
 	queryEngine = new QueryEngine(null, builderVisitor, indexMap);
 
@@ -328,7 +333,7 @@ public class RDFIndex {
 	final Object2ObjectOpenHashMap<String, TermProcessor> termProcessors = new Object2ObjectOpenHashMap<String, TermProcessor>(getIndexedFields().size());
 	for (String alias : getIndexedFields())
 	    termProcessors.put(alias, getField(alias).termProcessor);
-	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, SUBJECT_TEXT_INDEX_KEY,
+	parser = new RDFQueryParser(getAlignmentIndex(), indexedPredicatesOrdered, fieldNameSuffixToFieldNameOrderedMap, OBJECT_INDEX_KEY,
 		termProcessors, allResourcesToIds);
     }
 
@@ -430,15 +435,29 @@ public class RDFIndex {
 		// split));
 		index2Weight.put(index, weight);
 	    }
-	    
+
 	    if (index.numberOfDocuments != documentCollectionSize) {
 		throw new IllegalArgumentException("Index " + index + " has " + index.numberOfDocuments + " documents, but the document collection has size "
 			+ documentCollectionSize);
 	    }
+	    
+	    setTermMapDumpFile(index, indexBasename);
 
 	    name2Index.put(index.field != null ? index.field : indexBasename, index);
 	}
 	return name2Index;
+    }
+
+    private void setTermMapDumpFile(final Index index, final String indexBasename) throws RDFIndexException {
+	// See the section of the MG4J Manual entitled 'Setup Time'
+	if (index.termMap instanceof ImmutableExternalPrefixMap) {
+	    ImmutableExternalPrefixMap termMap = (ImmutableExternalPrefixMap) index.termMap;
+	    try {
+		termMap.setDumpStream(indexBasename + DiskBasedIndex.TERMMAP_EXTENSION + ".dump");
+	    } catch (FileNotFoundException e) {
+		throw new RDFIndexException("Failed to set dump file for index " + indexBasename, e);
+	    }
+	}
     }
 
     private Reference2DoubleOpenHashMap<Index> loadB(Context context) {
@@ -450,7 +469,7 @@ public class RDFIndex {
 	    // TODO load from file if needed
 	    b.put(getField(indexName), db);
 	}
-	b.put(queryEngine.indexMap.get(SUBJECT_TEXT_INDEX_KEY), db);
+	b.put(queryEngine.indexMap.get(OBJECT_INDEX_KEY), db);
 	return b;
     }
 
@@ -493,17 +512,17 @@ public class RDFIndex {
 	documentWeights[Integer.parseInt(SetDocumentPriors.UNIMPORTANT)] = context.getWsUnimportant();
 	documentWeights[Integer.parseInt(SetDocumentPriors.NEUTRAL)] = context.getWsNeutral();
 
-	StringMap<? extends CharSequence> subjectTermMap;
-	Index subjectIndex = getSubjectTextIndex();
-	if (subjectIndex instanceof BitStreamIndex) {
-	    subjectTermMap = ((BitStreamIndex) subjectIndex).termMap;
-	} else if (subjectIndex instanceof QuasiSuccinctIndex) {
-	    subjectTermMap = ((QuasiSuccinctIndex) subjectIndex).termMap;
+	StringMap<? extends CharSequence> objectTermMap;
+	Index objectIndex = getObjectIndex();
+	if (objectIndex instanceof BitStreamIndex) {
+	    objectTermMap = ((BitStreamIndex) objectIndex).termMap;
+	} else if (objectIndex instanceof QuasiSuccinctIndex) {
+	    objectTermMap = ((QuasiSuccinctIndex) objectIndex).termMap;
 	} else {
 	    throw new IllegalStateException("Subject index is not a BitStreamIndex. Don't know how to get its termMap.");
 	}
-	return new WOOScorer(context.getK1(), bByIndex, subjectTermMap, frequencies, subjectIndex.sizes, (double) subjectIndex.numberOfOccurrences
-		/ subjectIndex.numberOfDocuments, subjectIndex.numberOfDocuments, context.getWMatches(), documentWeights, context.getDlCutoff(),
+	return new WOOScorer(context.getK1(), bByIndex, objectTermMap, frequencies, objectIndex.sizes, (double) objectIndex.numberOfOccurrences
+		/ objectIndex.numberOfDocuments, objectIndex.numberOfDocuments, context.getWMatches(), documentWeights, context.getDlCutoff(),
 		documentPriors, context.getMaxNumberOfDieldsNorm());
     }
 
@@ -534,8 +553,8 @@ public class RDFIndex {
 
     }
 
-    private Index getSubjectTextIndex() {
-	return queryEngine.indexMap.get(SUBJECT_TEXT_INDEX_KEY);
+    private Index getObjectIndex() {
+	return queryEngine.indexMap.get(OBJECT_INDEX_KEY);
     }
 
     /**
@@ -560,25 +579,18 @@ public class RDFIndex {
      * @throws IOException
      * @throws RDFIndexException
      */
-    public Integer getSubjectId(String uri) throws IOException {
+    public Long getSubjectId(String uri) throws IOException {
 	Long id = allResourcesToIds.get(uri);
 	if (id != null) {
 	    // Check that the doc is a valid doc(has contents).. TODO could use
 	    // the subjects signed hash here..
-	    Document doc = documentCollection.document(id.intValue());
-	    Object content = doc.content(0);
-	    if (content instanceof Reader) {
-		Reader contentReader = (Reader) content;
-		if (contentReader.read() == -1) {
-		    id = null;
-		}
-		contentReader.close();
-	    } else {
-		throw new IllegalStateException("doc.content(0) for doc id " + id.intValue() + " didn't return a Reader!");
+	    InputStream docStream = documentCollection.stream(id);
+	    if (docStream.read() == -1) {
+		id = null;
 	    }
-	    doc.close();
+	    docStream.close();
 	}
-	return id == null ? null : id.intValue();
+	return id;
     }
 
     public DocumentCollection getCollection() {
@@ -606,7 +618,7 @@ public class RDFIndex {
     }
 
     public String getDefaultField() {
-	return SUBJECT_TEXT_INDEX_KEY;
+	return OBJECT_INDEX_KEY;
     }
 
     public RDFIndexStatistics getStatistics() {
@@ -629,14 +641,6 @@ public class RDFIndex {
 	} catch (IOException e) {
 	    e.printStackTrace();
 	}
-    }
-
-    public Map<String, Integer> getPredicateTermDistribution() throws IOException {
-	return predicateDistribution;
-    }
-
-    public Map<String, Integer> getTypeTermDistribution() throws IOException {
-	return typeTermDistribution;
     }
 
     private Map<String, Integer> getTermDistribution(Index index, boolean termsAreResourceIds) throws IOException {
@@ -693,7 +697,7 @@ public class RDFIndex {
     }
 
     public Integer getDocumentSize(int docId) {
-	return getSubjectTextIndex().sizes.get(docId);
+	return getObjectIndex().sizes.get(docId);
     }
 
     public Set<String> getIndexedPredicates() {

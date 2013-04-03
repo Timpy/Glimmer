@@ -23,9 +23,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
+import org.apache.log4j.Logger;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -40,16 +42,21 @@ import com.yahoo.glimmer.query.RDFQueryResult;
 
 @Controller()
 public class QueryController {
+    private final static Logger LOGGER = Logger.getLogger(QueryController.class);
+    
     public final static String INDEX_KEY = "index";
     public final static String OBJECT_KEY = "object";
     
     private static final String DOC_PSEUDO_FIELD = "doc:";
     // This defines how resources are written in the command objects query string.
     private static final Pattern RESOURCE_PATTERN = Pattern.compile("(<(?:https?://[^>]+|_:[A-Za-z][A-Za-z0-9]*)>)");
-    //private static final Pattern RESOURCE_PATTERN = Pattern.compile("(<(?:https?://[^>]+)>)");
+
+    private static final Integer DEFAULT_OBJECT_LENGTH_LIMIT = 300;
 
     private IndexMap indexMap;
     private Querier querier;
+    
+    private Integer defaultObjectLengthLimit = DEFAULT_OBJECT_LENGTH_LIMIT;
 
     // / For every request populate the dataset model attribute from the request
     // parameter.
@@ -72,7 +79,7 @@ public class QueryController {
     }
 
     @RequestMapping(value = "/indexStatistics", method = RequestMethod.GET)
-    public Map<String, ?> getIndextStatistics(@ModelAttribute(INDEX_KEY) RDFIndex index, @RequestParam(required = false) String callback) {
+    public Map<String, ?> getIndexStatistics(@ModelAttribute(INDEX_KEY) RDFIndex index, @RequestParam(required = false) String callback) {
 	if (index == null) {
 	    throw new HttpMessageConversionException("No index given");
 	}
@@ -101,15 +108,15 @@ public class QueryController {
 	switch (command.getType()) {
 	case MG4J:
 	    parsedQuery = new SimpleParser().parse(query);
-	    result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref());
+	    result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref(), defaultObjectLengthLimit);
 	    break;
 	case YAHOO:
 	    if (query.startsWith(DOC_PSEUDO_FIELD)) {
 		String idOrSubject = query.substring(DOC_PSEUDO_FIELD.length());
-		Integer id;
+		Long id;
 		if (Character.isDigit(idOrSubject.charAt(0))) {
 		    try {
-			id = Integer.parseInt(idOrSubject);
+			id = Long.parseLong(idOrSubject);
 		    } catch (NumberFormatException e) {
 			throw new IllegalArgumentException("Query " + query + " failed to parse as a numeric subject ID(int)");
 		    }
@@ -119,14 +126,14 @@ public class QueryController {
 			throw new IllegalArgumentException("subject " + idOrSubject + " is not in collection.");
 		    }
 		}
-		result = querier.doQueryForDocId(index, id, command.isDeref());
+		result = querier.doQueryForDocId(index, id, command.isDeref(), defaultObjectLengthLimit);
 	    } else {
 		try {
 		    parsedQuery = index.getParser().parse(query);
 		} catch (QueryParserException e) {
 		    throw new IllegalArgumentException("Query failed to parse:" + query, e);
 		}
-		result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref());
+		result = querier.doQuery(index, parsedQuery, command.getPageStart(), command.getPageSize(), command.isDeref(), defaultObjectLengthLimit);
 	    }
 	    break;
 	default:
@@ -137,7 +144,8 @@ public class QueryController {
     }
 
     @ExceptionHandler(Exception.class)
-    public Map<String, ?> handleException(Exception ex, HttpServletResponse response) {
+    public Map<String, ?> handleException(Exception ex,  HttpServletRequest request, HttpServletResponse response) {
+	LOGGER.error("Exception when processing:" + request.getQueryString(), ex);
 	response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 	return Collections.singletonMap(OBJECT_KEY, ex.getMessage());
     }
@@ -188,6 +196,10 @@ public class QueryController {
     @Resource
     public void setIndexMap(IndexMap indexMap) {
 	this.indexMap = indexMap;
+    }
+    
+    public void setDefaultObjectLengthLimit(Integer defaultObjectLengthLimit) {
+	this.defaultObjectLengthLimit = defaultObjectLengthLimit;
     }
 }
 

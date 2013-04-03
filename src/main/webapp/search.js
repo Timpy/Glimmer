@@ -80,6 +80,7 @@ YUI({
 	'io-base',
 	'json-parse',
 	'json-stringify',
+	'escape',
 	'querystring-parse-simple',
 	'autocomplete',
 	'autocomplete-filters',
@@ -98,7 +99,6 @@ YUI({
 			Y.one("#results").setContent("");
 			Y.one("#result-stats").setContent("");
 			Y.one("#class-select").setContent("");
-			Y.one("#resultContainer").hide();
 
 			Y.one("#statistics-tree").setContent("");
 			Y.one("#statistics-loader").show();
@@ -171,12 +171,12 @@ YUI({
 							    if(a.localName<b.localName) return -1;
 							    if(a.localName>b.localName) return 1;
 							    return 0;
-							})
+							});
 							
 							var frag = '<select>';
 							for (i in classesWithProperties) {
 								clazz = classesWithProperties[i];
-								frag = frag + "<option value='" + i + "'>" + clazz.localName + " - " + clazz.className + "</option>";
+								frag = frag + "<option value='" + i + "'>" + Y.Escape.html(clazz.localName) + " - " + Y.Escape.html(clazz.className) + "</option>";
 							}
 							frag = frag + '</select>';
 							var fragNode = Y.Node.create(frag);
@@ -188,7 +188,10 @@ YUI({
 								changeProperties(classesWithProperties[i]);
 							});
 
-							var tree = [];
+							function classSortOrderCompare(a,b) {
+								return b.inheritedCount - a.inheritedCount;
+							}
+
 							function addClass(clazz) {
 								var rt = {};
 								
@@ -196,32 +199,43 @@ YUI({
 									return rt;
 								}
 								
-								var label = '<a href="' + clazz.className + '">' + clazz.localName + ' ' + clazz.inheritedCount;
+								var label = '<a href="' + Y.Escape.html(clazz.className) + '">' + Y.Escape.html(clazz.localName) + ' ' + clazz.inheritedCount;
 								if (clazz.inheritedCount != clazz.count) {
 									label += "(" + clazz.count + ")";
 								}
 								label += '</a>';
 								rt['label'] = label;
 								
-								var children = [];
-								for (i in clazz.children) {
-									var childClass = clazz.children[i];
-									children.push(addClass(childClass));
-								}
-								if (children.length > 0) {
+								if (clazz.children != undefined) {
+									// Sort childern nodes highest inherited count first.
+									clazz.children.sort(classSortOrderCompare);
+									var children = [];
+									for (i in clazz.children) {
+										var childClass = clazz.children[i];
+										children.push(addClass(childClass));
+									}
 									rt['type'] = 'TreeView';
 									rt['children'] = children;
 								}
 								return rt;
 							}
 	
-							// Render TreeView
-							Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
+							// The right TreeView
+							var rootClasses = [];
 							for (i in stats.rootClasses) {
 								var className = stats.rootClasses[i];
-								var clazz = stats.classes[className];
-								tree.push(addClass(clazz));
+								rootClasses.push(stats.classes[className]);
 							}
+
+							// Sort roots highest inherited count first.
+							rootClasses.sort(classSortOrderCompare);
+							
+							var tree = [];
+							for (i in rootClasses) {
+								tree.push(addClass(rootClasses[i]));
+							}
+							
+							Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
 							var treeview = new Y.TreeView({
 								toggleOnLabelClick : false,
 								srcNode : '#statisticsTreeList',
@@ -261,19 +275,9 @@ YUI({
 							});
 						}
 
-						// Render statistics box
-						/*
-						 * Y.one("#statistics").setContent(''); var sidestats =
-						 * [];a for (clazz in keys) { sidestats.push({"Entity" :
-						 * getLocalName(keys[clazz]), "Count":
-						 * stats.classes[keys[clazz]].count}); } var
-						 * dtScrollingY = new Y.DataTable.Base({ columnset : [{
-						 * key : "Entity", label : "Entity" }, { key : "Count",
-						 * label : "Count" }], recordset : sidestats, summary :
-						 * "Y axis scrolling table" });
-						 * dtScrollingY.plug(Y.Plugin.DataTableScroll, { height :
-						 * "400px" }); dtScrollingY.render("#statistics");
-						 */
+						
+						// Only do the URL's search once the stats are loaded.
+						doQuery(history.get());
 					},
 					failure : function(transactionid, response, arguments) {
 						Y.one("#statistics-loader").hide();
@@ -329,7 +333,6 @@ YUI({
 		function doQuery(paramsMap) {
 			if (paramsMap['index'] == undefined || paramsMap['query'] == undefined) { // || paramsMap['query'].length == 0) {
 				Y.one("#result-loader").hide();
-				Y.one("#resultContainer").hide();
 				return;
 			}
 			
@@ -342,7 +345,6 @@ YUI({
 						var result = Y.JSON.parse(response.response);
 						
 						Y.one("#result-loader").hide();
-						Y.one("#resultContainer").show();
 						Y.one("#result-stats").setContent("Found " + result.numResults + " results in " + result.time + " ms.");
 
 						var ol = Y.Node.create("<ol></ol>");
@@ -350,14 +352,14 @@ YUI({
 
 						var markers = [];
 						for ( var i in result.resultItems) {
-							renderResult(result.resultItems[i], ol);
+							ol.append(renderResult(result.resultItems[i]));
 						}
 
 						Y.one("#results").setContent("").append(ol);
 						
 						resultsPager.setState({
 							pageSize: result.pageSize,
-							pages: Math.ceil(result.numResults / result.pageSize),
+							items: result.numResults,
 							page: 1 + Math.floor(result.pageStart / result.pageSize)
 						});
 					},
@@ -368,14 +370,13 @@ YUI({
 						}
 						alert("Failed to get results from server. " + message);
 						Y.one("#result-loader").hide();
-						Y.one("#resultContainer").hide();
 					}
 				}
 			}
 			Y.io('ajax/query', doQueryConfig);
 		}
 
-		function renderResult(result, node) {
+		function renderResult(result) {
 			var li = Y.Node.create("<li class=\"result\"></li>");
 
 			function predSort(a, b) {
@@ -384,7 +385,7 @@ YUI({
 			
 			result.relations.sort(predSort);
 			if (result.hasOwnProperty("label") && result.label != null) {
-				li.append('<span class="label">' + result.label + '</span>');
+				li.append('<span class="label">' + Y.Escape.html(result.label) + '</span>');
 			}
 			li.append("<br/>");
 
@@ -426,16 +427,16 @@ YUI({
 				types.sort(typeSort);
 				
 				for (type in types) {
-					li.append('&nbsp;<a class="type" href="' + types[type] + '">' + getLocalName(types[type]) + '</a>&nbsp;');
+					li.append('&nbsp;<a class="type" href="' + Y.Escape.html(types[type]) + '">' + Y.Escape.html(getLocalName(types[type])) + '</a>&nbsp;');
 				}
 				li.append('-&nbsp;');
 			}
 
 			var span;
 			if (result.subject.match("^https?://")) {
-				span = Y.Node.create('<span class="id"><a href=' + result.subject + '>' + result.subject + '</a></span>');
+				span = Y.Node.create('<span class="id"><a href=' + Y.Escape.html(result.subject) + '>' + Y.Escape.html(result.subject) + '</a></span>');
 			} else {
-				span = Y.Node.create('<span class="id">' + result.subject + '</span>');
+				span = Y.Node.create('<span class="id">' + Y.Escape.html(result.subject) + '</span>');
 			}
 			if (result.subjectId != undefined) {
 				appendDocLink(span, result.subjectId);
@@ -449,7 +450,7 @@ YUI({
 				if (predicate == RDF_TYPE)
 					continue;
 				
-				var tdPredicate = Y.Node.create('<td class="predicate">' + getLocalName(predicate) + '</td>');
+				var tdPredicate = Y.Node.create('<td class="predicate">' + Y.Escape.html(getLocalName(predicate)) + '</td>');
 				
 				var tdValues = Y.Node.create('<td class="object"></td>');
 				for ( var relationIndex in map[predicate]) {
@@ -475,7 +476,7 @@ YUI({
 			}
 
 			li.append(table);
-			node.append(li);
+			return li;
 		}
 
 		function appendDocLink(parent, docId) {
@@ -498,16 +499,16 @@ YUI({
 					value = ref;
 				}
 				var kbname = Y.one("#dataset").get('value');
-				return '<a href="search.html?index=' + kbname + '&subject=' + ref + '">' + value + '</a>';
+				return '<a href="search.html?index=' + kbname + '&subject=' + Y.Escape.html(ref) + '">' + Y.Escape.html(value) + '</a>';
 			}
 
 			if (value == undefined) {
 				value = ref;
 			}
 			if (ref.startsWith("http:")) {
-				return '<a href="' + ref + '">' + value + '</a>';
+				return '<a href="' + Y.Escape.html(ref) + '">' + Y.Escape.html(value) + '</a>';
 			}
-			return value;
+			return Y.Escape.html(value);
 		}
 
 		function changeProperties(clazz) {
@@ -599,8 +600,6 @@ YUI({
 					
 					initDataSet();
 					Y.one('#dataset').on('change', initDataSet);
-					
-					doQuery(history.get());
 				},
 				failure: function(transactionid, response, arguments) {
 					alert("Failed to load data set list.");
@@ -618,7 +617,8 @@ YUI({
 
 		resultsPager.setCallback(pagerPage);
 		resultsPager.setState({
-			elementIds: ['#results-pager-top', '#results-pager-bottom']
+			pagerElements: ['#results-pager-top', '#results-pager-bottom'],
+			statusElements: ["#results-pager-top-status"]
 		})
 		var tabview = new Y.TabView({
 			srcNode : '#resultContainer'
