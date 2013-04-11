@@ -10,8 +10,8 @@
  */
 
 String.prototype.startsWith = function(str) {
-	return (this.match("^" + str) == str)
-}
+	return (this.match("^" + str) == str);
+};
 
 var stats;
 var fieldShortNames;
@@ -22,34 +22,8 @@ var webapp = "";
 var RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 var contextsToColour = []; // TODO populate from server.
 
-var argString = window.location.href.split('?')[1];
-var args = []; // URL arguments
-if (argString != undefined) {
-	args = parse(argString);
-}
-
-function getProviderName(sstring) {
-	if (contextsToColour[sstring] === undefined)
-		return getLocalName(sstring);
-	else
-		return contextsToColour[sstring];
-}
-
-function getLocalName(uri) {
-	if (uri.indexOf('#') > 0) {
-		return uri.substring(uri.lastIndexOf('#') + 1);
-	} else if (uri.indexOf('/') > 0) {
-		return uri.substring(uri.lastIndexOf('/') + 1);
-	} else
-		return uri;
-}
-
-function stripVersion(uri) {
-	return uri.replace(/[0-9]+\.[0-9]+\.[0-9]+\//, "");
-}
-
-function encode(uri) {
-	return uri.replace(/[^a-zA-Z0-9]+/g, "_");
+function unescape(s) {
+	return decodeURIComponent(s.replace(/\+/g, ' '));
 }
 
 function parse(qs, sep, eq) {
@@ -62,11 +36,40 @@ function parse(qs, sep, eq) {
 		}
 	}
 	return obj;
-};
+}
 
-function unescape(s) {
-	return decodeURIComponent(s.replace(/\+/g, ' '));
-};
+var argString = window.location.href.split('?')[1];
+var args = []; // URL arguments
+if (argString !== undefined) {
+	args = parse(argString);
+}
+
+function getLocalName(uri) {
+	if (uri.indexOf('#') > 0) {
+		return uri.substring(uri.lastIndexOf('#') + 1);
+	} else if (uri.indexOf('/') > 0) {
+		return uri.substring(uri.lastIndexOf('/') + 1);
+	} else {
+		return uri;
+	}
+}
+
+function getProviderName(sstring) {
+	if (contextsToColour[sstring] === undefined) {
+		return getLocalName(sstring);
+	} else {
+		return contextsToColour[sstring];
+	}
+}
+
+
+function stripVersion(uri) {
+	return uri.replace(/[0-9]+\.[0-9]+\.[0-9]+\//, "");
+}
+
+function encode(uri) {
+	return uri.replace(/[^a-zA-Z0-9]+/g, "_");
+}
 
 YUI({
 	gallery : 'gallery-2011.01.03-18-30'
@@ -108,7 +111,7 @@ YUI({
 					'index': Y.one("#dataset").get('value')
 				},
 				on: {
-					success : function(transactionid, response, arguments) {
+					success : function(transactionid, response, args) {
 						stats = Y.JSON.parse(response.response);
 
 						Y.one("#class-loader").hide();
@@ -117,12 +120,15 @@ YUI({
 						Y.one("#statistics-loader").hide();
 
 						var autocompletefields = [ 'OR' ];
-						for ( var key in stats.fields) {
-							fieldShortNames.push(key);
-							fieldLongNames.push(stats.fields[key]);
-							// fill up the autocomplete
-							// suggestion box
-							autocompletefields.push(key);
+						
+						for (var key in stats.fields) {
+							if (stats.fields.hasOwnProperty(key)) {
+								fieldShortNames.push(key);
+								fieldLongNames.push(stats.fields[key]);
+								// fill up the autocomplete
+								// suggestion box
+								autocompletefields.push(key);
+							}
 						}
 
 						Y.one('#ac-input').plug(Y.Plugin.AutoComplete, {
@@ -133,8 +139,42 @@ YUI({
 							source : autocompletefields
 						});
 
+						function classSortOrderCompare(a,b) {
+							return b.inheritedCount - a.inheritedCount;
+						}
+
+						function addClass(clazz) {
+							var rt = {};
+							
+							if (clazz === undefined) {
+								return rt;
+							}
+							
+							var label = '<a href="' + Y.Escape.html(clazz.className) + '">' + Y.Escape.html(clazz.localName) + ' ' + clazz.inheritedCount;
+							if (clazz.inheritedCount != clazz.count) {
+								label += "(" + clazz.count + ")";
+							}
+							label += '</a>';
+							rt.label = label;
+							
+							if (clazz.children !== undefined) {
+								// Sort childern nodes highest inherited count first.
+								clazz.children.sort(classSortOrderCompare);
+								var children = [];
+								for (var i in clazz.children) {
+									if (clazz.children.hasOwnProperty(i)) {
+										var childClass = clazz.children[i];
+										children.push(addClass(childClass));
+									}
+								}
+								rt.type = 'TreeView';
+								rt.children = children;
+							}
+							return rt;
+						}
+						
 						// Display class selection dropdown
-						if (stats.classes == undefined) {
+						if (stats.classes === undefined) {
 							// Render TreeView
 							Y.one('#statistics-tree').setContent('<p>There are no rdf:type tuples in this dataset.</p>');
 							
@@ -143,40 +183,50 @@ YUI({
 							
 						} else {
 							var classesWithProperties = [];
-							for (className in stats.classes) {
-								var clazz = stats.classes[className];
-								// Add className field to each class.
-								clazz.className = className;
-								
-								// Change all children class names to references +
-								// for all classes that are children add a ref to the parent classes.
-								for (i in clazz.children) {
-									var childName = clazz.children[i];
-									var childClass = stats.classes[childName];
-									clazz.children[i] = childClass;
-									if (childClass.parents == undefined) {
-										childClass.parents = [];
+							for (var className in stats.classes) {
+								if (stats.classes.hasOwnProperty(className)) {
+									var clazz = stats.classes[className];
+									// Add className field to each class.
+									clazz.className = className;
+									
+									// Change all children class names to references +
+									// for all classes that are children add a ref to the parent classes.
+									for (var childIndex in clazz.children) {
+										if (clazz.children.hasOwnProperty(childIndex)) {
+											var childName = clazz.children[childIndex];
+											var childClass = stats.classes[childName];
+											clazz.children[childIndex] = childClass;
+											if (childClass.parents === undefined) {
+												childClass.parents = [];
+											}
+											childClass.parents.push(clazz);
+										}
 									}
-									childClass.parents.push(clazz);
-								}
-								
-								// get classes with properties.
-								if (clazz.properties != undefined) {
-									classesWithProperties.push(clazz);
+									
+									// get classes with properties.
+									if (clazz.properties !== undefined) {
+										classesWithProperties.push(clazz);
+									}
 								}
 							}
 							
 							// Sort by the local name
 							classesWithProperties.sort(function(a,b) {
-							    if(a.localName<b.localName) return -1;
-							    if(a.localName>b.localName) return 1;
-							    return 0;
+								if ( a.localName < b.localName ) {
+									return -1;
+								}
+								if ( a.localName > b.localName ) {
+									return 1;
+								}
+								return 0;
 							});
 							
 							var frag = '<select>';
-							for (i in classesWithProperties) {
-								clazz = classesWithProperties[i];
-								frag = frag + "<option value='" + i + "'>" + Y.Escape.html(clazz.localName) + " - " + Y.Escape.html(clazz.className) + "</option>";
+							for (var classKey in classesWithProperties) {
+								if (classesWithProperties.hasOwnProperty(classKey)) {
+									var classWithProp = classesWithProperties[classKey];
+									frag = frag + "<option value='" + classKey + "'>" + Y.Escape.html(classWithProp.localName) + " - " + Y.Escape.html(classWithProp.className) + "</option>";
+								}
 							}
 							frag = frag + '</select>';
 							var fragNode = Y.Node.create(frag);
@@ -184,55 +234,27 @@ YUI({
 							
 							changeProperties(classesWithProperties[0]);
 							fragNode.on('change', function(e) {
-								var i = e.target.get('value');
+								i = e.target.get('value');
 								changeProperties(classesWithProperties[i]);
 							});
-
-							function classSortOrderCompare(a,b) {
-								return b.inheritedCount - a.inheritedCount;
-							}
-
-							function addClass(clazz) {
-								var rt = {};
-								
-								if (clazz == undefined) {
-									return rt;
-								}
-								
-								var label = '<a href="' + Y.Escape.html(clazz.className) + '">' + Y.Escape.html(clazz.localName) + ' ' + clazz.inheritedCount;
-								if (clazz.inheritedCount != clazz.count) {
-									label += "(" + clazz.count + ")";
-								}
-								label += '</a>';
-								rt['label'] = label;
-								
-								if (clazz.children != undefined) {
-									// Sort childern nodes highest inherited count first.
-									clazz.children.sort(classSortOrderCompare);
-									var children = [];
-									for (i in clazz.children) {
-										var childClass = clazz.children[i];
-										children.push(addClass(childClass));
-									}
-									rt['type'] = 'TreeView';
-									rt['children'] = children;
-								}
-								return rt;
-							}
 	
 							// The right TreeView
 							var rootClasses = [];
-							for (i in stats.rootClasses) {
-								var className = stats.rootClasses[i];
-								rootClasses.push(stats.classes[className]);
+							for (var i in stats.rootClasses) {
+								if (stats.rootClasses.hasOwnProperty(i)) {
+									var rootClassName = stats.rootClasses[i];
+									rootClasses.push(stats.classes[rootClassName]);
+								}
 							}
 
 							// Sort roots highest inherited count first.
 							rootClasses.sort(classSortOrderCompare);
 							
 							var tree = [];
-							for (i in rootClasses) {
-								tree.push(addClass(rootClasses[i]));
+							for (var rootClassKey in rootClasses) {
+								if (rootClasses.hasOwnProperty(rootClassKey)) {
+									tree.push(addClass(rootClasses[rootClassKey]));
+								}
 							}
 							
 							Y.one('#statistics-tree').setContent('<ul id="statisticsTreeList"></ul>');
@@ -249,9 +271,9 @@ YUI({
 							treeview.on("click", function (e){
 								var anchor = e.details[0].domEvent.target;
 								var typeUrl = anchor.getAttribute('href');
-								if (typeUrl != undefined) {
+								if (typeUrl !== undefined) {
 									var typeClass = stats.classes[typeUrl];
-									if (typeClass != undefined && typeClass.count > 0) {
+									if (typeClass !== undefined && typeClass.count > 0) {
 										executeSearchByType(typeUrl);
 									}
 								}
@@ -279,12 +301,12 @@ YUI({
 						// Only do the URL's search once the stats are loaded.
 						doQuery(history.get());
 					},
-					failure : function(transactionid, response, arguments) {
+					failure : function(transactionid, response, args) {
 						Y.one("#statistics-loader").hide();
 						alert("Failed to get index stats from server. " + response);
 					}
 				}
-			}
+			};
 			
 			Y.io('ajax/indexStatistics', indexStatisticsConfig);
 		}
@@ -306,7 +328,7 @@ YUI({
 		function executeSearchByClass(e) {
 			var query = '';
 			var params = Y.all(".class-property").each(function(thisNode) {
-				if (thisNode.get('value') != '') {
+				if (thisNode.get('value') !== '') {
 					query = query + ' ';
 					query = query + ns + thisNode.get('name') + ':' + thisNode.get('value');
 				}
@@ -315,7 +337,7 @@ YUI({
 		}
 		
 		function pagerPage(targetPage, pagerState) {
-			var current = history.get()
+			var current = history.get();
 			current.pageStart = (targetPage - 1 ) * pagerState.pageSize;
 			history.add(current);
 		}
@@ -331,7 +353,7 @@ YUI({
 		}
 
 		function doQuery(paramsMap) {
-			if (paramsMap['index'] == undefined || paramsMap['query'] == undefined) { // || paramsMap['query'].length == 0) {
+			if (paramsMap.index === undefined || paramsMap.query === undefined) { // || paramsMap.query.length == 0) {
 				Y.one("#result-loader").hide();
 				return;
 			}
@@ -341,7 +363,7 @@ YUI({
 			var doQueryConfig = {
 				data: paramsMap,
 				on: {
-					success : function(transactionid, response, arguments) {
+					success : function(transactionid, response, args) {
 						var result = Y.JSON.parse(response.response);
 						
 						Y.one("#result-loader").hide();
@@ -351,8 +373,10 @@ YUI({
 						ol.setAttribute("start", result.pageStart + 1);
 
 						var markers = [];
-						for ( var i in result.resultItems) {
-							ol.append(renderResult(result.resultItems[i]));
+						for (var i in result.resultItems) {
+							if (result.resultItems.hasOwnProperty(i)) {
+								ol.append(renderResult(result.resultItems[i]));
+							}
 						}
 
 						Y.one("#results").setContent("").append(ol);
@@ -363,16 +387,16 @@ YUI({
 							page: 1 + Math.floor(result.pageStart / result.pageSize)
 						});
 					},
-					failure : function(transactionid, response, arguments) {
+					failure : function(transactionid, response, args) {
 						var message = "";
-						if (response != undefined) {
+						if (response !== undefined) {
 							message = Y.JSON.parse(response.response);
 						}
 						alert("Failed to get results from server. " + message);
 						Y.one("#result-loader").hide();
 					}
 				}
-			}
+			};
 			Y.io('ajax/query', doQueryConfig);
 		}
 
@@ -384,7 +408,7 @@ YUI({
 			}
 			
 			result.relations.sort(predSort);
-			if (result.hasOwnProperty("label") && result.label != null) {
+			if (result.hasOwnProperty("label") && result.label !== undefined) {
 				li.append('<span class="label">' + Y.Escape.html(result.label) + '</span>');
 			}
 			li.append("<br/>");
@@ -394,40 +418,45 @@ YUI({
 			var types = [];
 
 			if (result.hasOwnProperty("relations")) {
-				for (relationIndex in result.relations) {
-					var relation = result.relations[relationIndex];
-					if (map[relation.predicate] == null) {
-						map[relation.predicate] = [ relation ];
-					} else {
-						map[relation.predicate].push(relation);
-					}
-					if (relation.predicate == RDF_TYPE) {
-						var type = stripVersion(relation.object);
-						if (types.indexOf(type) == -1) {
-							types.push(type);
+				for (var relationIndex in result.relations) {
+					if (result.relations.hasOwnProperty(relationIndex)) {
+						var relation = result.relations[relationIndex];
+						if (map[relation.predicate] === undefined) {
+							map[relation.predicate] = [ relation ];
+						} else {
+							map[relation.predicate].push(relation);
+						}
+						if (relation.predicate == RDF_TYPE) {
+							var stripedType = stripVersion(relation.object);
+							if (types.indexOf(stripedType) == -1) {
+								types.push(stripedType);
+							}
 						}
 					}
 				}
 			}
 			
-			if (types.length > 0) {
-				function typeSort(a, b) {
-					var countA = 0;
-					// For very long documents, there is a small chance that the class will existing in the document but not be in the list of classes.
-					if (stats.classes[a] != undefined) {
-						countA = stats.classes[a].count
-					}
-					var countB = 0;
-					if (stats.classes[b] != undefined) {
-						countB = stats.classes[b].count;
-					}
-					
-					return countA - countB;
+			function typeSort(a, b) {
+				var countA = 0;
+				// For very long documents, there is a small chance that the class will existing in the document but not be in the list of classes.
+				if (stats.classes[a] !== undefined) {
+					countA = stats.classes[a].count;
 				}
+				var countB = 0;
+				if (stats.classes[b] !== undefined) {
+					countB = stats.classes[b].count;
+				}
+				
+				return countA - countB;
+			}
+			
+			if (types.length > 0) {
 				types.sort(typeSort);
 				
-				for (type in types) {
-					li.append('&nbsp;<a class="type" href="' + Y.Escape.html(types[type]) + '">' + Y.Escape.html(getLocalName(types[type])) + '</a>&nbsp;');
+				for (var type in types) {
+					if (types.hasOwnProperty(type)) {
+						li.append('&nbsp;<a class="type" href="' + Y.Escape.html(types[type]) + '">' + Y.Escape.html(getLocalName(types[type])) + '</a>&nbsp;');
+					}
 				}
 				li.append('-&nbsp;');
 			}
@@ -438,7 +467,7 @@ YUI({
 			} else {
 				span = Y.Node.create('<span class="id">' + Y.Escape.html(result.subject) + '</span>');
 			}
-			if (result.subjectId != undefined) {
+			if (result.subjectId !== undefined) {
 				appendDocLink(span, result.subjectId);
 			}
 			li.append(span);
@@ -447,32 +476,37 @@ YUI({
 					.create('<table class=\"result\"><col class=\"predicate-col\"/><col class=\"value-col\"/><th class="result-header">Property</th><th class=\"result-header\">Value</th></table>');
 			var i = 0;
 			for (var predicate in map) {
-				if (predicate == RDF_TYPE)
-					continue;
-				
-				var tdPredicate = Y.Node.create('<td class="predicate">' + Y.Escape.html(getLocalName(predicate)) + '</td>');
-				
-				var tdValues = Y.Node.create('<td class="object"></td>');
-				for ( var relationIndex in map[predicate]) {
-					var item = map[predicate][relationIndex];
-					var providedName = getProviderName(item.context[0]);
-					var div = Y.Node.create('<div title="' + providedName + '" class="source-' + providedName + '"></div>');
-					div.appendChild(renderValue(item.object, item.label));
-					if (item.subjectIdOfObject != undefined) {
-						appendDocLink(div, item.subjectIdOfObject);
+				if (map.hasOwnProperty(predicate)) {
+					if (predicate == RDF_TYPE) {
+						continue;
 					}
-					tdValues.appendChild(div);
+					
+					var tdPredicate = Y.Node.create('<td class="predicate">' + Y.Escape.html(getLocalName(predicate)) + '</td>');
+					
+					var tdValues = Y.Node.create('<td class="object"></td>');
+					for (var relationKey in map[predicate]) {
+						if (map[predicate].hasOwnProperty(relationKey)) {
+							var item = map[predicate][relationKey];
+							var providedName = getProviderName(item.context[0]);
+							var div = Y.Node.create('<div title="' + providedName + '" class="source-' + providedName + '"></div>');
+							div.appendChild(renderValue(item.object, item.label));
+							if (item.subjectIdOfObject !== undefined) {
+								appendDocLink(div, item.subjectIdOfObject);
+							}
+							tdValues.appendChild(div);
+						}
+					}
+					
+					var tr;
+					if (i++ % 2 === 0) {
+						tr = Y.Node.create('<tr class="even"></tr>');
+					} else {
+						tr = Y.Node.create('<tr class="odd"></tr>');
+					}
+					tr.appendChild(tdPredicate);
+					tr.appendChild(tdValues);
+					table.appendChild(tr);
 				}
-				
-				var tr;
-				if (i++ % 2 == 0) {
-					tr = Y.Node.create('<tr class="even"></tr>');
-				} else {
-					tr = Y.Node.create('<tr class="odd"></tr>');
-				}
-				tr.appendChild(tdPredicate);
-				tr.appendChild(tdValues);
-				table.appendChild(tr);
 			}
 
 			li.append(table);
@@ -484,7 +518,7 @@ YUI({
 			var param = docId;
 			var closure = function() {
 				func(param);
-			}
+			};
 			var element = Y.Node.create('<span class="doc-link">&nbsp;-&gt;</span>');
 			element.on('click', closure);
 			parent.appendChild(element);
@@ -495,14 +529,14 @@ YUI({
 		function renderValue(ref, value) {
 			if (ref.startsWith("urn:uuid:")) {
 				ref = ref.substring(9);
-				if (value == undefined) {
+				if (value === undefined) {
 					value = ref;
 				}
 				var kbname = Y.one("#dataset").get('value');
 				return '<a href="search.html?index=' + kbname + '&subject=' + Y.Escape.html(ref) + '">' + Y.Escape.html(value) + '</a>';
 			}
 
-			if (value == undefined) {
+			if (value === undefined) {
 				value = ref;
 			}
 			if (ref.startsWith("http:")) {
@@ -517,17 +551,21 @@ YUI({
 			var classes = [];
 			classes.push(clazz);
 			
+			var i;
+			
 			while (classes.length > 0) {
-				var clazz = classes.shift();
-				if (clazz.properties != undefined) {
-					for (var i in clazz.properties) {
-						var propertyName = clazz.properties[i];
-						if (properties.indexOf(propertyName) == -1) {
-							properties.push(propertyName);
+				clazz = classes.shift();
+				if (clazz.properties !== undefined) {
+					for (i in clazz.properties) {
+						if (clazz.properties.hasOwnProperty(i)) {
+							var propertyName = clazz.properties[i];
+							if (properties.indexOf(propertyName) == -1) {
+								properties.push(propertyName);
+							}
 						}
 					}
 				}
-				if (clazz.parents != undefined) {
+				if (clazz.parents !== undefined) {
 					classes = classes.concat(clazz.parents);
 				}
 			}
@@ -536,39 +574,41 @@ YUI({
 				
 			Y.one('#class-properties').setContent('');
 			var frag = '<table>';
-			for (var i in properties) {
-				var property = properties[i];
-				
-				frag = frag + '<tr><td>' + property
-						+ '</td><td><input class="class-property yui3-hastooltip" type="text" title="' + /* TODO */'" name="'
-						+ property + '"/></td></tr>';
+			for (i in properties) {
+				if (properties.hasOwnProperty(i)) {
+					var property = properties[i];
+					
+					frag = frag + '<tr><td>' + property +
+					'</td><td><input class="class-property yui3-hastooltip" type="text" title="' + /* TODO */'" name="' +
+					property + '"/></td></tr>';
+				}
 			}
 			frag = frag + '</table>';
 			Y.one('#class-properties').append(Y.Node.create(frag)).show();
 		}
 		
 		function updateSearchBoxes(paramsMap) {
-			if (paramsMap['query'] != undefined) {
-				Y.one("#ac-input").set('value', paramsMap['query']);
+			if (paramsMap.query !== undefined) {
+				Y.one("#ac-input").set('value', paramsMap.query);
 			} else {
 				Y.one("#ac-input").set('value', '');
 			}
-			if (paramsMap['pageSize'] != undefined) {
-				Y.one("#numresults").set('value', paramsMap['pageSize']);
+			if (paramsMap.pageSize !== undefined) {
+				Y.one("#numresults").set('value', paramsMap.pageSize);
 			}
-			if (paramsMap['deref'] != undefined) {
-				Y.one("#dereference").set('checked', paramsMap['deref'] == 'true');
+			if (paramsMap.deref !== undefined) {
+				Y.one("#dereference").set('checked', paramsMap.deref == 'true');
 			}
-			if (paramsMap['index'] != undefined) {
+			if (paramsMap.index !== undefined) {
 				var selectOption;
 				Y.one("#dataset").get("options").each( function() {
-					if (this.get('value') == paramsMap['index']) {
+					if (this.get('value') == paramsMap.index) {
 						selectOption = this;
 					}
 				});
 				
-				if (selectOption == undefined) {
-					alert("The given index named " + paramsMap['index'] + " was not found on the server.");
+				if (selectOption === undefined) {
+					alert("The given index named " + paramsMap.index + " was not found on the server.");
 				} else {
 					if (!selectOption.get('selected')) {
 						// Change dataset.
@@ -589,11 +629,13 @@ YUI({
 		
 		var dataSetListConfig = {
 			on: {
-				success: function(transactionid, response, arguments) {
+				success: function(transactionid, response, args) {
 					var dataSetNames = Y.JSON.parse(response.response);
 					for (var i in dataSetNames) {
-						var dataSetName = dataSetNames[i];
-						Y.one("#dataset").append('<option value=\"' + dataSetName + '\">' + dataSetName + '</option>');
+						if (dataSetNames.hasOwnProperty(i)) {
+							var dataSetName = dataSetNames[i];
+							Y.one("#dataset").append('<option value=\"' + dataSetName + '\">' + dataSetName + '</option>');
+						}
 					}
 					
 					updateSearchBoxes(history.get());
@@ -601,11 +643,11 @@ YUI({
 					initDataSet();
 					Y.one('#dataset').on('change', initDataSet);
 				},
-				failure: function(transactionid, response, arguments) {
+				failure: function(transactionid, response, args) {
 					alert("Failed to load data set list.");
 				}
 			}
-		}
+		};
 		
 		Y.io('ajax/dataSetList', dataSetListConfig);
 
@@ -619,7 +661,7 @@ YUI({
 		resultsPager.setState({
 			pagerElements: ['#results-pager-top', '#results-pager-bottom'],
 			statusElements: ["#results-pager-top-status"]
-		})
+		});
 		var tabview = new Y.TabView({
 			srcNode : '#resultContainer'
 		});
