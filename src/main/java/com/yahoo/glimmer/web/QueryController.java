@@ -177,9 +177,14 @@ public class QueryController {
 	    // Remove < and >
 	    resource = resource.substring(1, resource.length() - 1);
 	    
+	    // TODO. Objects that are Resources aren't converted to lower case during indexing but predicates are!
+	    // (in PredicatePrefixTupleFilter)  Needs to be consistent.
 	    String resourceId = index.lookupIdByResourceId(resource);
 	    if (resourceId == null) {
-		throw new IllegalArgumentException("The resource " + resource + " isn't in the data set.");
+		resourceId = index.lookupIdByResourceId(resource.toLowerCase());
+		if (resourceId == null) {
+		    throw new IllegalArgumentException("The resource " + resource + " isn't in the data set.");
+		}
 	    }
 	    resourceMatcher.appendReplacement(sb, resourceId);
 	 }

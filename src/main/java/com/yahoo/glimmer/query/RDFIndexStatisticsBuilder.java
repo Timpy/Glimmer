@@ -16,6 +16,7 @@ import java.io.InputStream;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 
@@ -128,7 +129,7 @@ public class RDFIndexStatisticsBuilder {
 	    Set<ClassStat> ancestorStats = new HashSet<ClassStat>();
 	    HashSet<String> classNamesInIndex = new HashSet<String>(stats.getClasses().keySet());
 	    for (String className : classNamesInIndex) {
-		buildGraph(ontology, stats, nameToOwlClassMap, rootClassNames, ancestorStats, className);
+		buildGraph(stats, nameToOwlClassMap, rootClassNames, ancestorStats, className);
 
 		int count = stats.getClasses().get(className).getCount();
 		for (ClassStat stat : ancestorStats) {
@@ -139,6 +140,21 @@ public class RDFIndexStatisticsBuilder {
 
 	    for (String rootClassName : rootClassNames) {
 		stats.addRootClass(rootClassName);
+	    }
+	    
+	    // Propagate properties from ancestors to decendents.
+	    LinkedList<String> fifo = new LinkedList<String>(stats.getRootClasses());
+	    while (!fifo.isEmpty()) {
+		String className = fifo.remove();
+		ClassStat classStat = stats.getClasses().get(className);
+		// Add classStat's properties to it direct children and then queue them.
+		if (classStat.getChildren() != null) {
+		    for (String childClassName : classStat.getChildren()) {
+			ClassStat childClassStat = stats.getClasses().get(childClassName);
+			childClassStat.addProperties(classStat.getProperties());
+			fifo.add(childClassName);
+		    }
+		}
 	    }
 	}
 
@@ -162,7 +178,7 @@ public class RDFIndexStatisticsBuilder {
      * 
      *            TODO cyclic detection.
      */
-    private static void buildGraph(OWLOntology ontology, RDFIndexStatistics stats, Map<String, OWLClass> nameToOwlClassMap, Set<String> rootClassNames,
+    private void buildGraph(RDFIndexStatistics stats, Map<String, OWLClass> nameToOwlClassMap, Set<String> rootClassNames,
 	    Set<ClassStat> ancestorStats, String owlClassName) {
 	int superClassCount = 0;
 	OWLClass owlClass = nameToOwlClassMap.get(owlClassName);
@@ -179,14 +195,22 @@ public class RDFIndexStatisticsBuilder {
 		    String superLocalName = OwlUtils.getLocalName(superOwlClass.getIRI());
 		    superStat = new ClassStat(superLocalName,0);
 		    superStat.setLabel(OwlUtils.getLabel(superOwlClass, ontology));
+		    
+		    for (OWLProperty<?, ?> prop : OwlUtils.getPropertiesInDomain(superOwlClass, ontology)) {
+			if (prop instanceof OWLDataProperty) {
+			    String name = prop.getIRI().toString();
+			    superStat.addProperty(name);
+			}
+		    }
 		    stats.addClassStat(superOwlClassName, superStat);
+		    
 		    nameToOwlClassMap.put(superOwlClassName, superOwlClass);
 		}
 
 		// Add this owlClass as a child of the superOwlClass
 		superStat.addChild(owlClass.getIRI().toString());
 
-		buildGraph(ontology, stats, nameToOwlClassMap, rootClassNames, ancestorStats, superOwlClassName);
+		buildGraph(stats, nameToOwlClassMap, rootClassNames, ancestorStats, superOwlClassName);
 
 		ancestorStats.add(superStat);
 

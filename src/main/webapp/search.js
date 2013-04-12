@@ -17,7 +17,6 @@ var stats;
 var fieldShortNames;
 var fieldLongNames;
 var store = {};
-var ns;
 var webapp = "";
 var RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 var contextsToColour = []; // TODO populate from server.
@@ -95,13 +94,15 @@ YUI({
 		var history = new Y.HistoryHash();
 		
 		var resultsPager = new Y.Pager();
+		
+		var ontologySelectedClass;
 
 		function initDataSet() {
 			fieldShortNames = [ "any" ];
 			fieldLongNames = [ "any" ];
 			Y.one("#results").setContent("");
 			Y.one("#result-stats").setContent("");
-			Y.one("#class-select").setContent("");
+			Y.one("#search-by-class-classes").setContent("");
 
 			Y.one("#statistics-tree").setContent("");
 			Y.one("#statistics-loader").show();
@@ -182,6 +183,7 @@ YUI({
 							Y.one('#ontologysearch').hide();
 							
 						} else {
+							// Set up classes and their properties for the Ontology-based search.
 							var classesWithProperties = [];
 							for (var className in stats.classes) {
 								if (stats.classes.hasOwnProperty(className)) {
@@ -221,16 +223,14 @@ YUI({
 								return 0;
 							});
 							
-							var frag = '<select>';
-							for (var classKey in classesWithProperties) {
-								if (classesWithProperties.hasOwnProperty(classKey)) {
-									var classWithProp = classesWithProperties[classKey];
-									frag = frag + "<option value='" + classKey + "'>" + Y.Escape.html(classWithProp.localName) + " - " + Y.Escape.html(classWithProp.className) + "</option>";
-								}
+							var frag = '<select id="search-by-class-classes-select">';
+							for (var classesWithPropertiesI = 0 ; classesWithPropertiesI < classesWithProperties.length ; classesWithPropertiesI++) {
+								var classWithProp = classesWithProperties[classesWithPropertiesI];
+								frag = frag + "<option value='" + classesWithPropertiesI + "'>" + Y.Escape.html(classWithProp.localName) + " - " + Y.Escape.html(classWithProp.className) + "</option>";
 							}
 							frag = frag + '</select>';
 							var fragNode = Y.Node.create(frag);
-							Y.one('#class-select').append("I'm looking for a").append(fragNode).append("where");
+							Y.one('#search-by-class-classes').append("I'm looking for a").append(fragNode).append("where");
 							
 							changeProperties(classesWithProperties[0]);
 							fragNode.on('change', function(e) {
@@ -311,29 +311,32 @@ YUI({
 			Y.io('ajax/indexStatistics', indexStatisticsConfig);
 		}
 
-		function getDocumentByIdOrSubject(idOrSubject) {
-			Y.one("#ac-input").set('value', "doc:" + idOrSubject);
-			executeUnifiedSearch(null);
-		}
-		function executeSearchByType(type) {
-			Y.one("#ac-input").set('value', 'type:<' + type + '>');
-			executeUnifiedSearch(null);
-		}
-		
 		function executeUnifiedSearch(e) {
 			var query = Y.one("#ac-input").get('value');
 			loadResults(query);
 		}
+		
+		function executeSearchByQuery(query) {
+			Y.one("#ac-input").set('value', query);
+			executeUnifiedSearch(null);
+		}
+		
+		function getDocumentByIdOrSubject(idOrSubject) {
+			executeSearchByQuery('doc:' + idOrSubject);
+		}
+		function executeSearchByType(type) {
+			executeSearchByQuery('type:<' + type + '>');
+		}
 
 		function executeSearchByClass(e) {
-			var query = '';
-			var params = Y.all(".class-property").each(function(thisNode) {
+			var query = 'type:<' + ontologySelectedClass.className + '>';
+			var params = Y.all(".search-by-class-property").each(function(thisNode) {
 				if (thisNode.get('value') !== '') {
-					query = query + ' ';
-					query = query + ns + thisNode.get('name') + ':' + thisNode.get('value');
+					query += ' (predicate:<' + thisNode.get('name') + '> ^ object:' + thisNode.get('value') + ')';
 				}
 			});
-			loadResults(query);
+			
+			executeSearchByQuery(query);
 		}
 		
 		function pagerPage(targetPage, pagerState) {
@@ -546,6 +549,8 @@ YUI({
 		}
 
 		function changeProperties(clazz) {
+			ontologySelectedClass = clazz;
+			
 			var properties = [];
 			
 			var classes = [];
@@ -572,19 +577,13 @@ YUI({
 			
 			properties.sort();
 				
-			Y.one('#class-properties').setContent('');
-			var frag = '<table>';
-			for (i in properties) {
-				if (properties.hasOwnProperty(i)) {
-					var property = properties[i];
-					
-					frag = frag + '<tr><td>' + property +
-					'</td><td><input class="class-property yui3-hastooltip" type="text" title="' + /* TODO */'" name="' +
-					property + '"/></td></tr>';
-				}
+			Y.one('#search-by-class-properties').setContent('');
+			var tableNode = Y.Node.create('<table></table>');
+			for (var propertiesI = 0 ; propertiesI < properties.length ; propertiesI++) {
+					var property = properties[propertiesI];
+					tableNode.append('<tr><td>' + property + '</td><td><input class="search-by-class-property" type="text" name="' + property + '"/></td></tr>');
 			}
-			frag = frag + '</table>';
-			Y.one('#class-properties').append(Y.Node.create(frag)).show();
+			Y.one('#search-by-class-properties').append(tableNode).show();
 		}
 		
 		function updateSearchBoxes(paramsMap) {
