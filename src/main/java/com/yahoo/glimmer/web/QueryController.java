@@ -55,6 +55,7 @@ public class QueryController {
 
     private IndexMap indexMap;
     private Querier querier;
+    private QueryFilter queryFilter;
     
     private Integer defaultObjectLengthLimit = DEFAULT_OBJECT_LENGTH_LIMIT;
 
@@ -89,22 +90,27 @@ public class QueryController {
     }
 
     @RequestMapping(value = "/query", method = RequestMethod.GET)
-    public Map<String, ?> query(@ModelAttribute(INDEX_KEY) RDFIndex index, @Valid QueryCommand command) throws QueryParserException,
+    public Map<String, ?> query(@ModelAttribute(INDEX_KEY) RDFIndex index, @Valid QueryCommand command, HttpServletRequest httpServletRequest) throws QueryParserException,
 	    QueryBuilderVisitorException, IOException {
 	if (index == null) {
-	    throw new HttpMessageConversionException("No index given");
+	    throw new HttpMessageConversionException("No index given.");
 	}
 
 	String query = command.getQuery();
 	if (query == null || query.isEmpty()) {
-	    throw new HttpMessageConversionException("No query given");
+	    throw new HttpMessageConversionException("No query given.");
+	}
+	
+	RDFQueryResult result;
+	if (queryFilter != null && queryFilter.filter(query)) {
+	    LOGGER.info("Blocking query:" + query + " from address:" + httpServletRequest.getRemoteAddr());
+	    throw new HttpMessageConversionException("Bad query given.");
 	}
 
 	query = decodeEntities(command.getQuery()).trim();
 	query = encodeResources(index, query);
 	
 	Query parsedQuery;
-	RDFQueryResult result;
 	switch (command.getType()) {
 	case MG4J:
 	    parsedQuery = new SimpleParser().parse(query);
@@ -145,7 +151,9 @@ public class QueryController {
 
     @ExceptionHandler(Exception.class)
     public Map<String, ?> handleException(Exception ex,  HttpServletRequest request, HttpServletResponse response) {
-	LOGGER.error("Exception when processing:" + request.getQueryString(), ex);
+	if (!(ex instanceof HttpMessageConversionException)) {
+	    LOGGER.error("Exception when processing:" + request.getQueryString(), ex);
+	}
 	response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 	return Collections.singletonMap(OBJECT_KEY, ex.getMessage());
     }
@@ -201,6 +209,11 @@ public class QueryController {
     @Resource
     public void setIndexMap(IndexMap indexMap) {
 	this.indexMap = indexMap;
+    }
+    
+    @Resource
+    public void setQueryFilter(QueryFilter queryFilter) {
+	this.queryFilter = queryFilter;
     }
     
     public void setDefaultObjectLengthLimit(Integer defaultObjectLengthLimit) {
