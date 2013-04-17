@@ -44,9 +44,14 @@
 	float: right;
 }
 
-#resultContainer {
+#bottom-content {
 	position: relative;
 	clear: both;
+	width: 940px;
+}
+
+#results-container {
+	border: 1px solid lightgrey;
 }
 
 .hidden {
@@ -137,13 +142,13 @@ form {
 	top: 0px;
 }
 
-#resultContainer table .predicate-col {
+#results-container table .predicate-col {
 	column-width: 100px;
 	-moz-column-width: 100px; /* Firefox */
 	-webkit-column-width: 100px; /* Safari and Chrome */
 }
 
-#resultContainer table .value-col {
+#results-container table .value-col {
 	column-width: 450px;
 	-moz-column-width: 450px; /* Firefox */
 	-webkit-column-width: 450px; /* Safari and Chrome */
@@ -177,7 +182,7 @@ form {
 	float: left;
 }
 
-#bottomContent {
+#bottom-content {
 	padding: 10px;
 	margin-top: 10px;
 	/*	max-width: 650px;

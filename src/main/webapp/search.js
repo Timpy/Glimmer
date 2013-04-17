@@ -356,12 +356,13 @@ YUI({
 		}
 
 		function doQuery(paramsMap) {
+			Y.one("#results-container").hide();
 			if (paramsMap.index === undefined || paramsMap.query === undefined) { // || paramsMap.query.length == 0) {
-				Y.one("#result-loader").hide();
+				Y.one("#results-loader").hide();
 				return;
 			}
 			
-			Y.one("#result-loader").show();
+			Y.one("#results-loader").show();
 			
 			var doQueryConfig = {
 				data: paramsMap,
@@ -369,7 +370,7 @@ YUI({
 					success : function(transactionid, response, args) {
 						var result = Y.JSON.parse(response.response);
 						
-						Y.one("#result-loader").hide();
+						Y.one("#results-loader").hide();
 						Y.one("#result-stats").setContent("Found " + result.numResults + " results in " + result.time + " ms.");
 
 						var ol = Y.Node.create("<ol></ol>");
@@ -389,6 +390,7 @@ YUI({
 							items: result.numResults,
 							page: 1 + Math.floor(result.pageStart / result.pageSize)
 						});
+						Y.one("#results-container").show();
 					},
 					failure : function(transactionid, response, args) {
 						var message = "";
@@ -396,7 +398,7 @@ YUI({
 							message = Y.JSON.parse(response.response);
 						}
 						alert("Failed to get results from server. " + message);
-						Y.one("#result-loader").hide();
+						Y.one("#results-loader").hide();
 					}
 				}
 			};
@@ -661,9 +663,5 @@ YUI({
 			pagerElements: ['#results-pager-top', '#results-pager-bottom'],
 			statusElements: ["#results-pager-top-status"]
 		});
-		var tabview = new Y.TabView({
-			srcNode : '#resultContainer'
-		});
-		tabview.render();
 	}
 );
