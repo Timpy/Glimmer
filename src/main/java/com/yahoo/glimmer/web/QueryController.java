@@ -49,7 +49,7 @@ public class QueryController {
     
     private static final String DOC_PSEUDO_FIELD = "doc:";
     // This defines how resources are written in the command objects query string.
-    private static final Pattern RESOURCE_PATTERN = Pattern.compile("(<(?:https?://[^>]+|_:[A-Za-z][A-Za-z0-9]*)>)");
+    private static final Pattern RESOURCE_PATTERN = Pattern.compile("(\\{(?:https?://[^}]+|_:[A-Za-z][A-Za-z0-9]*)\\})");
 
     private static final Integer DEFAULT_OBJECT_LENGTH_LIMIT = 300;
 
@@ -170,7 +170,7 @@ public class QueryController {
     }
     
     /**
-     * Replaces '<' + resource + '>' strings with '@' + resourceId.
+     * Replaces '{' + resourceString + '}' with '@' + resourceId.
      * 
      * @param index
      * @param query
@@ -182,7 +182,7 @@ public class QueryController {
 	StringBuffer sb = new StringBuffer();
 	while (resourceMatcher.find()) {
 	    String resource = resourceMatcher.group(0);
-	    // Remove < and >
+	    // Remove { and }
 	    resource = resource.substring(1, resource.length() - 1);
 	    
 	    // TODO. Objects that are Resources aren't converted to lower case during indexing but predicates are!

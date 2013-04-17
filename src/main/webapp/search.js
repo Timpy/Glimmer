@@ -325,14 +325,14 @@ YUI({
 			executeSearchByQuery('doc:' + idOrSubject);
 		}
 		function executeSearchByType(type) {
-			executeSearchByQuery('type:<' + type + '>');
+			executeSearchByQuery('type:{' + type + '}');
 		}
 
 		function executeSearchByClass(e) {
-			var query = 'type:<' + ontologySelectedClass.className + '>';
+			var query = 'type:{' + ontologySelectedClass.className + '}';
 			var params = Y.all(".search-by-class-property").each(function(thisNode) {
 				if (thisNode.get('value') !== '') {
-					query += ' (predicate:<' + thisNode.get('name') + '> ^ object:' + thisNode.get('value') + ')';
+					query += ' (predicate:{' + thisNode.get('name') + '} ^ object:' + thisNode.get('value') + ')';
 				}
 			});
 			
