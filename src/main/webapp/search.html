@@ -6,7 +6,7 @@
 <link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssfonts/cssfonts-min.css" />
 <link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/gallery-2011.01.03-18-30/build/gallery-yui3treeview/assets/treeview-classic.css" />
 <link rel="stylesheet" type="text/css" href="schema.css" />
-<link rel="stylesheet" type="text/css" href="glimmer-red.css" />
+<link rel="stylesheet" type="text/css" href="glimmer.css" />
 </head>
 <body>
 	<script src="http://yui.yahooapis.com/3.4.1/build/yui/yui-min.js"></script>
@@ -16,7 +16,6 @@
 		<div id="pageHeader">
 			<h1>Glimmer - An RDF Search Engine</h1>
 		</div>
-		<div id="selectionbar"></div>
 		<div id="mainContent">
 			<div id="statisticsTree">
 				<div id="statistics-loader">
@@ -65,8 +64,8 @@
 							<div id="class-message">&nbsp;</div>
 							<form id="search-by-class" action="javascript:void(0);">
 								<div>
-									<div id="class-select">&nbsp;</div>
-									<div id="class-properties">&nbsp;</div>
+									<div id="search-by-class-classes">&nbsp;</div>
+									<div id="search-by-class-properties">&nbsp;</div>
 								</div>
 								<input type="submit" class="button" value="Search">
 						</form>
@@ -78,30 +77,20 @@
 			</div>
 			<!-- end of topContent -->
 
-			<div id="bottomContent">
-				<div id="resultContainer" class="yui3-skin-sam">
-					<ul>
-						<li id="result-list-tab"><a href="#list">List View</a></li>
-					</ul>
-					<div>
-						<div id="list" style="width: 940px">
-							<!-- <h2>Results</h2> -->
-							<div id="result-loader" style="display: none">
-								<div>Loading...</div>
-								<img src="http://ontologyonline.org/img/ajax-loader.gif"
-									alt="Loading Image" />
-							</div>
-							<div class="status">
-								<div id="result-stats"></div>
-								<div id="results-pager-top-status"></div>
-								<div id="results-pager-top" class="results-pager"></div>
-							</div>
-							<div id="results"></div>
-							<div class="status">
-								<div id="results-pager-bottom" class="results-pager"></div>
-							</div>
-						</div>
+			<div id="bottom-content">
+				<div id="results-loader" style="display: none">
+					<div>Loading...</div>
+					<img src="http://ontologyonline.org/img/ajax-loader.gif"
+						alt="Loading Image" />
+				</div>
+				<div id="results-container">
+					<div class="status">
+						<div id="result-stats"></div>
+						<div id="results-pager-top-status"></div>
 					</div>
+					<div id="results-pager-top" class="results-pager"></div>
+					<div id="results"></div>
+					<div id="results-pager-bottom" class="results-pager"></div>
 				</div>
 			</div>
 		</div>

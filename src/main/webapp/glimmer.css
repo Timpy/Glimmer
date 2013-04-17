@@ -1,0 +1,392 @@
+/* 
+ * Copyright (c) 2012 Yahoo! Inc. All rights reserved.
+ * 
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is 
+ *  distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and limitations under the License.
+ *  See accompanying LICENSE file.
+ */
+/* -- local specific -- */
+.context-red {
+	color: #FF0000;
+}
+
+.context-green {
+	color: #00FF00;
+}
+
+.context-blue {
+	color: #0000FF;
+}
+
+.context-yellow {
+	color: #FFFF00;
+}
+
+.context-cyan {
+	color: #00FFFF;
+}
+
+.context-purple {
+	color: #FF00FF;
+}
+
+/* -- search specific -- */
+#searchBoxes {
+	margin-top: 10px;
+	/*        max-width: 650px;
+        min-width: 650px;*/
+	float: left;
+}
+
+#statisticsBox {
+	margin-top: 10px;
+	height: 470px;
+	float: right;
+}
+
+#bottom-content {
+	position: relative;
+	clear: both;
+	width: 940px;
+}
+
+#results-container {
+}
+
+.hidden {
+	display: none;
+}
+
+#id-text .param .query,#dataset,#loader,#class-message,#search-by-class-classes select,#search-by-class-properties table
+	{
+	margin: 10px 5px 10px 10px;
+}
+
+#search-by-class-classes-select {
+	width: 400px;
+}
+
+#search-by-class-properties table {
+	border: 0px;
+}
+
+#search-by-class-properties td {
+	padding: 5px;
+}
+
+.button {
+	margin: 5px 5px 5px 0px;
+}
+
+table.result {
+	width: 100%;
+	margin: 0px;
+	margin-top: 3px;
+}
+
+table.result td {
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+
+table.result .odd {
+	background: #FFFFFF;
+}
+
+table.result .even {
+	background: #F8F0FF;
+}
+
+form {
+	margin: 10px 0px;
+}
+
+.label {
+	font-size: 120%;
+}
+
+.predicate {
+	width: 40%;
+	color: black;
+}
+
+.result-header {
+	background: #DDDDDD;
+}
+
+/** Most specific **/
+#statisticsTree a:link {
+	border-bottom: none;
+}
+
+#statisticsTree {
+	line-height: 150%;
+	margin-top: 10px;
+	float: right;
+	width: 370px;
+	height: 400px;
+	overflow: auto;
+	border-left: 1px solid #900;
+}
+
+#statisticsTree ul {
+	margin-bottom: 6px;
+	margin-top: 6px;
+	padding-bottom: 0px;
+}
+
+#statisticsTree .yui3-treeleaf {
+	padding-top: 0px;
+	margin-bottom: 1px;
+	margin-top: 1px;
+}
+
+#statisticsTree .yui3-treeview-label-content {
+	top: 0px;
+}
+
+#results-container table .predicate-col {
+	column-width: 100px;
+	-moz-column-width: 100px; /* Firefox */
+	-webkit-column-width: 100px; /* Safari and Chrome */
+}
+
+#results-container table .value-col {
+	column-width: 450px;
+	-moz-column-width: 450px; /* Firefox */
+	-webkit-column-width: 450px; /* Safari and Chrome */
+}
+
+/* -- header/title -- */
+#container {
+	width: 100%;
+	text-align: left;
+	margin: 0;
+	min-height: 100%;
+	height: auto !important;
+	height: 100%;
+	margin: 0 auto -20px;
+	background-color: #f8f8f8;
+}
+
+#intro {
+	position: relative;
+}
+
+#mainContent { /*margin: 15px 50px 15px 50px; */
+	margin: 15px auto !important;
+	max-width: 960px;
+	min-width: 350px;
+}
+
+#topContent {
+	padding: 8px;
+	z-index: 2;
+	float: left;
+}
+
+#bottom-content {
+	padding: 10px;
+	margin-top: 10px;
+	/*	max-width: 650px;
+	min-width: 650px; */
+	float: left;
+}
+
+#spacer {
+	margin-bottom: 10px;
+}
+
+#disclaimer {
+	margin: 15px auto !important;
+	padding: 10px 10px 10px 0px;
+	float: left;
+}
+
+#footer,#footer-push {
+	padding: 0 10px;
+	height: 20px;
+	text-align: right;
+	font-size: x-small;
+	clear: both;
+}
+
+#togglefields {
+	font-size: 12pt;
+	color: #3A4956;
+	text-decoration: underline
+}
+
+#toggleonto {
+	color: #3A4956;
+	font-family: 'Lucida Grande';
+	font-size: 11px;
+	color: #3A4956;
+	position: relative;
+	left: 190px;
+	top: -20px;
+	margin-bottom: -20px;
+}
+
+#pageHeader {
+	width: 100%;
+	height: 50px;
+	max-width: 960px;
+	min-width: 350px;
+	margin: 0 auto !important;
+	padding: 0 40px;
+	position: relative;
+	top: 25px;
+	left: -40px;
+}
+
+#pageHeader h1 {
+	color: #000;
+	margin: 0 0 5px 20px;
+	font-family: bold Helvetica, Arial, sans-serif;
+	letter-spacing: -1px;
+}
+
+#pageHeader a:link,#pageHeader a:hover,#pageHeader a:visited {
+	color: #fff; //
+	background-color: #3399FF;
+	text-decoration: none;
+}
+
+
+#selectionbar ul {
+	margin: 0;
+	padding: 1em 1em 0 0;
+}
+
+#selectionbar li {
+	display: inline;
+	list-style: none outside none;
+}
+
+#selectionbar a:link,#selectionbar a:visited {
+	color: #FFFFFF;
+	display: block;
+	float: right;
+	margin: 0 6px;
+	padding: 1px 9px 3px 6px;
+	text-decoration: none;
+}
+
+#selectionbar a:hover {
+	background-color: transparent;
+	color: #FFEE99;
+}
+
+#selectionbar .activelink a {
+	background: none repeat scroll 0 0 #3399FF;
+}
+
+#selectionbar .activelink a:hover {
+	background-color: #3399FF;
+	color: #FFFFFF;
+	cursor: default;
+}
+
+.doc-link {
+	color: #3A4956;
+	text-decoration: none;
+	margin-left: 10px;
+}
+
+.doc-link:hover {
+	border-bottom: none;
+	color: #fff;
+	background-color: #5555FF;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+/* -- main content -- */
+#mainContent {
+	font-size: 100%;
+}
+
+#ac-input {
+	width: 500px;
+}
+
+#disclaimer {
+	width: 960px;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+#mainContent a:link { /*color: #5555FF*/;
+	color: #3A4956;
+	text-decoration: none;
+}
+
+#mainContent a:visited {
+	color: #3A4956;
+	text-decoration: none;
+}
+
+#mainContent a:hover {
+	border-bottom: none;
+	color: #fff;
+	background-color: #5555FF;
+	text-decoration: none;
+}
+
+#mainContent blockquote {
+	padding: 0 0 0 15px;
+	margin: 10px 0 10px 15px;
+	width: auto;
+	float: right;
+}
+
+#statistics-loader {
+	padding: 6px;
+}
+
+.status {
+}
+
+#result-stats {
+	float: left;
+}
+
+#results {
+	clear: both;
+}
+
+#results ol {
+	list-style: decimal inside;
+	margin:0px;
+}
+#results li {
+	padding-bottom:10px;
+}
+
+.results-pager {
+	clear: both;
+	text-align: center;
+	margin-bottom: 10px;
+}
+
+.results-pager .pager-link {
+	border: 1px solid #ccdbe4;
+	margin: 0 2px;
+	padding: 3px 5px;
+}
+
+.results-pager .pager-link-current {
+	border: 0;
+	color: #000;
+	font-size: 108%;
+	font-weight: bold;
+	padding: 1px 6px;
+}
+
+#results-pager-top-status {
+	float: right;
+}
