@@ -77,8 +77,8 @@
 	padding: 5px;
 }
 
-.button {
-	margin: 5px 5px 5px 0px;
+.search-button {
+	margin-bottom: -6px;
 }
 
 table.result {
@@ -97,7 +97,7 @@ table.result .odd {
 }
 
 table.result .even {
-	background: #F8F0FF;
+	background: #F0F0FF;
 }
 
 form {
@@ -129,7 +129,7 @@ form {
 	width: 370px;
 	height: 400px;
 	overflow: auto;
-	border-left: 1px solid #900;
+	border-left: 1px solid #ccdbe4;
 }
 
 #statisticsTree ul {
@@ -169,7 +169,7 @@ form {
 	height: auto !important;
 	height: 100%;
 	margin: 0 auto -20px;
-	background-color: #f8f8f8;
+	background-color: #fafafc;
 }
 
 #intro {
@@ -312,6 +312,7 @@ form {
 
 #ac-input {
 	width: 500px;
+	margin-top: 10px;
 }
 
 #disclaimer {
@@ -349,6 +350,7 @@ form {
 }
 
 .status {
+	border-top: 1px solid #ccdbe4;
 }
 
 #result-stats {
