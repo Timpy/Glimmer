@@ -85,11 +85,13 @@ table.result {
 	width: 100%;
 	margin: 0px;
 	margin-top: 3px;
+	table-layout: fixed;
 }
 
 table.result td {
 	padding-top: 5px;
 	padding-bottom: 5px;
+	overflow: hidden;
 }
 
 table.result .odd {
@@ -109,7 +111,6 @@ form {
 }
 
 .predicate {
-	width: 40%;
 	color: black;
 }
 
@@ -152,6 +153,7 @@ form {
 	column-width: 100px;
 	-moz-column-width: 100px; /* Firefox */
 	-webkit-column-width: 100px; /* Safari and Chrome */
+	width: 130px;
 }
 
 #results-container table .value-col {
@@ -351,6 +353,7 @@ form {
 
 .status {
 	border-top: 1px solid #ccdbe4;
+	height: 30px;
 }
 
 #result-stats {
@@ -379,6 +382,7 @@ form {
 	border: 1px solid #ccdbe4;
 	margin: 0 2px;
 	padding: 3px 5px;
+	display: inline-block;
 }
 
 .results-pager .pager-link-current {
