@@ -77,19 +77,21 @@
 	padding: 5px;
 }
 
-.button {
-	margin: 5px 5px 5px 0px;
+.search-button {
+	margin-bottom: -6px;
 }
 
 table.result {
 	width: 100%;
 	margin: 0px;
 	margin-top: 3px;
+	table-layout: fixed;
 }
 
 table.result td {
 	padding-top: 5px;
 	padding-bottom: 5px;
+	overflow: hidden;
 }
 
 table.result .odd {
@@ -97,7 +99,7 @@ table.result .odd {
 }
 
 table.result .even {
-	background: #F8F0FF;
+	background: #F0F0FF;
 }
 
 form {
@@ -109,7 +111,6 @@ form {
 }
 
 .predicate {
-	width: 40%;
 	color: black;
 }
 
@@ -129,7 +130,7 @@ form {
 	width: 370px;
 	height: 400px;
 	overflow: auto;
-	border-left: 1px solid #900;
+	border-left: 1px solid #ccdbe4;
 }
 
 #statisticsTree ul {
@@ -152,6 +153,7 @@ form {
 	column-width: 100px;
 	-moz-column-width: 100px; /* Firefox */
 	-webkit-column-width: 100px; /* Safari and Chrome */
+	width: 130px;
 }
 
 #results-container table .value-col {
@@ -169,7 +171,7 @@ form {
 	height: auto !important;
 	height: 100%;
 	margin: 0 auto -20px;
-	background-color: #f8f8f8;
+	background-color: #fafafc;
 }
 
 #intro {
@@ -312,6 +314,7 @@ form {
 
 #ac-input {
 	width: 500px;
+	margin-top: 10px;
 }
 
 #disclaimer {
@@ -349,6 +352,8 @@ form {
 }
 
 .status {
+	border-top: 1px solid #ccdbe4;
+	height: 30px;
 }
 
 #result-stats {
@@ -377,6 +382,7 @@ form {
 	border: 1px solid #ccdbe4;
 	margin: 0 2px;
 	padding: 3px 5px;
+	display: inline-block;
 }
 
 .results-pager .pager-link-current {
