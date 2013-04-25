@@ -93,7 +93,7 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 	threadLocalUncompressedInputStream = new ThreadLocal<UncompressedInputStream>() {
 	    @Override
 	    protected UncompressedInputStream initialValue() {
-		return new UncompressedInputStream(byteBufferInputStream);
+		return new UncompressedInputStream(byteBufferInputStream.copy());
 	    }
 	};
     }
