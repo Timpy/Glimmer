@@ -133,7 +133,7 @@ public class IndexRecordWriter extends RecordWriter<IntWritable, IndexRecordWrit
 		    }
 		}
 	    } catch (RuntimeException e) {
-		LOG.warn("Exception for term>" + lastTermValue == null ? "" : lastTermValue.getTerm() + "< and doc value:" + value == null ? "null" : value.toString());
+		LOG.warn("Exception for term >" + (lastTermValue == null ? "null" : lastTermValue.getTerm()) + "< and doc value:" + (value == null ? "null" : value.toString()) );
 		logStats();
 		throw e;
 	    }

@@ -192,11 +192,15 @@ function groupBySubject () {
 		echo "PrepTool exited with code $EXIT_CODE. exiting.."
 		exit $EXIT_CODE
 	fi
-	
+}
+
+function moveBySubjectFiles() {
+	local PREP_DIR=${1}
 	local CMD="${HADOOP_CMD} fs -mv ${PREP_DIR}/part-r-00000/* ${PREP_DIR}"
 	echo ${CMD}
 	${CMD}
 	
+	echo "Getting ${N_VERTICAL_PREDICATES} most used predicates in topPredicates."
 	${HADOOP_CMD} fs -cat ${PREP_DIR}/predicates | sort -nr | cut -f 2 > ${LOCAL_BUILD_DIR}/allPredicates
 	head -${N_VERTICAL_PREDICATES} ${LOCAL_BUILD_DIR}/allPredicates > ${LOCAL_BUILD_DIR}/topPredicates
 	${HADOOP_CMD} fs -put ${LOCAL_BUILD_DIR}/topPredicates ${PREP_DIR}
@@ -380,7 +384,7 @@ function mergeSubIndexes() {
 		for PART_DIR in ${PART_DIRS[@]}; do
 			rm ${PART_DIR}/${INDEX_NAME}.*
 		done
-		
+
 		CMD="java -Xmx3800m -cp ${JAR_FOR_HADOOP} it.unimi.dsi.big.util.ImmutableExternalPrefixMap \
 			-o ${INDEX_DIR}/${INDEX_NAME}.terms \
 			${INDEX_DIR}/${INDEX_NAME}.termmap \
@@ -436,6 +440,7 @@ function generateDocSizes () {
 }	
 
 groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep
+moveBySubjectFiles ${DFS_BUILD_DIR}/prep
 computeHashes ${DFS_BUILD_DIR}/prep/all
 
 getDocCount ${DFS_BUILD_DIR}/prep

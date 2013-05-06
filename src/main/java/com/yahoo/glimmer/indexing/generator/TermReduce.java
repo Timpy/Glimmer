@@ -54,7 +54,7 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	    LOG.info(statusString);
 	}
 	
-	//TODO remove this when fixed int overflow bug fixed.
+	//TODO remove this when int overflow bug is fixed. Should be already but needs testing..
 	if (key.getTerm().startsWith("@-")) {
 	    throw new IllegalStateException("Negative referenceID. Key:" + key);
 	}
@@ -95,13 +95,12 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	    while (valuesIt.hasNext()) {
 		value = valuesIt.next();
 
-		if (value.getType() == Type.DOC_STATS) {
-		    termFrequency++;
-		    termCount += value.getV1();
-		    sumOfMaxTermPositions += value.getV2();
-		} else {
+		if (Type.DOC_STATS != value.getType()) {
 		    break;
 		}
+		termFrequency++;
+		termCount += value.getV1();
+		sumOfMaxTermPositions += value.getV2();
 	    }
 
 	    writerTermValue.setTerm(key.getTerm());
@@ -115,25 +114,25 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 	    prevValue.set(value);
 
 	    while (value != null) {
-		if (value.getType() == Type.OCCURRENCE) {
-		    long docId = value.getV1();
-		    if (docId < 0) {
-			throw new IllegalStateException("Negative DocID. Key:" + key + "\nValue:" + value);
-		    }
-		    if (docId != prevValue.getV1()) {
-			// New document, write out previous postings
-			writerDocValue.setDocument(prevValue.getV1());
-			
-			context.write(writerKey, writerDocValue);
-
-			// The first occerrence of this docId/
-			writerDocValue.clearOccerrences();
-			writerDocValue.addOccurrence(value.getV2());
-		    } else {
-			writerDocValue.addOccurrence(value.getV2());
-		    }
-		} else {
+		if (value.getType() != Type.OCCURRENCE) {
 		    throw new IllegalStateException("Got a " + value.getType() + " value when expecting only " + Type.OCCURRENCE);
+		}
+
+		long docId = value.getV1();
+		if (docId < 0) {
+		    throw new IllegalStateException("Negative DocID. Key:" + key + "\nValue:" + value);
+		}
+		if (docId != prevValue.getV1()) {
+		    // New document, write out previous postings
+		    writerDocValue.setDocument(prevValue.getV1());
+
+		    context.write(writerKey, writerDocValue);
+
+		    // The first occerrence of this docId/
+		    writerDocValue.clearOccerrences();
+		    writerDocValue.addOccurrence(value.getV2());
+		} else {
+		    writerDocValue.addOccurrence(value.getV2());
 		}
 
 		prevValue.set(value);
@@ -143,6 +142,10 @@ public class TermReduce extends Reducer<TermKey, TermValue, IntWritable, IndexRe
 		    value = valuesIt.next();
 		    //LOG.warn("Value:" + value.toString());
 		    // Skip equivalent occurrences
+		    if (value.equals(prevValue)) {
+			// This should never happen.. Is it legacy code?
+			throw new IllegalStateException("For indexId " + key.getIndex() + " and term " + key.getTerm() + " got a duplicate occurrence " + value.toString());
+		    }
 		    while (value.equals(prevValue) && valuesIt.hasNext()) {
 			value = valuesIt.next();
 		    }

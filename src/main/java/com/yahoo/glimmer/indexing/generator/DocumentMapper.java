@@ -103,9 +103,9 @@ public class DocumentMapper extends Mapper<LongWritable, Text, TermKey, TermValu
 			    // index) the first time we encounter a term.
 			    // The 'Alignment Index' is an index without counts
 			    // or positions. It's used for query optimization in
-			    // the query parse. The resulting 'alignment index'
+			    // the query parser. The resulting 'alignment index'
 			    // is basically used as a map from term to
-			    // predicates that term occures in.
+			    // predicates that the term occurs in.
 			    context.write(new TermKey(termString, ALIGNMENT_INDEX, indexIdValue), indexIdValue);
 			}
 			docStat = new DocStat();
