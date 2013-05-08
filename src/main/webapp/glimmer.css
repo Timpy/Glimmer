@@ -20,11 +20,11 @@ body {
 	text-align: left;
 	min-height: 100%;
 	height: auto !important;
-	margin: 0 auto -40px;
+	margin: 0 auto -41px;
 }
 
 #footer,#footer-push {
-	height: 40px;
+	height: 41px;
 	text-align: right;
 	font-size: x-small;
 	clear: both;
@@ -114,17 +114,21 @@ body {
 	display: none;
 }
 
-#id-text .param .query,#dataset,#loader,#class-message,#search-by-class-classes select,#search-by-class-properties table
-	{
+#id-text .param .query,#dataset,#loader,#class-message,#search-by-class-classes select,#search-by-class-properties table {
 	margin: 10px 5px 10px 10px;
 }
 
 #search-by-class-classes-select {
-	width: 400px;
+	width: 395px;
+}
+
+#search-by-class-properties {
+	margin: 5px 0px;
 }
 
 #search-by-class-properties table {
 	border: 0px;
+	margin: 0px;
 }
 
 #search-by-class-properties td {
@@ -156,10 +160,6 @@ table.result .even {
 	background: #F0F0FF;
 }
 
-form {
-	margin: 10px 0px;
-}
-
 .label {
 	font-size: 120%;
 }
@@ -178,9 +178,15 @@ form {
 	margin-top: 10px;
 	float: right;
 	width: 390px;
-	height: 400px;
+	min-height: 150px;
+	max-height: 600px;
+	padding: 4px 0px;
 	overflow: auto;
 	border-left: 1px solid #ccdbe4;
+}
+
+#statisticsTree .yui3-treeview-content {
+	margin: 0px 5px;
 }
 
 #results-container table .predicate-col {
@@ -203,10 +209,13 @@ form {
 #topContent {
 	z-index: 2;
 	float: left;
+	border-right: 1px solid #ccdbe4;
+	padding-right: 14px;
+	margin-right: -2px;
 }
 
 #bottom-content {
-	margin-top: 10px;
+	margin-top: 20px;
 	float: left;
 }
 
@@ -344,7 +353,7 @@ form {
 .results-pager .pager-link {
 	border: 1px solid #ccdbe4;
 	margin: 0 2px;
-	padding: 3px 5px;
+	padding: 1px 3px;
 	display: inline-block;
 }
 
