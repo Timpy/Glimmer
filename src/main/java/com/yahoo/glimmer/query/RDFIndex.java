@@ -67,6 +67,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.log4j.Logger;
+import org.semanticweb.yars.nx.namespace.RDF;
 
 import com.yahoo.glimmer.indexing.TitleListDocumentCollection;
 import com.yahoo.glimmer.util.BlockCompressedDocumentCollection;
@@ -74,7 +75,6 @@ import com.yahoo.glimmer.util.Util;
 
 public class RDFIndex {
     private final static Logger LOGGER = Logger.getLogger(RDFIndex.class);
-    private final static String TYPE_INDEX = "http_www_w3_org_1999_02_22_rdf_syntax_ns_type";
     public final static int MAX_STEMMING = 1024;
 
     private final static String BASENAME_INDEX_PROPERTY_KEY = "basename";
@@ -249,7 +249,7 @@ public class RDFIndex {
 
 	try {
 	    predicateDistribution = Collections.unmodifiableMap(getTermDistribution(indexMap.get(PREDICATE_INDEX_KEY), true));
-	    Index typeField = indexMap.get(TYPE_INDEX);
+	    Index typeField = indexMap.get(Util.encodeFieldName(RDF.TYPE.toString()));
 	    if (typeField == null) {
 		typeTermDistribution = Collections.emptyMap();
 	    } else {

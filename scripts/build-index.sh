@@ -34,6 +34,8 @@ if [ ! -z ${4} ] ; then
 	SUBINDICES=${4}
 fi
 
+# The ontology file to pass to PrepTool and TripleIndexGenerator
+ONTOLOGY="schemaDotOrg.owl"
 
 # Set to "-C" to exclude context from processing. 
 EXCLUDE_CONTEXTS=""
@@ -67,7 +69,6 @@ echo "and writing output to local disk in ${LOCAL_BUILD_DIR}."
 echo
 
 JAR_FOR_HADOOP="../target/Glimmer-0.0.1-SNAPSHOT-jar-for-hadoop.jar"
-HADOOP_CACHE_FILES="../target/classes/blacklist.txt"
 
 COMPRESSION_CODEC="org.apache.hadoop.io.compress.BZip2Codec"
 COMPRESSION_CODECS="org.apache.hadoop.io.compress.DefaultCodec,org.apache.hadoop.io.compress.GzipCodec,${COMPRESSION_CODEC}"
@@ -172,6 +173,10 @@ function groupBySubject () {
 	if [ ! -z ${PREP_FILTER_FILE} ] ; then
 		HADOOP_FILES="-files ${PREP_FILTER_FILE}#FilterXml"
 	fi
+	ONTOLOGY_OPTION=""
+	if [ ! -z ${ONTOLOGY} ] ; then
+		ONTOLOGY_OPTION="-O ${ONTOLOGY}"
+	fi
 	
 	local CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.preprocessor.PrepTool \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
@@ -183,6 +188,7 @@ function groupBySubject () {
 		-Dmapreduce.output.fileoutputformat.compress=false \
 		-Dmapreduce.job.queuename=${QUEUE} \
 		${HADOOP_FILES} \
+		${ONTOLOGY_OPTION} \
 		${EXCLUDE_CONTEXTS} ${INPUT_FILE} ${PREP_DIR}"
 	echo ${CMD}
 	${CMD}
@@ -272,6 +278,11 @@ function generateIndex () {
 		${HADOOP_CMD} fs -rmr -skipTrash ${METHOD_DIR}
 	fi
 	
+	HADOOP_FILES=""
+	if [ ! -z ${ONTOLOGY} ] ; then
+		HADOOP_FILES="-files ${ONTOLOGY}#Ontology"
+	fi
+	
 	echo Generating index..
 	local CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.generator.TripleIndexGenerator \
 		-Dio.compression.codecs=${COMPRESSION_CODECS} \
@@ -284,8 +295,9 @@ function generateIndex () {
 		-Dmapreduce.task.io.sort.mb=128 \
 		-Dmapreduce.job.queuename=${QUEUE} \
 		-Dmapreduce.job.user.classpath.first=true \
-		-files ${HADOOP_CACHE_FILES} \
-		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates ${PREP_DIR}/bySubject.bz2 $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
+		${HADOOP_FILES} \
+		-m ${METHOD} ${EXCLUDE_CONTEXTS} -p ${PREP_DIR}/topPredicates \
+		${PREP_DIR}/bySubject.bz2 $NUMBER_OF_DOCS ${METHOD_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
 
@@ -347,6 +359,12 @@ function mergeSubIndexes() {
 			rm -f ${INDEX_DIR}/*.${FILE_EXT}
 		done
 	fi
+	
+	# The first reducer write the sizes files for all partitions so we don't need to merge them
+	# Move the .sizes files to the correct location before running the merge. Otherwise Merge
+	# finds .sizes for only the first partition.
+	echo "Moving .sizes files.."
+	mv -v ${INDEX_DIR}/part-r-00000/*.sizes ${INDEX_DIR}
 	
 	PART_DIRS=(`ls -1d ${INDEX_DIR}/part-r-?????`)
 	echo "Map Reduce part dirs are:"
@@ -423,7 +441,6 @@ function generateDocSizes () {
 		-Dmapreduce.reduce.memory.mb=1800 \
 		-Dmapreduce.job.reduces=${NUM_INDEXES} \
 		-Dmapreduce.job.queuename=${QUEUE} \
-		-files ${HADOOP_CACHE_FILES} \
 		-m ${METHOD} -p ${PREP_DIR}/predicate ${PREP_DIR}/bySubject.bz2 $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${PREP_DIR}/all.map"
 	echo ${CMD}
 	${CMD}
@@ -436,7 +453,7 @@ function generateDocSizes () {
 		exit $EXIT_CODE
 	fi
 	
-	${HADOOP_CMD} fs -copyToLocal "${DFS_SIZES_DIR}/*.sizes" "${LOCAL_BUILD_DIR}/${METHOD}"
+	echo ${HADOOP_CMD} fs -copyToLocal "${DFS_SIZES_DIR}/*.sizes" "${LOCAL_BUILD_DIR}/${METHOD}"
 }	
 
 groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep

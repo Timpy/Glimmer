@@ -31,6 +31,7 @@ import org.semanticweb.owlapi.model.OWLOntologyManager;
 import org.semanticweb.owlapi.model.OWLProperty;
 
 import com.yahoo.glimmer.query.RDFIndexStatistics.ClassStat;
+import com.yahoo.glimmer.util.Util;
 import com.yahoo.glimmer.vocabulary.OwlUtils;
 
 public class RDFIndexStatisticsBuilder {
@@ -68,7 +69,7 @@ public class RDFIndexStatisticsBuilder {
 	for (String key : predicateTermDistribution.keySet()) {
 	    Integer count = predicateTermDistribution.get(key);
 	    if (key != null && count != null) {
-		this.predicateTermDistribution.put(removeVersion(key), count);
+		this.predicateTermDistribution.put(Util.removeVersion(key), count);
 	    }
 	}
 	return this;
@@ -82,7 +83,7 @@ public class RDFIndexStatisticsBuilder {
 	for (String clazzName : typeTermDistribution.keySet()) {
 	    Integer count = typeTermDistribution.get(clazzName);
 	    String localName = OwlUtils.getLocalName(IRI.create(clazzName));
-	    stats.addClassStat(removeVersion(clazzName), new ClassStat(localName, count));
+	    stats.addClassStat(Util.removeVersion(clazzName), new ClassStat(localName, count));
 	}
 
 	if (ontology != null && stats.getClasses() != null) {
@@ -97,7 +98,7 @@ public class RDFIndexStatisticsBuilder {
 		if (ontology.containsClassInSignature(IRI.create(clazzName))) {
 		    owlClass = ontology.getOWLOntologyManager().getOWLDataFactory().getOWLClass(IRI.create(clazzName));
 		} else {
-		    owlClass = ontology.getOWLOntologyManager().getOWLDataFactory().getOWLClass(IRI.create(removeVersion(clazzName)));
+		    owlClass = ontology.getOWLOntologyManager().getOWLDataFactory().getOWLClass(IRI.create(Util.removeVersion(clazzName)));
 		}
 
 		if (owlClass != null) {
@@ -109,7 +110,7 @@ public class RDFIndexStatisticsBuilder {
 			    String name = prop.getIRI().toString();
 			    stat.addProperty(name);
 
-			    String encodeName = com.yahoo.glimmer.util.Util.encodeFieldName(removeVersion(name));
+			    String encodeName = com.yahoo.glimmer.util.Util.encodeFieldName(Util.removeVersion(name));
 			    Integer predicateCount = predicateTermDistribution.get(encodeName);
 
 			    if (predicateCount != null) {
@@ -126,16 +127,9 @@ public class RDFIndexStatisticsBuilder {
 
 	    // Build tree and get root classes.
 	    Set<String> rootClassNames = new HashSet<String>();
-	    Set<ClassStat> ancestorStats = new HashSet<ClassStat>();
 	    HashSet<String> classNamesInIndex = new HashSet<String>(stats.getClasses().keySet());
 	    for (String className : classNamesInIndex) {
-		buildGraph(stats, nameToOwlClassMap, rootClassNames, ancestorStats, className);
-
-		int count = stats.getClasses().get(className).getCount();
-		for (ClassStat stat : ancestorStats) {
-		    stat.addToInheritedCount(count);
-		}
-		ancestorStats.clear();
+		buildGraph(stats, nameToOwlClassMap, rootClassNames, className);
 	    }
 
 	    for (String rootClassName : rootClassNames) {
@@ -178,8 +172,7 @@ public class RDFIndexStatisticsBuilder {
      * 
      *            TODO cyclic detection.
      */
-    private void buildGraph(RDFIndexStatistics stats, Map<String, OWLClass> nameToOwlClassMap, Set<String> rootClassNames,
-	    Set<ClassStat> ancestorStats, String owlClassName) {
+    private void buildGraph(RDFIndexStatistics stats, Map<String, OWLClass> nameToOwlClassMap, Set<String> rootClassNames, String owlClassName) {
 	int superClassCount = 0;
 	OWLClass owlClass = nameToOwlClassMap.get(owlClassName);
 	for (OWLClassExpression superOwlExpression : owlClass.getSuperClasses(ontology)) {
@@ -191,7 +184,7 @@ public class RDFIndexStatisticsBuilder {
 		if (superStat == null) {
 		    // Is is possible the the super class doesn't have a
 		    // ClassStat object as we start with only
-		    // ClassStat objects for things that are index.
+		    // ClassStat objects for things that are indexed.
 		    String superLocalName = OwlUtils.getLocalName(superOwlClass.getIRI());
 		    superStat = new ClassStat(superLocalName,0);
 		    superStat.setLabel(OwlUtils.getLabel(superOwlClass, ontology));
@@ -210,9 +203,7 @@ public class RDFIndexStatisticsBuilder {
 		// Add this owlClass as a child of the superOwlClass
 		superStat.addChild(owlClass.getIRI().toString());
 
-		buildGraph(stats, nameToOwlClassMap, rootClassNames, ancestorStats, superOwlClassName);
-
-		ancestorStats.add(superStat);
+		buildGraph(stats, nameToOwlClassMap, rootClassNames, superOwlClassName);
 
 		superClassCount++;
 	    }
@@ -239,8 +230,6 @@ public class RDFIndexStatisticsBuilder {
 	sb.append(owlClassName);
 	sb.append(':');
 	sb.append(stat.getCount());
-	sb.append('/');
-	sb.append(stat.getInheritedCount());
 	sb.append('\n');
 
 	if (stat.getChildren() != null) {
@@ -248,12 +237,5 @@ public class RDFIndexStatisticsBuilder {
 		print(depth + 1, stats, childClassName, sb);
 	    }
 	}
-    }
-
-    private static String removeVersion(String uri) {
-	// HACK: second part we shouldn't need
-	uri = uri.replaceFirst("[0-9]+\\.[0-9]+\\.[0-9]+\\/", "");
-	uri = uri.replaceFirst("[0-9]+_[0-9]_+[0-9]+_", "");
-	return uri;
     }
 }

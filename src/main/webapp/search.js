@@ -141,7 +141,7 @@ YUI({
 						});
 
 						function classSortOrderCompare(a,b) {
-							return b.inheritedCount - a.inheritedCount;
+							return b.count - a.count;
 						}
 
 						function addClass(clazz) {
@@ -151,15 +151,13 @@ YUI({
 								return rt;
 							}
 							
-							var label = '<a href="' + Y.Escape.html(clazz.className) + '">' + Y.Escape.html(clazz.localName) + ' ' + clazz.inheritedCount;
-							if (clazz.inheritedCount != clazz.count) {
-								label += "(" + clazz.count + ")";
-							}
+							var label = '<a href="' + Y.Escape.html(clazz.className) + '">' + Y.Escape.html(clazz.localName) + ' ' + clazz.count;
+							
 							label += '</a>';
 							rt.label = label;
 							
 							if (clazz.children !== undefined) {
-								// Sort childern nodes highest inherited count first.
+								// Sort childern nodes highest count first.
 								clazz.children.sort(classSortOrderCompare);
 								var children = [];
 								for (var i in clazz.children) {
@@ -247,7 +245,7 @@ YUI({
 								}
 							}
 
-							// Sort roots highest inherited count first.
+							// Sort roots highest count first.
 							rootClasses.sort(classSortOrderCompare);
 							
 							var tree = [];

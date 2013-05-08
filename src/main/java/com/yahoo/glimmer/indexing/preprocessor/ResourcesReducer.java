@@ -68,7 +68,7 @@ public class ResourcesReducer extends Reducer<Text, Text, Text, Object> {
 		keyContextCount++;
 	    } else if (SUBJECT_TEXT.equals(value)) {
 		throw new IllegalArgumentException("Reducer got a SUBJECT value!?.  Should only be \"PREDICATE\", \"OBJECT\", \"CONTEXT\" or a relation String.");
-	    } else {
+	    } else if (value.getLength() > 0) {
 		bySubjectRecord.addRelation(value.toString());
 		relationsCount++;
 	    }

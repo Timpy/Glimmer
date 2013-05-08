@@ -60,6 +60,7 @@ public class DocSizesGenerator extends Configured implements Tool {
     // Job configuration attribute names
     private static final String PROPERTIES_ARGS = "properties";
     private static final String RESOURCES_HASH_ARG = "resourcesHash";
+    private static final String ONTOLOGY_ARG = "ontology";
     private static final String OUTPUT_DIR_ARG = "OUTPUT_DIR";
     private static final String NUMBER_OF_DOCUMENTS_ARG = "NUMBER_OF_DOCUMENTS";
 
@@ -254,7 +255,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	private RDFDocument doc;
 
 	@Override
-	public void setup(Context context) {
+	public void setup(Context context) throws IOException {
 	    Configuration conf = context.getConfiguration();
 	    fields = RDFDocumentFactory.getFieldsFromConf(conf);
 	    doc = RDFDocumentFactory.buildFactory(conf).getDocument();
@@ -289,9 +290,9 @@ public class DocSizesGenerator extends Configured implements Tool {
 			// Report progress
 			if (position % 1000 == 0) {
 			    context.setStatus(fields[indexId] + "=" + term.substring(0, Math.min(term.length(), 50)));
+			    context.getCounter(Counters.INDEXED_OCCURRENCES).setValue(position);
 			}
 			position++;
-			context.getCounter(Counters.INDEXED_OCCURRENCES).increment(1);
 		    } else {
 			System.out.println("Nextterm is null");
 		    }
@@ -383,11 +384,13 @@ public class DocSizesGenerator extends Configured implements Tool {
 		new FlaggedOption(METHOD_ARG, JSAP.STRING_PARSER, METHOD_ARG_VALUE_HORIZONTAL, JSAP.REQUIRED, 'm', METHOD_ARG, "horizontal or vertical."),
 		new FlaggedOption(PROPERTIES_ARGS, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'p', PROPERTIES_ARGS,
 			"Subset of the properties to be indexed."),
+		new FlaggedOption(ONTOLOGY_ARG, JSAP.STRING_PARSER, JSAP.NO_DEFAULT, JSAP.NOT_REQUIRED, 'O', ONTOLOGY_ARG),
 
 		new UnflaggedOption("input", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the input data."),
 		new UnflaggedOption("numdocs", JSAP.LONG_PARSER, JSAP.REQUIRED, "Number of documents to index"),
 		new UnflaggedOption("output", JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location for the output."),
-		new UnflaggedOption(RESOURCES_HASH_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the resources hash file."), });
+		new UnflaggedOption(RESOURCES_HASH_ARG, JSAP.STRING_PARSER, JSAP.REQUIRED, "HDFS location of the resources hash file.")
+	});
 
 	JSAPResult args = jsap.parse(arg);
 
@@ -444,7 +447,7 @@ public class DocSizesGenerator extends Configured implements Tool {
 	    throw new IllegalArgumentException(METHOD_ARG + " should be '" + METHOD_ARG_VALUE_HORIZONTAL + "' or '" + METHOD_ARG_VALUE_VERTICAL + "'");
 	}
 
-	conf.setInt("mapreduce.input.linerecordreader.line.maxlength", 10000);
+	conf.setInt("mapreduce.input.linerecordreader.line.maxlength", 1024 * 1024);
 
 	boolean success = job.waitForCompletion(true);
 
