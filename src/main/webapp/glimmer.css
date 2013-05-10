@@ -217,6 +217,8 @@ table.result .even {
 #bottom-content {
 	margin-top: 20px;
 	float: left;
+	clear: both;
+	width:960px;
 }
 
 #spacer {
