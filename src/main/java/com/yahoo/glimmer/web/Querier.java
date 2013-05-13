@@ -46,13 +46,25 @@ public class Querier {
     private final static Logger LOGGER = Logger.getLogger(Querier.class);
     private static final String DEFAULT_CONTEXT = "default:";
     private static final int CACHE_SIZE = 10000;
+    private static final int BIG_RESULTS_LIMIT = 100000;
 
+    private final Map<Integer, ResultsCacheValue> queryHashToResultsCache;
     private final Map<String, Long> objectsSubjectsIdCache;
     private final Map<Long, String> objectLabelCache;
 
     private QueryLogger queryLogger = new QueryLogger();
 
     public Querier() {
+	Map<Integer, ResultsCacheValue> resultsCache = new LinkedHashMap<Integer, ResultsCacheValue>(CACHE_SIZE + 1, 1.1f, true) {
+	    private static final long serialVersionUID = -8171861525079261380L;
+
+	    protected boolean removeEldestEntry(java.util.Map.Entry<Integer, ResultsCacheValue> eldest) {
+		return size() > CACHE_SIZE;
+	    };
+	};
+
+	queryHashToResultsCache = Collections.synchronizedMap(resultsCache);
+
 	LinkedHashMap<String, Long> idCache = new LinkedHashMap<String, Long>(CACHE_SIZE + 1, 1.1f, true) {
 	    private static final long serialVersionUID = -8171861525079261380L;
 
@@ -72,19 +84,43 @@ public class Querier {
 	objectLabelCache = Collections.synchronizedMap(labelCache);
     }
 
-    public RDFQueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref, Integer objectLengthLimit) throws QueryBuilderVisitorException, IOException {
+    private static int getHashForQuery(String indexName, String query, int startItem, int maxNumItems) {
+	long l = indexName.hashCode();
+	l += query.hashCode();
+	l += startItem;
+	l += maxNumItems * 1299827l;
+	return (int) (l ^ (l >>> 32));
+    }
+
+    public RDFQueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref, Integer objectLengthLimit)
+	    throws QueryBuilderVisitorException, IOException {
 	if (startItem < 0 || maxNumItems < 0 || maxNumItems > 10000) {
 	    throw new IllegalArgumentException("Bad item range - start:" + startItem + " maxNumItems:" + maxNumItems);
 	}
 
-	ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results = new ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>>();
-
 	queryLogger.start();
 
-	int numResults = index.process(startItem, maxNumItems, results, query);
+	Integer queryHash = getHashForQuery(index.getIndexName(), query.toString(), startItem, maxNumItems);
 
-	if (results.size() > maxNumItems) {
-	    results.size(maxNumItems);
+	ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results;
+	int numResults;
+
+	if (queryHashToResultsCache.containsKey(queryHash)) {
+	    ResultsCacheValue cachedResults = queryHashToResultsCache.get(queryHash);
+	    results = cachedResults.results;
+	    numResults = cachedResults.numResults;
+	} else {
+	    results = new ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>>();
+	    numResults = index.process(startItem, maxNumItems, results, query);
+
+	    if (numResults > BIG_RESULTS_LIMIT) {
+		// Queries that return lots of results are slow. Cache them.
+		queryHashToResultsCache.put(queryHash, new ResultsCacheValue(numResults, results));
+	    }
+
+	    if (results.size() > maxNumItems) {
+		results.size(maxNumItems);
+	    }
 	}
 
 	ObjectArrayList<RDFResultItem> resultItems = new ObjectArrayList<RDFResultItem>();
@@ -121,7 +157,8 @@ public class Querier {
 	return new RDFQueryResult("", null, results.size(), 0, 1, results, (int) time);
     }
 
-    private RDFResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels, Integer objectLengthLimit) throws IOException {
+    private RDFResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels, Integer objectLengthLimit)
+	    throws IOException {
 	InputStream docInputStream;
 	try {
 	    docInputStream = index.getDocumentInputStream(docId);
@@ -207,5 +244,15 @@ public class Querier {
 	docInputStream.close();
 
 	return item;
+    }
+
+    private static class ResultsCacheValue {
+	public final ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results;
+	public final int numResults;
+
+	public ResultsCacheValue(int numResults, ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results) {
+	    this.results = results;
+	    this.numResults = numResults;
+	}
     }
 }
