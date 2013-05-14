@@ -23,10 +23,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.mutable.MutableInt;
 import org.apache.log4j.Logger;
 import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
@@ -181,6 +183,8 @@ public class Querier {
 	item.setSubjectId(record.getId());
 	item.setSubject(record.getSubject());
 	item.setScore(score);
+	
+	Map<String, MutableInt> predicateToAccumulatedOjectLengthMap = new HashMap<String, MutableInt>();
 
 	for (String relationString : record.getRelations()) {
 	    Node[] predicateObjectContext;
@@ -191,16 +195,31 @@ public class Querier {
 	    }
 
 	    String predicate = predicateObjectContext[0].toString();
-	    String object = predicateObjectContext[1].toString();
-	    if (objectLengthLimit != null && object.length() > objectLengthLimit) {
-		object = object.substring(0, objectLengthLimit) + "...";
+	    String object = predicateObjectContext[1].toString().trim();
+	    
+	    if (objectLengthLimit != null) {
+		MutableInt accumulatedOjectLength = predicateToAccumulatedOjectLengthMap.get(predicate);
+		if (accumulatedOjectLength == null) {
+		    accumulatedOjectLength = new MutableInt(0);
+		    predicateToAccumulatedOjectLengthMap.put(predicate, accumulatedOjectLength);
+		} else if (accumulatedOjectLength.intValue() >= objectLengthLimit) {
+		    continue;
+		}
+		
+		// If the new accumulated length will be more than the limit(plus a bit).
+		if (accumulatedOjectLength.intValue() + object.length() > objectLengthLimit + 20) {
+		    object = object.substring(0, objectLengthLimit - accumulatedOjectLength.intValue()) + "...";
+		}
+		accumulatedOjectLength.add(object.length());
 	    }
+	    
 	    String context;
 	    if (predicateObjectContext.length > 2) {
 		context = predicateObjectContext[2].toString();
 	    } else {
 		context = DEFAULT_CONTEXT;
 	    }
+	    
 	    boolean indexed = index.getIndexedPredicates().contains(Util.encodeFieldName(predicate));
 
 	    String label = null;
@@ -227,7 +246,7 @@ public class Querier {
 		    label = objectLabelCache.get(subjectIdOfObject);
 		} else {
 		    // If the object is also a subject Resource/BNode this
-		    // will return that subjects id with is the same as the
+		    // will return that subjects id which is the same as the
 		    // docId. Parse the subject doc that this object refers
 		    // too..
 		    RDFResultItem objectItem = createRdfResultItem(index, subjectIdOfObject, 0.0d, false, null);
@@ -236,6 +255,11 @@ public class Querier {
 		    }
 		    objectLabelCache.put(subjectIdOfObject, label);
 		}
+	    }
+	    
+	    // If the final label is the same as the object we just use the object.
+	    if (object.equals(label)) {
+		label = null;
 	    }
 
 	    item.addRelation(predicate, object, subjectIdOfObject, context, indexed, label);
