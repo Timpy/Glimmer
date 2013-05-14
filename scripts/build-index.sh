@@ -419,49 +419,13 @@ function mergeSubIndexes() {
 	rm -rf ${INDEX_DIR}/part-r-?????
 }
 
-	
-function generateDocSizes () {
-	PREP_DIR=${1}
-	METHOD=horizontal
-	NUMBER_OF_DOCS=${2}
-	NUM_INDEXES=5
-	
-	echo
-	echo GENERATING DOC SIZES..
-	echo
-	
-	DFS_SIZES_DIR="${DFS_BUILD_DIR}/${METHOD}.sizes"
-	
-	CMD="${HADOOP_CMD} jar ${JAR_FOR_HADOOP} com.yahoo.glimmer.indexing.DocSizesGenerator \
-		-Dmapreduce.map.failures.maxpercent=1 \
-		-Dmapreduce.map.speculative=false \
-		-Dmapred.map.child.java.opts=-Xmx3000m \
-		-Dmapreduce.map.memory.mb=3000 \
-		-Dmapred.reduce.child.java.opts=-Xmx1800m \
-		-Dmapreduce.reduce.memory.mb=1800 \
-		-Dmapreduce.job.reduces=${NUM_INDEXES} \
-		-Dmapreduce.job.queuename=${QUEUE} \
-		-m ${METHOD} -p ${PREP_DIR}/predicate ${PREP_DIR}/bySubject.bz2 $NUMBER_OF_DOCS ${DFS_SIZES_DIR} ${PREP_DIR}/all.map"
-	echo ${CMD}
-	${CMD}
-	EXIT_CODE=$?
-	
-	${HADOOP_CMD} fs -rmr -skipTrash "${DFS_SIZES_DIR}/*-temp"
-	
-	if [ $EXIT_CODE -ne 0 ] ; then
-		echo "DocSizesGenerator failed with value of $EXIT_CODE. exiting.."
-		exit $EXIT_CODE
-	fi
-	
-	echo ${HADOOP_CMD} fs -copyToLocal "${DFS_SIZES_DIR}/*.sizes" "${LOCAL_BUILD_DIR}/${METHOD}"
-}	
-
 groupBySubject ${IN_FILE} ${DFS_BUILD_DIR}/prep
 moveBySubjectFiles ${DFS_BUILD_DIR}/prep
 computeHashes ${DFS_BUILD_DIR}/prep/all
 
 getDocCount ${DFS_BUILD_DIR}/prep
 
+# Horizontal and Vertical index builds could be run in parallel..
 generateIndex ${DFS_BUILD_DIR}/prep horizontal ${NUMBER_OF_DOCS} ${SUBINDICES}
 getSubIndexes horizontal
 mergeSubIndexes horizontal
@@ -469,9 +433,6 @@ mergeSubIndexes horizontal
 generateIndex ${DFS_BUILD_DIR}/prep vertical ${NUMBER_OF_DOCS} ${SUBINDICES}
 getSubIndexes vertical
 mergeSubIndexes vertical
-
-# These could be run in parallel with index generation.
-generateDocSizes ${DFS_BUILD_DIR}/prep ${NUMBER_OF_DOCS}
 
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all" "${LOCAL_BUILD_DIR}/all.txt"
 ${HADOOP_CMD} fs -copyToLocal "${DFS_BUILD_DIR}/prep/all.map" "${LOCAL_BUILD_DIR}"
