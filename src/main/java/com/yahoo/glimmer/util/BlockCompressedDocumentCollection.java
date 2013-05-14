@@ -321,6 +321,15 @@ public class BlockCompressedDocumentCollection extends AbstractDocumentCollectio
 	}
 	return -byteCount;
     }
+    
+    @Override
+    public void close() throws IOException {
+        super.close();
+        // We have to remove the thread local object as in containers like tomcat the thread may still exist after the app is undeployed.
+        if (threadLocalUncompressedInputStream != null) {
+            threadLocalUncompressedInputStream.remove();
+        }
+    }
 
     public static void main(String[] args) throws IOException {
 	if (args.length < 1) {
