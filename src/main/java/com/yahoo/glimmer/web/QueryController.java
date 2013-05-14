@@ -132,7 +132,7 @@ public class QueryController {
 			throw new IllegalArgumentException("subject " + idOrSubject + " is not in collection.");
 		    }
 		}
-		result = querier.doQueryForDocId(index, id, command.isDeref(), defaultObjectLengthLimit);
+		result = querier.doQueryForDocId(index, id, command.isDeref(), null);
 	    } else {
 		try {
 		    parsedQuery = index.getParser().parse(query);
