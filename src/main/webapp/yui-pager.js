@@ -104,7 +104,7 @@ YUI.add('yui-pager', function (Y){
 				
 				if (state.page < pages) {
 					appendElement(rootElement, state.next, state.page + 1);
-					appendElement(rootElement, state.last, pages);
+					//appendElement(rootElement, state.last, pages);
 				}
 			}
 		},
