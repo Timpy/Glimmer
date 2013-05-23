@@ -65,7 +65,7 @@ function getLocalName(uri) {
 
 function getProviderName(sstring) {
 	if (contextsToColour[sstring] === undefined) {
-		return getLocalName(sstring);
+		return sstring;
 	} else {
 		return contextsToColour[sstring];
 	}
@@ -506,8 +506,8 @@ YUI({
 						if (map[predicate].hasOwnProperty(relationKey)) {
 							var item = map[predicate][relationKey];
 							var providedName = "unknown";
-							if (item.context[0] !== undefined) {
-								providedName = getProviderName(item.context[0]);
+							if (item.context !== undefined) {
+								providedName = getProviderName(item.context);
 							}
 							var div = Y.Node.create('<div title="' + providedName + '" class="source-' + providedName + '"></div>');
 							div.appendChild(renderValue(item.object, item.label));
