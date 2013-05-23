@@ -1,18 +1,21 @@
 <html>
 <head>
-<title>Glimmer - An RDF Search Engine</title>
-<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssreset/cssreset-min.css" />
-<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssbase/cssbase-min.css" />
-<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssfonts/cssfonts-min.css" />
-<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/gallery-2011.01.03-18-30/build/gallery-yui3treeview/assets/treeview-classic.css" />
-<link rel="stylesheet" type="text/css" href="schema.css" />
-<link rel="stylesheet" type="text/css" href="glimmer.css" />
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Glimmer - An RDF Search Engine</title>
+	<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssreset/cssreset-min.css" />
+	<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssbase/cssbase-min.css" />
+	<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/3.4.1/build/cssfonts/cssfonts-min.css" />
+	<link rel="stylesheet" type="text/css" href="http://yui.yahooapis.com/gallery-2011.01.03-18-30/build/gallery-yui3treeview/assets/treeview-classic.css" />
+	<link rel="stylesheet" type="text/css" href="schema.css" />
+	<link rel="stylesheet" type="text/css" href="glimmer.css" />
+	<link rel="icon" href="favicon.ico" type="image/x-icon">
+	<link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
 	<script src="http://yui.yahooapis.com/3.4.1/build/yui/yui-min.js"></script>
 	<script type="text/javascript" src="yui-pager.js"></script>
 	<script type="text/javascript" src="search.js"></script>
-	<div id="container" class="container">
+	<div id="container" class="container min-page-width">
 		<div id="pageHeader">
 			<img src="yahoo_glimmer.png" title="Glimmer - An RDF Search Engine"></img>
 		</div>
@@ -46,7 +49,7 @@
 					<div id="unifiedsearch" class="yui3-skin-sam">
 						<form id="unifiedsearchform" action="javascript:void(0);">
 							<label for="ac-input">Enter a query, e.g.,
-								personName:(barack obama) birthDate:(1961)</label> <br> <input
+								name:(barack obama) birthdate:(04 08 1961)</label> <br> <input
 								id="ac-input" type="text"> <input type="image" src="search_button.png"
 								class="search-button" value="Search">
 						</form>
@@ -96,6 +99,19 @@
 		</div>
 		<div id='footer-push'></div>
 	</div>
-	<div id='footer'><a href='http://info.yahoo.com/legal/us/yahoo/utos/terms'>Terms</a></div>
+	<div id='footer' class='min-page-width'>
+		
+		<style type="text/css">
+			#mem_ft {border-top:1px solid #CCDBE4;font-size:10px;font-family:arial,helvetica,clean,sans-serif;text-align:center}
+			#mem_ft p {margin:0;padding:0;}
+		</style>
+		<!--[if IE]> 
+		<style type="text/css">
+		#mem_ft p {margin:0.25em 0 0 0;}
+		</style>
+		<![endif]--><div id="mem_ft">
+		<p> Copyright © 2013 Yahoo! Inc. All rights reserved.</p>
+		<p><a href="http://info.yahoo.com/legal/us/yahoo/utos/terms" target='_blank'>Terms of Service</a></p>
+	</div>
 </body>
 </html>

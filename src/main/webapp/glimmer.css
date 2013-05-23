@@ -8,6 +8,65 @@
  *  See the License for the specific language governing permissions and limitations under the License.
  *  See accompanying LICENSE file.
  */
+ 
+body {
+	padding-top:15px;
+	background-color: #fafafc;
+	min-width: 980px;
+	width:expression(document.body.clientWidth < 980? "980px": "auto" );
+}
+
+#container {
+	text-align: left;
+	height: 100%;
+	margin: 0 auto -42px;
+}
+
+#footer,#footer-push {
+	height: 41px;
+	text-align: right;
+	font-size: x-small;
+	clear: both;
+	margin: auto;
+}
+
+.min-page-width {
+	max-width: 960px;
+	min-width: 960px;
+	width: 960px;
+}
+
+#mainContent {
+	margin: 0px auto !important;
+	max-width: 960px;
+	min-width: 960px;
+	font-size: 100%;
+}
+
+#mainContent a:link { /*color: #5555FF*/;
+	color: #3A4956;
+	text-decoration: none;
+}
+
+#mainContent a:visited {
+	color: #3A4956;
+	text-decoration: none;
+}
+
+#mainContent a:hover {
+	border-bottom: none;
+	color: #fff;
+	background-color: #5555FF;
+	text-decoration: none;
+}
+
+#mainContent blockquote {
+	padding: 0 0 0 15px;
+	margin: 10px 0 10px 15px;
+	width: auto;
+	float: right;
+}
+ 
 /* -- local specific -- */
 .context-red {
 	color: #FF0000;
@@ -47,12 +106,6 @@
 	float: right;
 }
 
-#bottom-content {
-	position: relative;
-	clear: both;
-	width: 940px;
-}
-
 #results-container {
 }
 
@@ -60,17 +113,21 @@
 	display: none;
 }
 
-#id-text .param .query,#dataset,#loader,#class-message,#search-by-class-classes select,#search-by-class-properties table
-	{
+#id-text .param .query,#dataset,#loader,#class-message,#search-by-class-classes select,#search-by-class-properties table {
 	margin: 10px 5px 10px 10px;
 }
 
 #search-by-class-classes-select {
-	width: 400px;
+	width: 395px;
+}
+
+#search-by-class-properties {
+	margin: 5px 0px;
 }
 
 #search-by-class-properties table {
 	border: 0px;
+	margin: 0px;
 }
 
 #search-by-class-properties td {
@@ -102,10 +159,6 @@ table.result .even {
 	background: #F0F0FF;
 }
 
-form {
-	margin: 10px 0px;
-}
-
 .label {
 	font-size: 120%;
 }
@@ -118,35 +171,21 @@ form {
 	background: #DDDDDD;
 }
 
-/** Most specific **/
-#statisticsTree a:link {
-	border-bottom: none;
-}
 
 #statisticsTree {
 	line-height: 150%;
 	margin-top: 10px;
 	float: right;
-	width: 370px;
-	height: 400px;
+	width: 390px;
+	min-height: 150px;
+	max-height: 310px;
+	padding: 4px 0px;
 	overflow: auto;
 	border-left: 1px solid #ccdbe4;
 }
 
-#statisticsTree ul {
-	margin-bottom: 6px;
-	margin-top: 6px;
-	padding-bottom: 0px;
-}
-
-#statisticsTree .yui3-treeleaf {
-	padding-top: 0px;
-	margin-bottom: 1px;
-	margin-top: 1px;
-}
-
-#statisticsTree .yui3-treeview-label-content {
-	top: 0px;
+#statisticsTree .yui3-treeview-content {
+	margin: 0px 5px;
 }
 
 #results-container table .predicate-col {
@@ -162,40 +201,23 @@ form {
 	-webkit-column-width: 450px; /* Safari and Chrome */
 }
 
-/* -- header/title -- */
-#container {
-	width: 100%;
-	text-align: left;
-	margin: 0;
-	min-height: 100%;
-	height: auto !important;
-	height: 100%;
-	margin: 0 auto -20px;
-	background-color: #fafafc;
-}
-
 #intro {
 	position: relative;
 }
 
-#mainContent { /*margin: 15px 50px 15px 50px; */
-	margin: 15px auto !important;
-	max-width: 960px;
-	min-width: 350px;
-}
-
 #topContent {
-	padding: 8px;
 	z-index: 2;
 	float: left;
+	border-right: 1px solid #ccdbe4;
+	padding-right: 14px;
+	margin-right: -2px;
 }
 
 #bottom-content {
-	padding: 10px;
-	margin-top: 10px;
-	/*	max-width: 650px;
-	min-width: 650px; */
+	margin-top: 20px;
 	float: left;
+	clear: both;
+	width:960px;
 }
 
 #spacer {
@@ -206,14 +228,6 @@ form {
 	margin: 15px auto !important;
 	padding: 10px 10px 10px 0px;
 	float: left;
-}
-
-#footer,#footer-push {
-	padding: 0 10px;
-	height: 20px;
-	text-align: right;
-	font-size: x-small;
-	clear: both;
 }
 
 #togglefields {
@@ -231,18 +245,6 @@ form {
 	left: 190px;
 	top: -20px;
 	margin-bottom: -20px;
-}
-
-#pageHeader {
-	width: 100%;
-	height: 50px;
-	max-width: 960px;
-	min-width: 350px;
-	margin: 0 auto !important;
-	padding: 0 40px;
-	position: relative;
-	top: 25px;
-	left: -40px;
 }
 
 #pageHeader h1 {
@@ -307,11 +309,6 @@ form {
 	cursor: pointer;
 }
 
-/* -- main content -- */
-#mainContent {
-	font-size: 100%;
-}
-
 #ac-input {
 	width: 500px;
 	margin-top: 10px;
@@ -321,30 +318,6 @@ form {
 	width: 960px;
 	margin-left: auto;
 	margin-right: auto;
-}
-
-#mainContent a:link { /*color: #5555FF*/;
-	color: #3A4956;
-	text-decoration: none;
-}
-
-#mainContent a:visited {
-	color: #3A4956;
-	text-decoration: none;
-}
-
-#mainContent a:hover {
-	border-bottom: none;
-	color: #fff;
-	background-color: #5555FF;
-	text-decoration: none;
-}
-
-#mainContent blockquote {
-	padding: 0 0 0 15px;
-	margin: 10px 0 10px 15px;
-	width: auto;
-	float: right;
 }
 
 #statistics-loader {
@@ -381,7 +354,7 @@ form {
 .results-pager .pager-link {
 	border: 1px solid #ccdbe4;
 	margin: 0 2px;
-	padding: 3px 5px;
+	padding: 1px 3px;
 	display: inline-block;
 }
 

@@ -89,7 +89,7 @@ YUI.add('yui-pager', function (Y){
 			rootElement.setContent("");
 			var pages = this.getNumberOfPages();
 			
-			if (pages > 0) {
+			if (pages > 1) {
 				if (state.page > 1) {
 					appendElement(rootElement, state.first, 1);
 					appendElement(rootElement, state.previous, state.page - 1);
@@ -97,14 +97,14 @@ YUI.add('yui-pager', function (Y){
 				var relativePageNumbers = this.getRelativePageNumbers();
 				for (var i = 0 ; i < relativePageNumbers.length ; i++) {
 					var delta = relativePageNumbers[i];
-					var label = delta === 0 ? state.page : (delta > 0) ? '+' + delta : delta;
+					var label = state.page + delta;
 					var pageNumber = state.page + delta;
 					appendElement(rootElement, label, pageNumber, pageNumber == state.page);
 				}
 				
 				if (state.page < pages) {
 					appendElement(rootElement, state.next, state.page + 1);
-					appendElement(rootElement, state.last, pages);
+					//appendElement(rootElement, state.last, pages);
 				}
 			}
 		},
@@ -150,23 +150,15 @@ YUI.add('yui-pager', function (Y){
 			
 			var pages = this.getNumberOfPages();
 
-			while (state.page - d >= 1 || state.page + d <= pages) {
+			while (d < 8 && a.length < 8) {
 				if (state.page - d >= 1) {
 					a.unshift( -d);
 				}
 				if (state.page + d <= pages) {
 					a.push(d);
 				}
-				if (d == 1) {
-					d = 2;
-				} else if (d == 2) {
-					d = 5;
-				} else if ( (100 * Math.log(d) / Math.LN10) % 100 === 0 ) {
-					// power of 10.
-					d *= 5;
-				} else {
-					d *= 2;
-				}
+				
+				d++;
 			}
 			
 			return a;

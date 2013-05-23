@@ -27,7 +27,6 @@ public class RDFIndexStatistics {
     public static class ClassStat {
 	private final String localName;
 	private final int count;
-	private int inheritedCount;
 	private String label;
 	private Set<String> properties;
 	private Set<String> children;
@@ -35,7 +34,6 @@ public class RDFIndexStatistics {
 	public ClassStat(String localName, int count) {
 	    this.localName = localName;
 	    this.count = count;
-	    inheritedCount = count;
 	}
 
 	public String getLocalName() {
@@ -44,14 +42,6 @@ public class RDFIndexStatistics {
 
 	public int getCount() {
 	    return count;
-	}
-
-	public int getInheritedCount() {
-	    return inheritedCount;
-	}
-
-	public void addToInheritedCount(int delta) {
-	    inheritedCount += delta;
 	}
 
 	public String getLabel() {

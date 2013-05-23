@@ -19,7 +19,6 @@ body {
 	margin: 0;
 	padding: 0;
 	text-align: center;
-	height: 100%;
 }
 
 code {
@@ -38,7 +37,7 @@ h2 {
 	padding-top: 5px;
 	clear: both;
 	font: normal 18px Helvetica, Arial, sans-serif;
-	margin: 2em 0 0 0;
+	margin: 10px 0 0 0;
 }
 
 h3 {

@@ -13,6 +13,16 @@ String.prototype.startsWith = function(str) {
 	return (this.match("^" + str) == str);
 };
 
+// IE doesn't have indexOf method on Arrays.
+if (!Array.prototype.indexOf) { 
+    Array.prototype.indexOf = function(obj, start) {
+         for (var i = (start || 0), j = this.length; i < j; i++) {
+             if (this[i] === obj) { return i; }
+         }
+         return -1;
+    }
+}
+
 var stats;
 var fieldShortNames;
 var fieldLongNames;
@@ -55,7 +65,7 @@ function getLocalName(uri) {
 
 function getProviderName(sstring) {
 	if (contextsToColour[sstring] === undefined) {
-		return getLocalName(sstring);
+		return sstring;
 	} else {
 		return contextsToColour[sstring];
 	}
@@ -113,7 +123,7 @@ YUI({
 				},
 				on: {
 					success : function(transactionid, response, args) {
-						stats = Y.JSON.parse(response.response);
+						stats = Y.JSON.parse(response.responseText);
 
 						Y.one("#class-loader").hide();
 						Y.one("#class-message").setContent("");
@@ -141,7 +151,7 @@ YUI({
 						});
 
 						function classSortOrderCompare(a,b) {
-							return b.inheritedCount - a.inheritedCount;
+							return b.count - a.count;
 						}
 
 						function addClass(clazz) {
@@ -151,15 +161,13 @@ YUI({
 								return rt;
 							}
 							
-							var label = '<a href="' + Y.Escape.html(clazz.className) + '">' + Y.Escape.html(clazz.localName) + ' ' + clazz.inheritedCount;
-							if (clazz.inheritedCount != clazz.count) {
-								label += "(" + clazz.count + ")";
-							}
+							var label = '<a href="' + Y.Escape.html(clazz.className) + '">' + Y.Escape.html(clazz.localName) + ' ' + clazz.count;
+							
 							label += '</a>';
 							rt.label = label;
 							
 							if (clazz.children !== undefined) {
-								// Sort childern nodes highest inherited count first.
+								// Sort childern nodes highest count first.
 								clazz.children.sort(classSortOrderCompare);
 								var children = [];
 								for (var i in clazz.children) {
@@ -247,7 +255,7 @@ YUI({
 								}
 							}
 
-							// Sort roots highest inherited count first.
+							// Sort roots highest count first.
 							rootClasses.sort(classSortOrderCompare);
 							
 							var tree = [];
@@ -368,7 +376,7 @@ YUI({
 				data: paramsMap,
 				on: {
 					success : function(transactionid, response, args) {
-						var result = Y.JSON.parse(response.response);
+						var result = Y.JSON.parse(response.responseText);
 						
 						Y.one("#results-loader").hide();
 						Y.one("#result-stats").setContent("Found " + result.numResults + " results in " + result.time + " ms.");
@@ -395,7 +403,7 @@ YUI({
 					failure : function(transactionid, response, args) {
 						var message = "";
 						if (response !== undefined) {
-							message = Y.JSON.parse(response.response);
+							message = Y.JSON.parse(response.responseText);
 						}
 						alert("Failed to get results from server. " + message);
 						Y.one("#results-loader").hide();
@@ -477,8 +485,13 @@ YUI({
 			}
 			li.append(span);
 
-			var table = Y.Node
-					.create('<table class=\"result\"><col class=\"predicate-col\"/><col class=\"value-col\"/><th class="result-header">Property</th><th class=\"result-header\">Value</th></table>');
+			var table = Y.Node.create('<table class=\"result\"></table>');
+			table.appendChild(Y.Node.create('<colgroup><col class=\"predicate-col\"/><col class=\"value-col\"/></colgroup>'));
+			var tbody = Y.Node.create('<tbody></tbody');
+			table.appendChild(tbody);
+			
+			tbody.appendChild('<tr><th class="result-header">Property</th><th class=\"result-header\">Value</th></tr>');
+			
 			var i = 0;
 			for (var predicate in map) {
 				if (map.hasOwnProperty(predicate)) {
@@ -492,7 +505,10 @@ YUI({
 					for (var relationKey in map[predicate]) {
 						if (map[predicate].hasOwnProperty(relationKey)) {
 							var item = map[predicate][relationKey];
-							var providedName = getProviderName(item.context[0]);
+							var providedName = "unknown";
+							if (item.context !== undefined) {
+								providedName = getProviderName(item.context);
+							}
 							var div = Y.Node.create('<div title="' + providedName + '" class="source-' + providedName + '"></div>');
 							div.appendChild(renderValue(item.object, item.label));
 							if (item.subjectIdOfObject !== undefined) {
@@ -510,7 +526,7 @@ YUI({
 					}
 					tr.appendChild(tdPredicate);
 					tr.appendChild(tdValues);
-					table.appendChild(tr);
+					tbody.appendChild(tr);
 				}
 			}
 
@@ -631,7 +647,7 @@ YUI({
 		var dataSetListConfig = {
 			on: {
 				success: function(transactionid, response, args) {
-					var dataSetNames = Y.JSON.parse(response.response);
+					var dataSetNames = Y.JSON.parse(response.responseText);
 					for (var i in dataSetNames) {
 						if (dataSetNames.hasOwnProperty(i)) {
 							var dataSetName = dataSetNames[i];

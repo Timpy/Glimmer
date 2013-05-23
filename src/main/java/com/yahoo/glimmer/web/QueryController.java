@@ -89,7 +89,7 @@ public class QueryController {
 	return Collections.singletonMap(OBJECT_KEY, statistics);
     }
 
-    @RequestMapping(value = "/query", method = RequestMethod.GET)
+    @RequestMapping(value = {"/query", "/v1/search"} , method = RequestMethod.GET)
     public Map<String, ?> query(@ModelAttribute(INDEX_KEY) RDFIndex index, @Valid QueryCommand command, HttpServletRequest httpServletRequest) throws QueryParserException,
 	    QueryBuilderVisitorException, IOException {
 	if (index == null) {
@@ -132,7 +132,7 @@ public class QueryController {
 			throw new IllegalArgumentException("subject " + idOrSubject + " is not in collection.");
 		    }
 		}
-		result = querier.doQueryForDocId(index, id, command.isDeref(), defaultObjectLengthLimit);
+		result = querier.doQueryForDocId(index, id, command.isDeref(), null);
 	    } else {
 		try {
 		    parsedQuery = index.getParser().parse(query);
