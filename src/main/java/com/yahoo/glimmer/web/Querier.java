@@ -107,6 +107,7 @@ public class Querier {
 	ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results;
 	int numResults;
 
+	// TODO: Caching results here maybe pointless now that queries by type only aren't scored.  See RDFIndex.process();
 	if (queryHashToResultsCache.containsKey(queryHash)) {
 	    ResultsCacheValue cachedResults = queryHashToResultsCache.get(queryHash);
 	    results = cachedResults.results;
