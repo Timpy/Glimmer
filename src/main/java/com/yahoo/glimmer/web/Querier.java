@@ -35,8 +35,6 @@ import org.semanticweb.yars.nx.parser.NxParser;
 
 import com.yahoo.glimmer.query.QueryLogger;
 import com.yahoo.glimmer.query.RDFIndex;
-import com.yahoo.glimmer.query.RDFQueryResult;
-import com.yahoo.glimmer.query.RDFResultItem;
 import com.yahoo.glimmer.util.BySubjectRecord;
 import com.yahoo.glimmer.util.Util;
 
