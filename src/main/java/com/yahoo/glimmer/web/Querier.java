@@ -34,6 +34,7 @@ import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
 
 import com.yahoo.glimmer.query.QueryLogger;
+import com.yahoo.glimmer.query.QueryLogger.QueryTimer;
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.util.BySubjectRecord;
 import com.yahoo.glimmer.util.Util;
@@ -98,7 +99,7 @@ public class Querier {
 	    throw new IllegalArgumentException("Bad item range - start:" + startItem + " maxNumItems:" + maxNumItems);
 	}
 
-	queryLogger.start();
+	QueryTimer timer = queryLogger.start();
 
 	Integer queryHash = getHashForQuery(index.getIndexName(), query.toString(), startItem, maxNumItems);
 
@@ -123,6 +124,8 @@ public class Querier {
 		results.size(maxNumItems);
 	    }
 	}
+	
+	timer.endSearch();
 
 	ObjectArrayList<QueryResultItem> resultItems = new ObjectArrayList<QueryResultItem>();
 	if (!results.isEmpty()) {
@@ -139,15 +142,15 @@ public class Querier {
 	    }
 	}
 
-	long time = queryLogger.endQuery(query.toString(), numResults);
-	QueryResult result = new QueryResult(null, query != null ? query.toString() : "", numResults, startItem, maxNumItems, resultItems, (int) time);
+	queryLogger.endQuery(timer, query.toString(), numResults);
+	QueryResult result = new QueryResult(null, query != null ? query.toString() : "", numResults, startItem, maxNumItems, resultItems, timer.getDuration(), timer.getSearchDuration());
 	return result;
     }
 
     public QueryResult doQueryForDocId(RDFIndex index, long id, boolean deref, Integer objectLengthLimit) throws IOException {
-	queryLogger.start();
+	QueryTimer timer = queryLogger.start();
 	QueryResultItem resultItem = createRdfResultItem(index, id, 1.0d, deref, objectLengthLimit);
-	long time = queryLogger.endQuery("getDoc " + Long.toString(id), 1);
+	queryLogger.endQuery(timer, "getDoc " + Long.toString(id), 1);
 
 	List<QueryResultItem> results;
 	if (resultItem != null) {
@@ -155,7 +158,7 @@ public class Querier {
 	} else {
 	    results = Collections.emptyList();
 	}
-	return new QueryResult("", null, results.size(), 0, 1, results, (int) time);
+	return new QueryResult("", null, results.size(), 0, 1, results, timer.getDuration(), timer.getSearchDuration());
     }
 
     private QueryResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels, Integer objectLengthLimit)
