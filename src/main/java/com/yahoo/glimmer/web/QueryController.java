@@ -18,6 +18,7 @@ import it.unimi.di.big.mg4j.query.parser.SimpleParser;
 
 import java.io.IOException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,6 +31,8 @@ import javax.validation.Valid;
 import org.apache.log4j.Logger;
 import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.stereotype.Controller;
+import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -123,7 +126,7 @@ public class QueryController {
 		    try {
 			id = Long.parseLong(idOrSubject);
 		    } catch (NumberFormatException e) {
-			throw new IllegalArgumentException("Query " + query + " failed to parse as a numeric subject ID(int)");
+			throw new IllegalArgumentException("Query " + query + " failed to parse as a numeric subject ID.");
 		    }
 		} else {
 		    id = index.getSubjectId(idOrSubject);
@@ -153,8 +156,15 @@ public class QueryController {
 	if (!(ex instanceof HttpMessageConversionException)) {
 	    LOGGER.error("Exception when processing:" + request.getQueryString(), ex);
 	}
-	response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-	return Collections.singletonMap(OBJECT_KEY, ex.getMessage());
+	if (ex instanceof IllegalArgumentException) {
+	    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+	    return Collections.singletonMap(OBJECT_KEY, ex.getMessage());
+	} else if (ex instanceof BindException) {
+	    response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+	    List<FieldError> errors = ((BindException) ex).getFieldErrors();
+	    return Collections.singletonMap(OBJECT_KEY, "Error binding on parameter:" + errors.get(0).getField());
+	}
+	throw new RuntimeException(ex);
     }
 
     private static String decodeEntities(String query) {

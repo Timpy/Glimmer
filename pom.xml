@@ -22,8 +22,8 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>2.3.2</version>
 				<configuration>
-					<source>1.6</source>
-					<target>1.6</target>
+					<source>1.7</source>
+					<target>1.7</target>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -60,7 +60,6 @@
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-client</artifactId>
 			<version>${hadoop.version}</version>
-			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.semanticweb.yars</groupId>
@@ -68,9 +67,14 @@
 			<version>1.2.strictNulls-SNAPSHOT</version>
 		</dependency>
 		<dependency>
-			<groupId>it.unimi.di.big</groupId>
-			<artifactId>mg4j</artifactId>
-			<version>5.1</version>
+			<groupId>org.apache.ant</groupId>
+			<artifactId>ant</artifactId>
+			<version>1.9.2</version>
+		</dependency>
+		<dependency>
+			<groupId>it.unimi.di</groupId>
+			<artifactId>mg4j-big</artifactId>
+			<version>5.2.1</version>
 			<exclusions>
 				<exclusion>
 					<artifactId>jetty</artifactId>
@@ -81,8 +85,8 @@
 					<groupId>javax.servlet</groupId>
 				</exclusion>
 				<exclusion>
-					<artifactId>org.apache.hadoop</artifactId>
-					<groupId>hadoop-core</groupId>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-core</artifactId>
 				</exclusion>
 			</exclusions>
 		</dependency>
@@ -113,7 +117,12 @@
 		</dependency>
 		<dependency>
 			<groupId>net.sourceforge.owlapi</groupId>
-			<artifactId>owlapi</artifactId>
+			<artifactId>owlapi-api</artifactId>
+			<version>3.3</version>
+		</dependency>
+		<dependency>
+			<groupId>net.sourceforge.owlapi</groupId>
+			<artifactId>owlapi-apibinding</artifactId>
 			<version>3.3</version>
 		</dependency>
 		<dependency>
