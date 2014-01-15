@@ -38,33 +38,55 @@ public class QueryLogger {
      */
     private long rollingSum;
 
-    private ThreadLocal<Long> threadLocalStartTime = new ThreadLocal<Long>();
-
-    public void start() {
-	threadLocalStartTime.set(System.currentTimeMillis());
+    public class QueryTimer {
+	private final long startTime = System.currentTimeMillis();
+	private int searchDuration;
+	private int duration;
+	
+	public QueryTimer endSearch() {
+	    if (searchDuration == 0) {
+		searchDuration = (int) (System.currentTimeMillis() - startTime);
+	    }
+	    return this;
+	}
+	public QueryTimer end() {
+	    if (duration == 0) {
+		duration = (int) (System.currentTimeMillis() - startTime);
+	    }
+	    return this;
+	}
+	
+	public long getStartTime() {
+	    return startTime;
+	}
+	public int getSearchDuration() {
+	    return searchDuration;
+	}
+	public int getDuration() {
+	    return duration;
+	}
     }
 
-    public synchronized long endQuery(String query, int numResults) {
-	Long startTime = threadLocalStartTime.get();
-	if (startTime == null) {
-	    throw new IllegalStateException("start() wasn't called!!");
-	}
-	long duration = System.currentTimeMillis() - startTime;
+    public QueryTimer start() {
+	return new QueryTimer();
+    }
 
+    public int endQuery(QueryTimer timer, String query, int numResults) {
+	timer.endSearch().end();
+	
 	numQueries += 1;
-	sumTime += duration;
+	sumTime += timer.duration;
 	if (numQueries % ROLLING_WINDOW_SIZE == 0) {
-	    rollingSum = duration;
+	    rollingSum = timer.duration;
 	    rollingCount = 1;
 	} else {
-	    rollingSum += duration;
+	    rollingSum += timer.duration;
 	    rollingCount += 1;
 	}
 
-	LOGGER.info("#" + LOG_SEPARATOR + numQueries + LOG_SEPARATOR + query + LOG_SEPARATOR + duration + LOG_SEPARATOR
+	LOGGER.info("#" + LOG_SEPARATOR + numQueries + LOG_SEPARATOR + query + LOG_SEPARATOR + timer.searchDuration + LOG_SEPARATOR + timer.duration + LOG_SEPARATOR
 		+ ((double) sumTime / (double) numQueries) + LOG_SEPARATOR + rollingSum + LOG_SEPARATOR + rollingCount + LOG_SEPARATOR
 		+ ((double) rollingSum / (double) rollingCount) + LOG_SEPARATOR + numResults);
-	threadLocalStartTime.set(null);
-	return duration;
+	return timer.duration;
     }
 }

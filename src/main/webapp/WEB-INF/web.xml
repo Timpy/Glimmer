@@ -12,7 +12,7 @@
 		<servlet-name>glimmer</servlet-name>
 		<url-pattern>/ajax/*</url-pattern>
 	</servlet-mapping>
-	
+
 	<servlet-mapping>
 		<servlet-name>glimmer</servlet-name>
 		<url-pattern>/v1/search</url-pattern>
@@ -25,4 +25,14 @@
 	<session-config>
 		<session-timeout>60</session-timeout>
 	</session-config>
+
+	<error-page>
+		<error-code>404</error-code>
+		<location>/404.json</location>
+	</error-page>
+	
+	<error-page>
+		<error-code>500</error-code>
+		<location>/500.json</location>
+	</error-page>
 </web-app>

@@ -22,16 +22,18 @@ public class QueryResult {
     private final int pageStart;
     private final int pageSize;
     private final int time;
+    private final int searchTime;
     private final String query;
     private final String parsedQuery;
 
-    public QueryResult(String query, String parsedQuery, int numResults, int pageStart, int pageSize, List<QueryResultItem> resultItems, int time) {
+    public QueryResult(String query, String parsedQuery, int numResults, int pageStart, int pageSize, List<QueryResultItem> resultItems, int time, int searchTime) {
 	super();
 	this.resultItems = resultItems;
 	this.numResults = numResults;
 	this.pageStart = pageStart;
 	this.pageSize = pageSize;
 	this.time = time;
+	this.searchTime = searchTime;
 	this.query = query != null ? query : "";
 	this.parsedQuery = parsedQuery;
     }
@@ -54,6 +56,10 @@ public class QueryResult {
 
     public long getTime() {
 	return time;
+    }
+    
+    public long getSearchTime() {
+	return searchTime;
     }
 
     public String getQuery() {

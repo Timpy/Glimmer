@@ -22,8 +22,8 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>2.3.2</version>
 				<configuration>
-					<source>1.6</source>
-					<target>1.6</target>
+					<source>1.7</source>
+					<target>1.7</target>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -74,7 +74,7 @@
 		<dependency>
 			<groupId>it.unimi.di</groupId>
 			<artifactId>mg4j-big</artifactId>
-			<version>5.2</version>
+			<version>5.2.1</version>
 			<exclusions>
 				<exclusion>
 					<artifactId>jetty</artifactId>
@@ -85,8 +85,8 @@
 					<groupId>javax.servlet</groupId>
 				</exclusion>
 				<exclusion>
-					<artifactId>org.apache.hadoop</artifactId>
-					<groupId>hadoop-core</groupId>
+					<groupId>org.apache.hadoop</groupId>
+					<artifactId>hadoop-core</artifactId>
 				</exclusion>
 			</exclusions>
 		</dependency>

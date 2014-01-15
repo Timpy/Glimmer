@@ -34,6 +34,7 @@ import org.semanticweb.yars.nx.Node;
 import org.semanticweb.yars.nx.parser.NxParser;
 
 import com.yahoo.glimmer.query.QueryLogger;
+import com.yahoo.glimmer.query.QueryLogger.QueryTimer;
 import com.yahoo.glimmer.query.RDFIndex;
 import com.yahoo.glimmer.util.BySubjectRecord;
 import com.yahoo.glimmer.util.Util;
@@ -46,25 +47,13 @@ public class Querier {
     private final static Logger LOGGER = Logger.getLogger(Querier.class);
     private static final String DEFAULT_CONTEXT = "default:";
     private static final int CACHE_SIZE = 10000;
-    private static final int BIG_RESULTS_LIMIT = 100000;
 
-    private final Map<Integer, ResultsCacheValue> queryHashToResultsCache;
     private final Map<String, Long> objectsSubjectsIdCache;
     private final Map<Long, String> objectLabelCache;
 
     private QueryLogger queryLogger = new QueryLogger();
 
     public Querier() {
-	Map<Integer, ResultsCacheValue> resultsCache = new LinkedHashMap<Integer, ResultsCacheValue>(CACHE_SIZE + 1, 1.1f, true) {
-	    private static final long serialVersionUID = -8171861525079261380L;
-
-	    protected boolean removeEldestEntry(java.util.Map.Entry<Integer, ResultsCacheValue> eldest) {
-		return size() > CACHE_SIZE;
-	    };
-	};
-
-	queryHashToResultsCache = Collections.synchronizedMap(resultsCache);
-
 	LinkedHashMap<String, Long> idCache = new LinkedHashMap<String, Long>(CACHE_SIZE + 1, 1.1f, true) {
 	    private static final long serialVersionUID = -8171861525079261380L;
 
@@ -84,45 +73,21 @@ public class Querier {
 	objectLabelCache = Collections.synchronizedMap(labelCache);
     }
 
-    private static int getHashForQuery(String indexName, String query, int startItem, int maxNumItems) {
-	long l = indexName.hashCode();
-	l += query.hashCode();
-	l += startItem;
-	l += maxNumItems * 1299827l;
-	return (int) (l ^ (l >>> 32));
-    }
-
     public QueryResult doQuery(RDFIndex index, Query query, int startItem, int maxNumItems, boolean deref, Integer objectLengthLimit)
 	    throws QueryBuilderVisitorException, IOException {
 	if (startItem < 0 || maxNumItems < 0 || maxNumItems > 10000) {
 	    throw new IllegalArgumentException("Bad item range - start:" + startItem + " maxNumItems:" + maxNumItems);
 	}
 
-	queryLogger.start();
-
-	Integer queryHash = getHashForQuery(index.getIndexName(), query.toString(), startItem, maxNumItems);
+	QueryTimer timer = queryLogger.start();
 
 	ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results;
 	int numResults;
 
-	// TODO: Caching results here maybe pointless now that queries by type only aren't scored.  See RDFIndex.process();
-	if (queryHashToResultsCache.containsKey(queryHash)) {
-	    ResultsCacheValue cachedResults = queryHashToResultsCache.get(queryHash);
-	    results = cachedResults.results;
-	    numResults = cachedResults.numResults;
-	} else {
-	    results = new ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>>();
-	    numResults = index.process(startItem, maxNumItems, results, query);
+	results = new ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>>();
+	numResults = index.process(startItem, maxNumItems, results, query);
 
-	    if (numResults > BIG_RESULTS_LIMIT) {
-		// Queries that return lots of results are slow. Cache them.
-		queryHashToResultsCache.put(queryHash, new ResultsCacheValue(numResults, results));
-	    }
-
-	    if (results.size() > maxNumItems) {
-		results.size(maxNumItems);
-	    }
-	}
+	timer.endSearch();
 
 	ObjectArrayList<QueryResultItem> resultItems = new ObjectArrayList<QueryResultItem>();
 	if (!results.isEmpty()) {
@@ -139,15 +104,16 @@ public class Querier {
 	    }
 	}
 
-	long time = queryLogger.endQuery(query.toString(), numResults);
-	QueryResult result = new QueryResult(null, query != null ? query.toString() : "", numResults, startItem, maxNumItems, resultItems, (int) time);
+	queryLogger.endQuery(timer, query.toString(), numResults);
+	QueryResult result = new QueryResult(null, query != null ? query.toString() : "", numResults, startItem, maxNumItems, resultItems, timer.getDuration(), timer.getSearchDuration());
 	return result;
     }
 
     public QueryResult doQueryForDocId(RDFIndex index, long id, boolean deref, Integer objectLengthLimit) throws IOException {
-	queryLogger.start();
+	QueryTimer timer = queryLogger.start();
+	timer.endSearch();
 	QueryResultItem resultItem = createRdfResultItem(index, id, 1.0d, deref, objectLengthLimit);
-	long time = queryLogger.endQuery("getDoc " + Long.toString(id), 1);
+	queryLogger.endQuery(timer, "getDoc " + Long.toString(id), 1);
 
 	List<QueryResultItem> results;
 	if (resultItem != null) {
@@ -155,7 +121,7 @@ public class Querier {
 	} else {
 	    results = Collections.emptyList();
 	}
-	return new QueryResult("", null, results.size(), 0, 1, results, (int) time);
+	return new QueryResult("", null, results.size(), 0, 1, results, timer.getDuration(), timer.getSearchDuration());
     }
 
     private QueryResultItem createRdfResultItem(RDFIndex index, long docId, double score, boolean lookupObjectLabels, Integer objectLengthLimit)
@@ -171,7 +137,8 @@ public class Querier {
 	BySubjectRecord record = new BySubjectRecord();
 
 	if (!record.parse(new InputStreamReader(docInputStream))) {
-	    throw new RuntimeException("Couldn't parse doc with id:" + docId);
+	    return null;
+	    // throw new RuntimeException("Couldn't parse doc with id:" + docId);
 	}
 
 	if (docId != record.getId()) {
@@ -267,15 +234,5 @@ public class Querier {
 	docInputStream.close();
 
 	return item;
-    }
-
-    private static class ResultsCacheValue {
-	public final ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results;
-	public final int numResults;
-
-	public ResultsCacheValue(int numResults, ObjectArrayList<DocumentScoreInfo<Reference2ObjectMap<Index, SelectedInterval[]>>> results) {
-	    this.results = results;
-	    this.numResults = numResults;
-	}
     }
 }

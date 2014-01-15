@@ -17,6 +17,7 @@ import it.unimi.di.big.mg4j.index.TermProcessor;
 import it.unimi.di.big.mg4j.query.nodes.AbstractQueryBuilderVisitor;
 import it.unimi.di.big.mg4j.query.nodes.Align;
 import it.unimi.di.big.mg4j.query.nodes.And;
+import it.unimi.di.big.mg4j.query.nodes.Annotation;
 import it.unimi.di.big.mg4j.query.nodes.Consecutive;
 import it.unimi.di.big.mg4j.query.nodes.Difference;
 import it.unimi.di.big.mg4j.query.nodes.False;
@@ -343,6 +344,11 @@ public class RDFQueryParser implements QueryParser {
 	@Override
 	public MyVisitor copy() {
 	    return new MyVisitor();
+	}
+
+	@Override
+	public Query visitPost(Annotation node, Query subNode) throws QueryBuilderVisitorException {
+	    return new Annotation( subNode );
 	}
     }
 }
