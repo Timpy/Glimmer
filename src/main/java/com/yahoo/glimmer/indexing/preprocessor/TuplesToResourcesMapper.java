@@ -13,6 +13,8 @@ package com.yahoo.glimmer.indexing.preprocessor;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -52,7 +54,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
     public static final String EXTRA_RESOURCES = "extraResources";
 
     enum Counters {
-	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE, UNEXPECTED_SUBJECT_TYPE, UNEXPECTED_PREDICATE_TYPE, UNEXPECTED_CONTEXT_TYPE
+	NX_PARSER_EXCEPTION, NX_PARSER_RETRY_EXCEPTION, LONG_TUPLE, LONG_TUPLES, SHORT_TUPLE, LONG_TUPLE_ELEMENT, INVALID_RESOURCE, UNEXPECTED_SUBJECT_TYPE, UNEXPECTED_PREDICATE_TYPE, UNEXPECTED_CONTEXT_TYPE, WRITTEN_RESOURCES_CACHE_HIT
     }
 
     public static enum TupleElementName {
@@ -64,6 +66,24 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
     private Tuple tuple = new Tuple();
     private TupleFilter filter;
     private String[] extraResources;
+
+    private static final int SIZE = 32 * 1024 * 1024;
+    private final Map<Long, Void> writtenResourcesCache = new LruCache<Long, Void>(SIZE);
+
+    private static class LruCache<K, V> extends LinkedHashMap<K, V> {
+	private static final long serialVersionUID = 1216024597604245741L;
+	
+	private final int initialCapacity;
+	public LruCache(int size) {
+	    super(size, 1.1f, true);
+	    initialCapacity = size;
+	}
+
+	protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+	    // This is called AFTER put or putAll inserts and entry. So always insure there is at least 1 free.
+	    return size() >= initialCapacity;
+	};
+    };
 
     private InputSplit lastInputSplit;
 
@@ -83,7 +103,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	} else {
 	    LOG.info("No TupleFilter given. Processing all tuples.");
 	}
-	
+
 	extraResources = conf.getStrings(EXTRA_RESOURCES);
     };
 
@@ -95,7 +115,7 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
     protected void map(LongWritable key, Text valueText, Mapper<LongWritable, Text, Text, Object>.Context context) throws java.io.IOException,
 	    InterruptedException {
 
-	if (extraResources != null) {
+	if (extraResources != null && context.getTaskAttemptID().getTaskID().getId() == 0) {
 	    // Add extra resources.
 	    // These end up in the 'all' resources file so get given a Doc ID
 	    // even if they don't occur in the data.
@@ -201,18 +221,37 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	    context.getCounter(Counters.UNEXPECTED_PREDICATE_TYPE).increment(1l);
 	    return;
 	}
-	context.write(new Text(tuple.predicate.text), new Text(TupleElementName.PREDICATE.name()));
+	
+	Long longHash = longHash(tuple.predicate.text, TupleElementName.PREDICATE);
+	if (writtenResourcesCache.containsKey(longHash)) {
+	    context.getCounter(Counters.WRITTEN_RESOURCES_CACHE_HIT).increment(1);
+	} else {
+	    context.write(new Text(tuple.predicate.text), new Text(TupleElementName.PREDICATE.name()));
+	    writtenResourcesCache.put(longHash, null);
+	}
 	predicateObjectContextDot.append(tuple.predicate.n3);
 
 	if (tuple.object.isOfType(TupleElement.Type.RESOURCE, TupleElement.Type.BNODE)) {
-	    context.write(new Text(tuple.object.text), new Text(TupleElementName.OBJECT.name()));
+	    longHash = longHash(tuple.object.text, TupleElementName.OBJECT);
+	    if (writtenResourcesCache.containsKey(longHash)) {
+		context.getCounter(Counters.WRITTEN_RESOURCES_CACHE_HIT).increment(1);
+	    } else {
+		context.write(new Text(tuple.object.text), new Text(TupleElementName.OBJECT.name()));
+		writtenResourcesCache.put(longHash, null);
+	    }
 	}
 	predicateObjectContextDot.append(' ');
 	predicateObjectContextDot.append(tuple.object.n3);
 
 	if (includeContexts && tuple.context.text != null) {
 	    if (tuple.context.isOfType(TupleElement.Type.RESOURCE)) {
-		context.write(new Text(tuple.context.text), new Text(TupleElementName.CONTEXT.name()));
+		longHash = longHash(tuple.context.text, TupleElementName.CONTEXT);
+		if (writtenResourcesCache.containsKey(longHash)) {
+		    context.getCounter(Counters.WRITTEN_RESOURCES_CACHE_HIT).increment(1);
+		} else {
+		    context.write(new Text(tuple.context.text), new Text(TupleElementName.CONTEXT.name()));
+		    writtenResourcesCache.put(longHash, null);
+		}
 		predicateObjectContextDot.append(' ');
 		predicateObjectContextDot.append(tuple.context.n3);
 	    } else {
@@ -228,5 +267,18 @@ public class TuplesToResourcesMapper extends Mapper<LongWritable, Text, Text, Ob
 	    // Write subject with predicate, object, context as value
 	    context.write(subject, new Text(predicateObjectContextDot.toString()));
 	}
+    }
+
+    private static long longHash(String string, TupleElementName tupleElementName) {
+	long h = 1125899906842597L; // prime
+	int len = string.length();
+
+	for (int i = 0; i < len; i++) {
+	    h = 31 * h + string.charAt(i);
+	}
+
+	h += tupleElementName.hashCode();
+	
+	return h;
     }
 }
