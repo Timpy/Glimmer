@@ -24,7 +24,7 @@ import com.yahoo.glimmer.util.BySubjectRecord;
 /**
  * Reducer
  * 
- * For the given Subject resource key concatanates all <predicate> <object>
+ * For the given Subject resource key concatenates all <predicate> <object>
  * <context> . for that key It also appends PREDICATE, OBJECT and/or CONTEXT
  * keywords if that keyword occurs once or more as a value.
  * 
