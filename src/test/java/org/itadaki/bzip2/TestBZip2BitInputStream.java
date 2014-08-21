@@ -13,233 +13,235 @@ import org.junit.Test;
  */
 public class TestBZip2BitInputStream {
 
-	// Boolean
+    // Boolean
 
-	/**
-	 * Test reading 8 zeroes
-	 * @throws IOException 
-	 */
-	@Test
-	public void testBooleanFalse8() throws IOException {
+    /**
+     * Test reading 8 zeroes
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testBooleanFalse8() throws IOException {
 
-		byte[] testData = { 0 };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
+	byte[] testData = { 0 };
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
-		for (int i = 0; i < 8; i++) {
-			assertFalse (inputStream.readBoolean());
+	for (int i = 0; i < 8; i++) {
+	    assertFalse(inputStream.readBoolean());
+	}
+
+    }
+
+    /**
+     * Test reading 8 ones
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testBooleanTrue8() throws IOException {
+
+	byte[] testData = { (byte) 0xff };
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
+
+	for (int i = 0; i < 8; i++) {
+	    assertTrue(inputStream.readBoolean());
+	}
+
+    }
+
+    /**
+     * Test reading a single 1 in any position as a boolean
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testBooleanSingleOne() throws IOException {
+
+	for (int i = 0; i < 8; i++) {
+
+	    byte[] testData = { (byte) (1 << (7 - i)) };
+	    BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
+
+	    for (int j = 0; j < 8; j++) {
+		if (j == i) {
+		    assertTrue(inputStream.readBoolean());
+		} else {
+		    assertFalse(inputStream.readBoolean());
 		}
+	    }
 
 	}
 
+    }
 
-	/**
-	 * Test reading 8 ones
-	 * @throws IOException 
-	 */
-	@Test
-	public void testBooleanTrue8() throws IOException {
+    /**
+     * Test reaching the end of the stream reading a boolean
+     * 
+     * @throws IOException
+     */
+    @Test(expected = IOException.class)
+    public void testBooleanEndOfStream() throws IOException {
 
-		byte[] testData = { (byte)0xff };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
+	byte[] testData = {};
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
-		for (int i = 0; i < 8; i++) {
-			assertTrue (inputStream.readBoolean());
-		}
+	inputStream.readBoolean();
 
-	}
+    }
 
+    // Unary
 
-	/**
-	 * Test reading a single 1 in any position as a boolean
-	 * @throws IOException 
-	 */
-	@Test
-	public void testBooleanSingleOne() throws IOException {
+    /**
+     * Test reading unary 0
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testUnaryZero() throws IOException {
 
-		for (int i = 0; i < 8; i++) {
+	byte[] testData = { 0x00 };
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
-			byte[] testData = { (byte)(1 << (7 - i)) };
-			BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
-	
-			for (int j = 0; j < 8; j++) {
-				if (j == i) {
-					assertTrue (inputStream.readBoolean());
-				} else {
-					assertFalse (inputStream.readBoolean());
-				}
-			}
+	assertEquals(0, inputStream.readUnary());
 
-		}
+    }
 
-	}
+    /**
+     * Test reading unary 0
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testUnaryOne() throws IOException {
 
+	byte[] testData = { (byte) (1 << 7) };
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
-	/**
-	 * Test reaching the end of the stream reading a boolean
-	 * @throws IOException 
-	 */
-	@Test(expected=IOException.class)
-	public void testBooleanEndOfStream() throws IOException {
+	assertEquals(1, inputStream.readUnary());
 
-		byte[] testData = { };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
+    }
 
-		inputStream.readBoolean();
+    /**
+     * Test reading unary 0
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testUnary31() throws IOException {
 
-	}
+	byte[] testData = { (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xfe };
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
+	assertEquals(31, inputStream.readUnary());
 
-	// Unary
+    }
 
-	/**
-	 * Test reading unary 0
-	 * @throws IOException 
-	 */
-	@Test
-	public void testUnaryZero() throws IOException {
+    /**
+     * Test reaching the end of the stream reading a unary number
+     * 
+     * @throws IOException
+     */
+    @Test(expected = IOException.class)
+    public void testUnaryEndOfStream() throws IOException {
 
-		byte[] testData = { 0x00 };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
+	byte[] testData = {};
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
-		assertEquals (0, inputStream.readUnary());
+	inputStream.readUnary();
 
-	}
+    }
 
-	/**
-	 * Test reading unary 0
-	 * @throws IOException 
-	 */
-	@Test
-	public void testUnaryOne() throws IOException {
+    // Bits
+    /**
+     * Test reading a single 0 as bits
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testBits1_0() throws IOException {
 
-		byte[] testData = { (byte)(1 << 7) };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
+	byte[] testData = { (byte) 0x00 };
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
-		assertEquals (1, inputStream.readUnary());
+	assertEquals(0, inputStream.readBits(1));
 
-	}
+    }
 
+    /**
+     * Test reading a single 1 as bits
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testBits1_1() throws IOException {
 
-	/**
-	 * Test reading unary 0
-	 * @throws IOException 
-	 */
-	@Test
-	public void testUnary31() throws IOException {
+	byte[] testData = { (byte) (1 << 7) };
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
-		byte[] testData = { (byte)0xff, (byte)0xff, (byte)0xff, (byte)0xfe };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
+	assertEquals(1, inputStream.readBits(1));
 
-		assertEquals (31, inputStream.readUnary());
+    }
 
-	}
+    /**
+     * Test reading 23 bits
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testBits23() throws IOException {
 
+	byte[] testData = { 0x02, 0x03, 0x04 };
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
-	/**
-	 * Test reaching the end of the stream reading a unary number
-	 * @throws IOException 
-	 */
-	@Test(expected=IOException.class)
-	public void testUnaryEndOfStream() throws IOException {
+	assertEquals(0x020304 >> 1, inputStream.readBits(23));
 
-		byte[] testData = { };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
+    }
 
-		inputStream.readUnary();
+    /**
+     * Test reaching the end of the stream reading bits
+     * 
+     * @throws IOException
+     */
+    @Test(expected = IOException.class)
+    public void testBitsEndOfStream() throws IOException {
 
-	}
+	byte[] testData = {};
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
+	inputStream.readBits(1);
 
-	// Bits
-	/**
-	 * Test reading a single 0 as bits
-	 * @throws IOException 
-	 */
-	@Test
-	public void testBits1_0() throws IOException {
+    }
 
-		byte[] testData = { (byte)0x00 };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
+    // Integer
 
-		assertEquals (0, inputStream.readBits(1));
+    /**
+     * Test reading an integer
+     * 
+     * @throws IOException
+     */
+    @Test
+    public void testInteger() throws IOException {
 
-	}
+	byte[] testData = { 0x12, 0x34, 0x56, 0x78 };
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
-	/**
-	 * Test reading a single 1 as bits
-	 * @throws IOException 
-	 */
-	@Test
-	public void testBits1_1() throws IOException {
+	assertEquals(0x12345678, inputStream.readInteger());
 
-		byte[] testData = { (byte)(1 << 7) };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
+    }
 
-		assertEquals (1, inputStream.readBits(1));
+    /**
+     * Test reaching the end of the stream reading an integer
+     * 
+     * @throws IOException
+     */
+    @Test(expected = IOException.class)
+    public void testIntegerEndOfStream() throws IOException {
 
-	}
+	byte[] testData = {};
+	BZip2BitInputStream inputStream = new BZip2BitInputStream(new ByteArrayInputStream(testData));
 
+	inputStream.readInteger();
 
-	/**
-	 * Test reading 23 bits
-	 * @throws IOException 
-	 */
-	@Test
-	public void testBits23() throws IOException {
-
-		byte[] testData = { 0x02, 0x03, 0x04 };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
-
-		assertEquals (0x020304 >> 1, inputStream.readBits(23));
-
-	}
-
-
-	/**
-	 * Test reaching the end of the stream reading bits
-	 * @throws IOException 
-	 */
-	@Test(expected=IOException.class)
-	public void testBitsEndOfStream() throws IOException {
-
-		byte[] testData = { };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
-
-		inputStream.readBits(1);
-
-	}
-
-
-	// Integer
-
-	/**
-	 * Test reading an integer
-	 * @throws IOException 
-	 */
-	@Test
-	public void testInteger() throws IOException {
-
-		byte[] testData = { 0x12, 0x34, 0x56, 0x78 };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
-
-		assertEquals (0x12345678, inputStream.readInteger());
-
-	}
-
-
-	/**
-	 * Test reaching the end of the stream reading an integer
-	 * @throws IOException 
-	 */
-	@Test(expected=IOException.class)
-	public void testIntegerEndOfStream() throws IOException {
-
-		byte[] testData = { };
-		BZip2BitInputStream inputStream = new BZip2BitInputStream (new ByteArrayInputStream (testData));
-
-		inputStream.readInteger();
-
-	}
-
+    }
 
 }

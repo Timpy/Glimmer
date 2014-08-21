@@ -338,7 +338,6 @@ public class TestBZip2OutputStream {
 	    output.close();
 	}
 
-
 	fail();
     }
 
@@ -365,7 +364,6 @@ public class TestBZip2OutputStream {
 	} finally {
 	    output.close();
 	}
-
 
 	fail();
     }
@@ -858,7 +856,6 @@ public class TestBZip2OutputStream {
 	    input.close();
 	}
 
-
 	fail();
     }
 
@@ -894,7 +891,6 @@ public class TestBZip2OutputStream {
 	} finally {
 	    input.close();
 	}
-
 
 	fail();
     }
@@ -933,7 +929,6 @@ public class TestBZip2OutputStream {
 	    input.close();
 	}
 
-
 	fail();
     }
 
@@ -970,7 +965,6 @@ public class TestBZip2OutputStream {
 	} finally {
 	    input.close();
 	}
-
 
 	fail();
     }
@@ -1009,7 +1003,6 @@ public class TestBZip2OutputStream {
 	    input.close();
 	}
 
-
 	fail();
     }
 
@@ -1047,7 +1040,6 @@ public class TestBZip2OutputStream {
 	    input.close();
 	}
 
-
 	fail();
     }
 
@@ -1084,7 +1076,6 @@ public class TestBZip2OutputStream {
 	} finally {
 	    input.close();
 	}
-
 
 	fail();
     }
