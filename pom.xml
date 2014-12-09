@@ -46,10 +46,6 @@
 
 	<repositories>
 		<repository>
-			<id>aduna-software</id>
-			<url>http://repo.aduna-software.org/maven2/releases</url>
-		</repository>
-		<repository>
 			<id>nxparser-repo</id>
 			<url>http://nxparser.googlecode.com/svn/snapshots</url>
 		</repository>
@@ -189,8 +185,7 @@
 		<dependency>
 			<groupId>com.google.guava</groupId>
 			<artifactId>guava</artifactId>
-			<version>14.0-rc3</version>
-			<scope>runtime</scope>
+			<version>16.0.1</version>
 		</dependency>
 	</dependencies>
 </project>
